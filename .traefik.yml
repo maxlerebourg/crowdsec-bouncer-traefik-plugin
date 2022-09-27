@@ -1,0 +1,12 @@
+displayName: Crowdsec Bouncer Traefik Plugin
+type: middleware
+iconPath: .assets/icon.png
+
+import: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+
+summary: 'Add Request Header'
+
+testData:
+  Headers:
+    X-Demo: test
+    X-URL: '{{URL}}'
