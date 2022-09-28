@@ -7,8 +7,7 @@ import: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 summary: 'Crowdsec Bouncer Traefik Plugin'
 
 testData:
-  crowdsec:
-    bouncer:
-      enabled: true
-      crowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
+  bouncer:
+    enabled: true
+    crowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
 
