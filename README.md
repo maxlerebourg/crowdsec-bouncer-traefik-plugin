@@ -79,3 +79,9 @@ The source code of the plugin should be organized as follows:
 
 [maxlerebourg](https://github.com/maxlerebourg) and [I](https://github.com/mhanotaux) have been using traefik since 2020.
 We come from developper and security engineer background and wanted to add the power of a very promesing technologie (Crowdsec) into the edge router we love.
+
+We initially run into this project: https://github.com/fbonalair/traefik-crowdsec-bouncer
+It was using traefik and forward auth middleware to verify every requests.
+They had to go through a webserver which then contacts of another webservice (the crowdsec LAPI) to make a decision based on the source IP.
+We initially proposed some improvement by implementing a streaming mode and a local cache
+With the Traefik hackathon we deciced to implement our solution directly as a traefik plugin which could be found by every one on plugins.traefik.io and be more performant.
