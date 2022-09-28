@@ -10,5 +10,5 @@ testData:
   crowdsec:
     bouncer:
       enabled: true
-      CrowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
+      crowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
 
