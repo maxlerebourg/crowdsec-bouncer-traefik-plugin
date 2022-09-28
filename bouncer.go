@@ -21,8 +21,8 @@ const (
 	realIpHeader                = "X-Real-Ip"
 	forwardHeader               = "X-Forwarded-For"
 	crowdsecAuthHeader          = "X-Api-Key"
-	crowdsecRoute        = "v1/decisions"
-	crowdsecStreamRoute  = "v1/decisions/stream"
+	crowdsecRoute               = "v1/decisions"
+	crowdsecStreamRoute         = "v1/decisions/stream"
 	cacheBannedValue            = "t"
 	cacheNoBannedValue          = "f"
 )
@@ -149,7 +149,11 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if a.crowdsecMode == "stream" {
-		a.next.ServeHTTP(rw, req)
+		if a.crowdsecStreamHealthy {
+			a.next.ServeHTTP(rw, req)
+		} else {
+			rw.WriteHeader(http.StatusForbidden)
+		}
 		return
 	}
 
