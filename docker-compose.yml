@@ -29,11 +29,9 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.whoami.rule=Host(`localhost`)"
       - "traefik.http.routers.whoami.entrypoints=web"
-      - "traefik.http.routers.whoami.middlewares=testo@docker"
-      - "traefik.http.middlewares.testo.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.testo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      # - "traefik.http.routers.whoami.middlewares=blacklist@docker"
-      # - "traefik.http.middlewares.blacklist.ipblacklist.sourcerange=127.0.0.1/32, 192.168.1.7"
+      - "traefik.http.routers.whoami.middlewares=crowdsec@docker"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.1
