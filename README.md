@@ -75,6 +75,13 @@ The source code of the plugin should be organized as follows:
                     ├── readme.md
                     └── vendor/* 
 ```
+
+For local developpement a docker-compose-local.yml is provided and reproduce the directory layout needed by traefik.
+
+```bash
+docker-compose -f docker-compose-local.yml up -d
+```
+
 ### About
 
 [maxlerebourg](https://github.com/maxlerebourg) and [I](https://github.com/mhanotaux) have been using traefik since 2020.
