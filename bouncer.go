@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"text/template"
 	"time"
 
@@ -22,13 +21,13 @@ const (
 	realIpHeader                = "X-Real-Ip"
 	forwardHeader               = "X-Forwarded-For"
 	crowdsecAuthHeader          = "X-Api-Key"
-	crowdsecBouncerRoute        = "v1/decisions"
-	crowdsecBouncerStreamRoute  = "v1/decisions/stream"
+	crowdsecRoute        = "v1/decisions"
+	crowdsecStreamRoute  = "v1/decisions/stream"
 	cacheBannedValue            = "t"
 	cacheNoBannedValue          = "f"
 )
 
-var ipRegex = regexp.MustCompile(`\b\d+\.\d+\.\d+\.\d+\b`)
+// var ipRegex = regexp.MustCompile(`\b\d+\.\d+\.\d+\.\d+\b`)
 var cache = ttl_map.New()
 
 type Config struct {
@@ -44,7 +43,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                false,
-		CrowdsecMode:           "live",
+		CrowdsecMode:           "stream",
 		CrowdsecLapiScheme:     "http",
 		CrowdsecLapiHost:       "crowdsec:8080",
 		CrowdsecLapiKey:        "",
@@ -59,6 +58,7 @@ type Bouncer struct {
 	template *template.Template
 
 	enabled                bool
+	crowdsecStreamHealthy  bool
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
@@ -90,19 +90,20 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	testUrl := url.URL{
 		Scheme:   config.CrowdsecLapiScheme,
 		Host:     config.CrowdsecLapiHost,
-		Path:     crowdsecBouncerRoute,
+		Path:     crowdsecRoute,
 	}
 	_, err := http.NewRequest(http.MethodGet, testUrl.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost) 
 	}
 
-	return &Bouncer{
+	bouncer := &Bouncer{
 		next:     next,
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
 		enabled: config.Enabled,
+		crowdsecStreamHealthy: false,
 		crowdsecMode: config.CrowdsecMode,
 		crowdsecScheme: config.CrowdsecLapiScheme,
 		crowdsecHost: config.CrowdsecLapiHost,
@@ -116,7 +117,9 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			},
 			Timeout: 5 * time.Second,
 		},
-	}, nil
+	}
+	go handleStreamCache(bouncer, "true")
+	return bouncer, nil
 }
 
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -154,7 +157,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		noneUrl := url.URL{
 			Scheme:   a.crowdsecScheme,
 			Host:     a.crowdsecHost,
-			Path:     crowdsecBouncerRoute,
+			Path:     crowdsecRoute,
 			RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
 		}
 		req, _ := http.NewRequest(http.MethodGet, noneUrl.String(), nil)
@@ -258,4 +261,45 @@ func setDecision(clientIP string, isBanned bool, duration int64) {
 	} else {
 		cache.Set(clientIP, cacheNoBannedValue, duration)
 	}
+}
+
+func handleStreamCache(a *Bouncer, initialized string) {
+	time.AfterFunc(time.Duration(a.updateInterval) * time.Second, func () {
+		handleStreamCache(a, "false")
+	})
+	streamUrl := url.URL{
+		Scheme:   a.crowdsecScheme,
+		Host:     a.crowdsecHost,
+		Path:     crowdsecStreamRoute,
+		RawQuery: fmt.Sprintf("startup=%s", initialized),
+	}
+	req, _ := http.NewRequest(http.MethodGet, streamUrl.String(), nil)
+	req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
+	res, err := a.client.Do(req)
+	if err != nil || res.StatusCode == http.StatusForbidden {
+		a.crowdsecStreamHealthy = false
+		return
+	}
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		a.crowdsecStreamHealthy = false
+		return
+	}
+	var stream Stream
+	err = json.Unmarshal(body, &stream)
+	if err != nil {
+		a.crowdsecStreamHealthy = false
+		return
+	}
+	for _, decision := range stream.New {
+		duration, err := time.ParseDuration(decision.Duration)
+		if err == nil {
+			setDecision(decision.Value, true, int64(duration.Seconds()))
+		}
+	}
+	for _, decision := range stream.Deleted {
+		cache.Del(decision.Value)
+	}
+	a.crowdsecStreamHealthy = true
 }
