@@ -1,4 +1,3 @@
-// Package plugindemo a demo plugin.
 package crowdsec_bouncer_traefik_plugin
 
 import (
@@ -27,7 +26,6 @@ const (
 	cacheNoBannedValue          = "f"
 )
 
-// var ipRegex = regexp.MustCompile(`\b\d+\.\d+\.\d+\.\d+\b`)
 var cache = ttl_map.New()
 
 type Config struct {
