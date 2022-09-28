@@ -4,6 +4,7 @@ package crowdsec_bouncer_traefik_plugin
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,6 +14,8 @@ import (
 	"regexp"
 	"text/template"
 	"time"
+
+	ttl_map "github.com/leprosus/golang-ttl-map"
 )
 
 const (
@@ -21,75 +24,60 @@ const (
 	crowdsecAuthHeader          = "X-Api-Key"
 	crowdsecBouncerRoute        = "v1/decisions"
 	crowdsecBouncerStreamRoute  = "v1/decisions/stream"
+	cacheBannedValue            = "t"
+	cacheNoBannedValue          = "f"
 )
 
 var ipRegex = regexp.MustCompile(`\b\d+\.\d+\.\d+\.\d+\b`)
-
-// Config the plugin configuration.
-// type Config struct {
-// 	Headers map[string]string `json:"headers,omitempty"`
-// }
-// // CreateConfig creates the default plugin configuration.
-// func CreateConfig() *Config {
-// 	return &Config{
-// 		Headers: make(map[string]string),
-// 	}
-// }
+var cache = ttl_map.New()
 
 type Config struct {
-	Enabled               bool   `json:"enabled,omitempty"`
-	CrowdsecMode          string `json:"crowdsecMode,omitempty"`
-	CrowdsecLapiScheme       string `json:"crowdsecLapiScheme,omitempty"`
+	Enabled                bool   `json:"enabled,omitempty"`
+	CrowdsecMode           string `json:"crowdsecMode,omitempty"`
+	CrowdsecLapiScheme     string `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost       string `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiKey       string `json:"crowdsecLapiKey,omitempty"`
-	UpdateIntervalSeconds int    `json:"updateIntervalSeconds,omitempty"`
+	CrowdsecLapiKey        string `json:"crowdsecLapiKey,omitempty"`
+	UpdateIntervalSeconds  int64  `json:"updateIntervalSeconds,omitempty"`
+	DefaultDecisionSeconds int64  `json:"defaultDecisionSeconds,omitempty"`
 }
 
 func CreateConfig() *Config {
 	return &Config{
-		Enabled:               false,
-		CrowdsecMode:          "none",
-		CrowdsecLapiScheme:    "http",
-		CrowdsecLapiHost:      "crowdsec:8080",
-		CrowdsecLapiKey:       "",
-		UpdateIntervalSeconds: 300,
+		Enabled:                false,
+		CrowdsecMode:           "live",
+		CrowdsecLapiScheme:     "http",
+		CrowdsecLapiHost:       "crowdsec:8080",
+		CrowdsecLapiKey:        "",
+		UpdateIntervalSeconds:  10,
+		DefaultDecisionSeconds: 10,
 	}
 }
 
-// Demo a Demo plugin.
 type Bouncer struct {
 	next     http.Handler
 	name     string
 	template *template.Template
 
-	enabled               bool
-	crowdsecScheme        string
-	crowdsecHost          string
-	crowdsecMode          string
-	crowdsecKey           string
-	updateInterval        time.Duration
-	client                *http.Client
-}
-
-func contains(source []string, target string) bool {
-	for _, a := range source {
-		if a == target {
-			return true
-		}
-	}
-	return false
+	enabled                bool
+	crowdsecScheme         string
+	crowdsecHost           string
+	crowdsecKey            string
+	crowdsecMode           string
+	updateInterval         int64
+	defaultDecisionTimeout int64
+	client                 *http.Client
 }
 
 // New created a new Demo plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	required := map[string]string{
-		config.CrowdsecLapiScheme: "CrowdsecLapiScheme",
-		config.CrowdsecLapiHost: "CrowdsecLapiHost",
-		config.CrowdsecLapiKey: "CrowdsecLapiKey",
-		config.CrowdsecMode: "CrowdsecMode",
+		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
+	  "CrowdsecLapiHost": config.CrowdsecLapiHost,
+		"CrowdsecLapiKey": config.CrowdsecLapiKey,
+		"CrowdsecMode": config.CrowdsecMode,
 	}
-	for key, val := range required {
-		if len(val) != 0 {
+	for val, key := range required {
+		if len(val) == 0 {
 			return nil, fmt.Errorf("%v cannot be empty", key)
 		}
 	}
@@ -114,11 +102,13 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
+		enabled: config.Enabled,
 		crowdsecMode: config.CrowdsecMode,
 		crowdsecScheme: config.CrowdsecLapiScheme,
 		crowdsecHost: config.CrowdsecLapiHost,
 		crowdsecKey: config.CrowdsecLapiKey,
-		updateInterval: time.Duration(config.UpdateIntervalSeconds) * time.Second,
+		updateInterval: config.UpdateIntervalSeconds,
+		defaultDecisionTimeout: config.DefaultDecisionSeconds,
 		client: &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConns:    10,
@@ -131,6 +121,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !a.enabled {
+		log.Printf("not enabled")
 		a.next.ServeHTTP(rw, req)
 		return
 	}
@@ -142,19 +133,39 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if a.crowdsecMode == "none" {
+	if a.crowdsecMode == "stream" || a.crowdsecMode == "live" {
+		isBanned, err := getDecision(remoteHost)
+		if err == nil {
+			if isBanned {
+				rw.WriteHeader(http.StatusForbidden)
+			} else {
+				a.next.ServeHTTP(rw, req)
+			}
+			return
+		}
+	}
+
+	if a.crowdsecMode == "stream" {
+		a.next.ServeHTTP(rw, req)
+		return
+	}
+
+	if a.crowdsecMode == "none" || a.crowdsecMode == "live" {
 		noneUrl := url.URL{
 			Scheme:   a.crowdsecScheme,
 			Host:     a.crowdsecHost,
 			Path:     crowdsecBouncerRoute,
 			RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
 		}
-		res, err := a.client.Get(noneUrl.String())
+		req, _ := http.NewRequest(http.MethodGet, noneUrl.String(), nil)
+		req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
+		res, err := a.client.Do(req)
 		if err != nil {
 			log.Printf("failed to get decision: %s", err)
 			rw.WriteHeader(http.StatusForbidden)
 			return
 		}
+		defer res.Body.Close()
 		if res.StatusCode != 200 {
 			log.Printf("failed to get decision, status code: %d", res.StatusCode)
 			rw.WriteHeader(http.StatusForbidden)
@@ -162,17 +173,89 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			log.Printf("failed to read body from crowdsec: %s", err)
+			log.Printf("failed to read body: %s", err)
 			rw.WriteHeader(http.StatusForbidden)
 			return
 		}
 		if !bytes.Equal(body, []byte("null")) {
+			var decisions []Decision
+			err = json.Unmarshal(body, &decisions)
+			if err != nil {
+				log.Printf("failed to parse body: %s", err)
+				rw.WriteHeader(http.StatusForbidden)
+				return
+			}
+			if len(decisions) == 0 {
+				if a.crowdsecMode == "live" {
+					setDecision(remoteHost, false, a.defaultDecisionTimeout)
+				}
+				a.next.ServeHTTP(rw, req)
+				return
+			}
+			duration, err := time.ParseDuration(decisions[0].Duration)
+			if err != nil {
+				log.Printf("failed to parse duration: %s", err)
+				rw.WriteHeader(http.StatusForbidden)
+				return
+			}
 			log.Printf("ip banned: %v", remoteHost)
 			rw.WriteHeader(http.StatusForbidden)
+			setDecision(remoteHost, true, int64(duration.Seconds()))
 			return
 		}
+		if a.crowdsecMode == "live" {
+			setDecision(remoteHost, false, a.defaultDecisionTimeout)
+		}
 		a.next.ServeHTTP(rw, req)
+		return
 	}
 
 	a.next.ServeHTTP(rw, req)
+}
+
+// CUSTOM CODE
+
+type Decision struct {
+	Id        int    `json:"id"`
+	Origin    string `json:"origin"`
+	Type      string `json:"type"`
+	Scope     string `json:"scope"`
+	Value     string `json:"value"`
+	Duration  string `json:"duration"`
+	Scenario  string `json:"scenario"`
+	Simulated bool   `json:"simulated"`
+}
+
+type Stream struct {
+	Deleted []Decision 	`json:"deleted"`
+	New     []Decision 	`json:"new"`
+}
+
+func contains(source []string, target string) bool {
+	for _, a := range source {
+		if a == target {
+			return true
+		}
+	}
+	return false
+}
+
+func getDecision(clientIP string) (bool, error) {
+	isBanned, ok := cache.Get(clientIP)
+	if ok && len(isBanned.(string)) > 0 {
+		if isBanned == cacheNoBannedValue {
+			return false, nil
+		} else {
+			return true, nil
+		}
+	}
+	return false, fmt.Errorf("no data")
+}
+
+func setDecision(clientIP string, isBanned bool, duration int64) {
+	if isBanned {
+		cache.Set(clientIP, cacheBannedValue, duration)
+	} else {
+		cache.Set(clientIP, cacheNoBannedValue, duration)
+	}
 }

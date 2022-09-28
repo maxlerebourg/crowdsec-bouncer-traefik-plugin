@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  traefik:
+    image: "traefik:v2.8.5"
+    container_name: "traefik"
+    command:
+      # - "--log.level=DEBUG"
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/traefik.log"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+
+      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "logs:/var/log/traefik"
+      - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - ./golang-ttl-map:/plugins-local/src/github.com/leprosus/golang-ttl-map
+    ports:
+      - 8000:80
+      - 8080:8080
+
+  whoami:
+    image: traefik/whoami
+    container_name: "simple-service"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`localhost`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami.middlewares=testo@docker"
+      - "traefik.http.middlewares.testo.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.testo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      # - "traefik.http.routers.whoami.middlewares=blacklist@docker"
+      # - "traefik.http.middlewares.blacklist.ipblacklist.sourcerange=127.0.0.1/32, 192.168.1.7"
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.4.1
+    container_name: "crowdsec"
+    command: rm -rf /etc/crowdsec/acquis.yaml
+    environment:
+      COLLECTIONS: crowdsecurity/traefik
+      CUSTOM_HOSTNAME: crowdsec
+      BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
+    depends_on:
+      - 'traefik'
+    volumes:
+      - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - logs:/var/log/traefik
+      - crowdsec-db:/var/lib/crowdsec/data/
+      - crowdsec-config:/etc/crowdsec/
+    ports:
+      - "8083:8080"
+
+volumes:
+  logs:
+  crowdsec-db:
+  crowdsec-config:
