@@ -16,6 +16,7 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "logs:/var/log/traefik"
+      - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 8000:80
       - 8080:8080
