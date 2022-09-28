@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+	crowdsec_bouncer_traefik_plugin "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
 )
 
-func TestDemo(t *testing.T) {
+func TestCrowdSec(t *testing.T) {
 	cfg := crowdsec_bouncer_traefik_plugin.CreateConfig()
 	cfg.CrowdsecLapiKey = "caca"
 

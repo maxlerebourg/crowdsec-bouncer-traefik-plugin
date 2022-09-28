@@ -17,13 +17,11 @@ import (
 )
 
 const (
-	realIpHeader                = "X-Real-Ip"
-	forwardHeader               = "X-Forwarded-For"
-	crowdsecAuthHeader          = "X-Api-Key"
-	crowdsecRoute               = "v1/decisions"
-	crowdsecStreamRoute         = "v1/decisions/stream"
-	cacheBannedValue            = "t"
-	cacheNoBannedValue          = "f"
+	crowdsecAuthHeader  = "X-Api-Key"
+	crowdsecRoute       = "v1/decisions"
+	crowdsecStreamRoute = "v1/decisions/stream"
+	cacheBannedValue    = "t"
+	cacheNoBannedValue  = "f"
 )
 
 var cache = ttl_map.New()
@@ -66,13 +64,13 @@ type Bouncer struct {
 	client                 *http.Client
 }
 
-// New created a new Demo plugin.
+// New creates the crowdsec bouncer plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	requiredStrings := map[string]string{
 		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
-	  "CrowdsecLapiHost": config.CrowdsecLapiHost,
-		"CrowdsecLapiKey": config.CrowdsecLapiKey,
-		"CrowdsecMode": config.CrowdsecMode,
+		"CrowdsecLapiHost":   config.CrowdsecLapiHost,
+		"CrowdsecLapiKey":    config.CrowdsecLapiKey,
+		"CrowdsecMode":       config.CrowdsecMode,
 	}
 	for key, val := range requiredStrings {
 		if len(val) == 0 {
@@ -88,6 +86,16 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			return nil, fmt.Errorf("%v cannot be less than 1", key)
 		}
 	}
+	// none -> If the client IP is on ban list, it will get a http code 403 response.
+	//         Otherwise, request will continue as usual. All request call the Crowdsec LAPI
+	// live ->  If the client IP is on ban list, it will get a http code 403 response.
+	//          Otherwise, request will continue as usual.
+	//          The bouncer can leverage use of a local cache in order to reduce the number
+	//          of requests made to the Crowdsec LAPI. It will keep in cache the status for
+	//          each IP that makes queries.
+	// stream -> Stream Streaming mode allows you to keep in the local cache only the Banned IPs,
+	// 			every requests that does not hit the cache is authorized.
+	// 			Every minute, the cache is updated with news from the Crowdsec LAPI.
 	if !contains([]string{"none", "live", "stream"}, config.CrowdsecMode) {
 		return nil, fmt.Errorf("CrowdsecMode must be one of: none, live or stream")
 	}
@@ -95,13 +103,13 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		return nil, fmt.Errorf("CrowdsecLapiScheme must be one of: http, https")
 	}
 	testUrl := url.URL{
-		Scheme:   config.CrowdsecLapiScheme,
-		Host:     config.CrowdsecLapiHost,
-		Path:     crowdsecRoute,
+		Scheme: config.CrowdsecLapiScheme,
+		Host:   config.CrowdsecLapiHost,
+		Path:   crowdsecRoute,
 	}
 	_, err := http.NewRequest(http.MethodGet, testUrl.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost) 
+		return nil, fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
 
 	bouncer := &Bouncer{
@@ -109,13 +117,13 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
-		enabled: config.Enabled,
-		crowdsecStreamHealthy: false,
-		crowdsecMode: config.CrowdsecMode,
-		crowdsecScheme: config.CrowdsecLapiScheme,
-		crowdsecHost: config.CrowdsecLapiHost,
-		crowdsecKey: config.CrowdsecLapiKey,
-		updateInterval: config.UpdateIntervalSeconds,
+		enabled:                config.Enabled,
+		crowdsecStreamHealthy:  false,
+		crowdsecMode:           config.CrowdsecMode,
+		crowdsecScheme:         config.CrowdsecLapiScheme,
+		crowdsecHost:           config.CrowdsecLapiHost,
+		crowdsecKey:            config.CrowdsecLapiKey,
+		updateInterval:         config.UpdateIntervalSeconds,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
 		client: &http.Client{
 			Transport: &http.Transport{
@@ -125,18 +133,22 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			Timeout: 5 * time.Second,
 		},
 	}
-	go handleStreamCache(bouncer, "true")
+	// if we are on a stream mode, we fetch in a go routine every minute the new decisions
+	if config.CrowdsecMode == "stream" {
+		go handleStreamCache(bouncer, true)
+	}
 	return bouncer, nil
 }
 
+// TODO the serve HTTP should be split as it's too long
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	log.Printf("not enabled, %v", a.enabled )
 	if !a.enabled {
-		log.Printf("not enabled")
+		log.Printf("Crowdsec Bouncer not enabled")
 		a.next.ServeHTTP(rw, req)
 		return
 	}
 
+	// TODO Make sur remote address does not include the port
 	remoteHost, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		log.Printf("failed to extract ip from remote address: %v", err)
@@ -156,6 +168,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// Right here if we cannot join the stream we forbid the request to go on
 	if a.crowdsecMode == "stream" {
 		if a.crowdsecStreamHealthy {
 			a.next.ServeHTTP(rw, req)
@@ -165,70 +178,66 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if a.crowdsecMode == "none" || a.crowdsecMode == "live" {
-		noneUrl := url.URL{
-			Scheme:   a.crowdsecScheme,
-			Host:     a.crowdsecHost,
-			Path:     crowdsecRoute,
-			RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
-		}
-		request, _ := http.NewRequest(http.MethodGet, noneUrl.String(), nil)
-		request.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
-		res, err := a.client.Do(request)
-		if err != nil {
-			log.Printf("failed to get decision: %s", err)
-			rw.WriteHeader(http.StatusForbidden)
-			return
-		}
-		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			log.Printf("failed to get decision, status code: %d", res.StatusCode)
-			rw.WriteHeader(http.StatusForbidden)
-			return
-		}
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			log.Printf("failed to read body: %s", err)
-			rw.WriteHeader(http.StatusForbidden)
-			return
-		}
-		if !bytes.Equal(body, []byte("null")) {
-			var decisions []Decision
-			err = json.Unmarshal(body, &decisions)
-			if err != nil {
-				log.Printf("failed to parse body: %s", err)
-				rw.WriteHeader(http.StatusForbidden)
-				return
-			}
-			if len(decisions) == 0 {
-				if a.crowdsecMode == "live" {
-					setDecision(remoteHost, false, a.defaultDecisionTimeout)
-				}
-				a.next.ServeHTTP(rw, req)
-				return
-			}
-			duration, err := time.ParseDuration(decisions[0].Duration)
-			if err != nil {
-				log.Printf("failed to parse duration: %s", err)
-				rw.WriteHeader(http.StatusForbidden)
-				return
-			}
-			rw.WriteHeader(http.StatusForbidden)
-			setDecision(remoteHost, true, int64(duration.Seconds()))
-			return
-		}
-		if a.crowdsecMode == "live" {
-			setDecision(remoteHost, false, a.defaultDecisionTimeout)
-		}
-		a.next.ServeHTTP(rw, req)
+	// We are now in none or live mode
+	noneUrl := url.URL{
+		Scheme:   a.crowdsecScheme,
+		Host:     a.crowdsecHost,
+		Path:     crowdsecRoute,
+		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
+	}
+	request, _ := http.NewRequest(http.MethodGet, noneUrl.String(), nil)
+	request.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
+	res, err := a.client.Do(request)
+	if err != nil {
+		log.Printf("failed to get decision: %s", err)
+		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
-
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Printf("failed to get decision, status code: %d", res.StatusCode)
+		rw.WriteHeader(http.StatusForbidden)
+		return
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Printf("failed to read body: %s", err)
+		rw.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if !bytes.Equal(body, []byte("null")) {
+		var decisions []Decision
+		err = json.Unmarshal(body, &decisions)
+		if err != nil {
+			log.Printf("failed to parse body: %s", err)
+			rw.WriteHeader(http.StatusForbidden)
+			return
+		}
+		if len(decisions) == 0 {
+			if a.crowdsecMode == "live" {
+				setDecision(remoteHost, false, a.defaultDecisionTimeout)
+			}
+			a.next.ServeHTTP(rw, req)
+			return
+		}
+		duration, err := time.ParseDuration(decisions[0].Duration)
+		if err != nil {
+			log.Printf("failed to parse duration: %s", err)
+			rw.WriteHeader(http.StatusForbidden)
+			return
+		}
+		rw.WriteHeader(http.StatusForbidden)
+		setDecision(remoteHost, true, int64(duration.Seconds()))
+		return
+	}
+	if a.crowdsecMode == "live" {
+		setDecision(remoteHost, false, a.defaultDecisionTimeout)
+	}
 	a.next.ServeHTTP(rw, req)
 }
 
 // CUSTOM CODE
-
+// TODO place in another file
 type Decision struct {
 	Id        int    `json:"id"`
 	Origin    string `json:"origin"`
@@ -241,8 +250,8 @@ type Decision struct {
 }
 
 type Stream struct {
-	Deleted []Decision 	`json:"deleted"`
-	New     []Decision 	`json:"new"`
+	Deleted []Decision `json:"deleted"`
+	New     []Decision `json:"new"`
 }
 
 func contains(source []string, target string) bool {
@@ -254,6 +263,8 @@ func contains(source []string, target string) bool {
 	return false
 }
 
+// Get Decision check in the cache if the IP has the banned / not banned value
+// Otherwise return with an error to add the IP in cache if we are on
 func getDecision(clientIP string) (bool, error) {
 	isBanned, ok := cache.Get(clientIP)
 	if ok && len(isBanned.(string)) > 0 {
@@ -274,15 +285,16 @@ func setDecision(clientIP string, isBanned bool, duration int64) {
 	}
 }
 
-func handleStreamCache(a *Bouncer, initialized string) {
-	time.AfterFunc(time.Duration(a.updateInterval) * time.Second, func () {
-		handleStreamCache(a, "false")
+func handleStreamCache(a *Bouncer, initialized bool) {
+	// TODO clean properly on exit
+	time.AfterFunc(time.Duration(a.updateInterval)*time.Second, func() {
+		handleStreamCache(a, false)
 	})
 	streamUrl := url.URL{
 		Scheme:   a.crowdsecScheme,
 		Host:     a.crowdsecHost,
 		Path:     crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%s", initialized),
+		RawQuery: fmt.Sprintf("startup=%t", initialized),
 	}
 	req, _ := http.NewRequest(http.MethodGet, streamUrl.String(), nil)
 	req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
