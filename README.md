@@ -2,9 +2,12 @@
 
 # Crowdsec Bouncer Traefik plugin
 
-This plugins aims to implement a Crowdsec Bouncer into a traefik plugin
+This plugins aims to implement a Crowdsec Bouncer into a traefik plugin.
+> [CrowdSec](https://www.crowdsec.net/) is an open-source and collaborative IPS (Intrusion Prevention   System) and a security suite.
+> We leverage local behavior analysis and crowd power to build the largest CTI network in the world.
 
 ## Usage
+
 
 
 ### Configuration
@@ -72,3 +75,7 @@ The source code of the plugin should be organized as follows:
                     ├── readme.md
                     └── vendor/* 
 ```
+### About
+
+[maxlerebourg](https://github.com/maxlerebourg) and [I](https://github.com/mhanotaux) have been using traefik since 2020.
+We come from developper and security engineer background and wanted to add the power of a very promesing technologie (Crowdsec) into the edge router we love.
