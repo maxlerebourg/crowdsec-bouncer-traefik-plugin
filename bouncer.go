@@ -39,7 +39,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                false,
-		CrowdsecMode:           "none",
+		CrowdsecMode:           "stream",
 		CrowdsecLapiScheme:     "http",
 		CrowdsecLapiHost:       "crowdsec:8080",
 		CrowdsecLapiKey:        "",
