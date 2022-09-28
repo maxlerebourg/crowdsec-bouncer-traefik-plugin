@@ -43,12 +43,12 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                false,
-		CrowdsecMode:           "stream",
+		CrowdsecMode:           "none",
 		CrowdsecLapiScheme:     "http",
 		CrowdsecLapiHost:       "crowdsec:8080",
 		CrowdsecLapiKey:        "",
-		UpdateIntervalSeconds:  10,
-		DefaultDecisionSeconds: 10,
+		UpdateIntervalSeconds:  60,
+		DefaultDecisionSeconds: 60,
 	}
 }
 
@@ -70,15 +70,24 @@ type Bouncer struct {
 
 // New created a new Demo plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	required := map[string]string{
+	requiredStrings := map[string]string{
 		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
 	  "CrowdsecLapiHost": config.CrowdsecLapiHost,
 		"CrowdsecLapiKey": config.CrowdsecLapiKey,
 		"CrowdsecMode": config.CrowdsecMode,
 	}
-	for val, key := range required {
+	for key, val := range requiredStrings {
 		if len(val) == 0 {
 			return nil, fmt.Errorf("%v cannot be empty", key)
+		}
+	}
+	requiredInt := map[string]int64{
+		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
+		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
+	}
+	for key, val := range requiredInt {
+		if val < 1 {
+			return nil, fmt.Errorf("%v cannot be less than 1", key)
 		}
 	}
 	if !contains([]string{"none", "live", "stream"}, config.CrowdsecMode) {
@@ -123,6 +132,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 }
 
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	log.Printf("not enabled, %v", a.enabled )
 	if !a.enabled {
 		log.Printf("not enabled")
 		a.next.ServeHTTP(rw, req)
@@ -164,9 +174,9 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			Path:     crowdsecRoute,
 			RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
 		}
-		req, _ := http.NewRequest(http.MethodGet, noneUrl.String(), nil)
-		req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
-		res, err := a.client.Do(req)
+		request, _ := http.NewRequest(http.MethodGet, noneUrl.String(), nil)
+		request.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
+		res, err := a.client.Do(request)
 		if err != nil {
 			log.Printf("failed to get decision: %s", err)
 			rw.WriteHeader(http.StatusForbidden)
@@ -205,7 +215,6 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				rw.WriteHeader(http.StatusForbidden)
 				return
 			}
-			log.Printf("ip banned: %v", remoteHost)
 			rw.WriteHeader(http.StatusForbidden)
 			setDecision(remoteHost, true, int64(duration.Seconds()))
 			return
@@ -281,18 +290,26 @@ func handleStreamCache(a *Bouncer, initialized string) {
 	req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
 	res, err := a.client.Do(req)
 	if err != nil || res.StatusCode == http.StatusForbidden {
+		log.Printf("error while fetching decisions: %s", err)
+		a.crowdsecStreamHealthy = false
+		return
+	}
+	if res.StatusCode == http.StatusForbidden {
+		log.Printf("error while fetching decisions, status code: %d", res.StatusCode)
 		a.crowdsecStreamHealthy = false
 		return
 	}
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
+		log.Printf("error while reading body: %s", err)
 		a.crowdsecStreamHealthy = false
 		return
 	}
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
+		log.Printf("error while parsing body: %s", err)
 		a.crowdsecStreamHealthy = false
 		return
 	}
