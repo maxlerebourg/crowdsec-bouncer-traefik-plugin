@@ -136,14 +136,14 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			Timeout: 5 * time.Second,
 		},
 	}
-	// if we are on a stream mode, we fetch in a go routine every minute the new decisions
+	// if we are on a stream mode, we fetch in a go routine every minute the new decisions.
 	if config.CrowdsecMode == "stream" {
 		go handleStreamCache(bouncer, true)
 	}
 	return bouncer, nil
 }
 
-// TODO the serve HTTP should be split as it's too long
+// TODO the serve HTTP should be split as it's too long.
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !a.enabled {
 		log.Printf("Crowdsec Bouncer not enabled")
@@ -151,7 +151,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// TODO Make sur remote address does not include the port
+	// TODO Make sur remote address does not include the port.
 	remoteHost, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		log.Printf("failed to extract ip from remote address: %v", err)
@@ -171,7 +171,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Right here if we cannot join the stream we forbid the request to go on
+	// Right here if we cannot join the stream we forbid the request to go on.
 	if a.crowdsecMode == "stream" {
 		if a.crowdsecStreamHealthy {
 			a.next.ServeHTTP(rw, req)
@@ -181,7 +181,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// We are now in none or live mode
+	// We are now in none or live mode.
 	noneUrl := url.URL{
 		Scheme:   a.crowdsecScheme,
 		Host:     a.crowdsecHost,
@@ -239,8 +239,8 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	a.next.ServeHTTP(rw, req)
 }
 
-// CUSTOM CODE
-// TODO place in another file
+// CUSTOM CODE.
+// TODO place in another file.
 
 // Decision: Body returned from Crowdsec LAPI.
 type Decision struct {
@@ -288,7 +288,7 @@ func setDecision(clientIP string, isBanned bool, duration int64) {
 }
 
 func handleStreamCache(a *Bouncer, initialized bool) {
-	// TODO clean properly on exit
+	// TODO clean properly on exit.
 	time.AfterFunc(time.Duration(a.updateInterval)*time.Second, func() {
 		handleStreamCache(a, false)
 	})
