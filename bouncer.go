@@ -105,12 +105,12 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	if !contains([]string{"http", "https"}, config.CrowdsecLapiScheme) {
 		return nil, fmt.Errorf("CrowdsecLapiScheme must be one of: http, https")
 	}
-	testUrl := url.URL{
+	testURL := url.URL{
 		Scheme: config.CrowdsecLapiScheme,
 		Host:   config.CrowdsecLapiHost,
 		Path:   crowdsecRoute,
 	}
-	_, err := http.NewRequest(http.MethodGet, testUrl.String(), nil)
+	_, err := http.NewRequest(http.MethodGet, testURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
@@ -182,13 +182,13 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// We are now in none or live mode.
-	noneUrl := url.URL{
+	noneURL := url.URL{
 		Scheme:   a.crowdsecScheme,
 		Host:     a.crowdsecHost,
 		Path:     crowdsecRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
 	}
-	request, _ := http.NewRequest(http.MethodGet, noneUrl.String(), nil)
+	request, _ := http.NewRequest(http.MethodGet, noneURL.String(), nil)
 	request.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
 	res, err := a.client.Do(request)
 	if err != nil {
@@ -292,13 +292,13 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 	time.AfterFunc(time.Duration(a.updateInterval)*time.Second, func() {
 		handleStreamCache(a, false)
 	})
-	streamUrl := url.URL{
+	streamURL := url.URL{
 		Scheme:   a.crowdsecScheme,
 		Host:     a.crowdsecHost,
 		Path:     crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", initialized),
 	}
-	req, _ := http.NewRequest(http.MethodGet, streamUrl.String(), nil)
+	req, _ := http.NewRequest(http.MethodGet, streamURL.String(), nil)
 	req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
 	res, err := a.client.Do(req)
 	if err != nil || res.StatusCode == http.StatusForbidden {
