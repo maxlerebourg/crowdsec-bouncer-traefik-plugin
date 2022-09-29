@@ -256,12 +256,12 @@ func contains(source []string, target string) bool {
 // Get Decision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func getDecision(clientIP string) (bool, error) {
-	isBanned, ok := cache.Get(clientIP)
-	banned, err := isBanned.(string)
-	if ok && err == nil && len(banned) > 0 {
-		return isBanned == cacheNoBannedValue, nil
+	banned, isCached := cache.Get(clientIP)
+	bannedString, isValid := banned.(string)
+	if isCached && !isValid && len(bannedString) > 0 {
+		return bannedString == cacheNoBannedValue, nil
 	}
-	return false, fmt.Errorf("no data")
+	return false, fmt.Errorf("no cache data")
 }
 
 func setDecision(clientIP string, isBanned bool, duration int64) {
