@@ -4,7 +4,7 @@ iconPath: .assets/icon.png
 
 import: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 
-summary: 'Crowdsec Bouncer Traefik Plugin'
+summary: Middleware plugin which forwards the request IP to local Crowdsec agent, which can be used to allow/deny the request  
 
 testData:
   Enabled: false
