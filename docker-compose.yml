@@ -20,6 +20,8 @@ services:
     ports:
       - 8000:80
       - 8080:8080
+    depends_on:
+      - 'crowdsec'
 
   whoami:
     image: traefik/whoami
@@ -40,8 +42,6 @@ services:
       COLLECTIONS: crowdsecurity/traefik
       CUSTOM_HOSTNAME: crowdsec
       BOUNCER_KEY_TRAEFIK: FIXME-LAPI-KEY
-    depends_on:
-      - 'traefik'
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - logs:/var/log/traefik:ro

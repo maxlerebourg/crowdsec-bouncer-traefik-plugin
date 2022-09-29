@@ -21,6 +21,8 @@ services:
     ports:
       - 8000:80
       - 8080:8080
+    depends_on:
+      - 'crowdsec'
 
   whoami:
     image: traefik/whoami
@@ -31,7 +33,7 @@ services:
       - "traefik.http.routers.whoami.entrypoints=web"
       - "traefik.http.routers.whoami.middlewares=crowdsec@docker"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.1
@@ -40,9 +42,7 @@ services:
     environment:
       COLLECTIONS: crowdsecurity/traefik
       CUSTOM_HOSTNAME: crowdsec
-      BOUNCER_KEY_TRAEFIK: FIXME-LAPI-KEY
-    depends_on:
-      - 'traefik'
+      BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - logs:/var/log/traefik:ro
