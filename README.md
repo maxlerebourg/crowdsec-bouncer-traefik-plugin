@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/workflows/Main/badge.svg?branch=main)](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/actions/workflows/main/badge.svg)
+[![Build Status](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/workflows/Main/badge.svg?branch=main)](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/actions/workflows/main.yml/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin)](https://goreportcard.com/badge/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin)
 
 # Crowdsec Bouncer Traefik plugin
