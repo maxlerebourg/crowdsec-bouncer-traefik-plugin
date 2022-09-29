@@ -226,7 +226,7 @@ docker-compose -f docker-compose.local.yml up -d
 
 ### About
 
-Me and [mhanotaux](https://github.com/mhanotaux) have been using traefik since 2020 at [Primadviz](https://primadviz.com).
+Me and [mathieuHa](https://github.com/mathieuHa) have been using traefik since 2020 at [Primadviz](https://primadviz.com).
 We come from web developper and security engineer background and wanted to add the power of a very promesing technology (Crowdsec) into the edge router we love.
 
 We initially run into this project: https://github.com/fbonalair/traefik-crowdsec-bouncer
