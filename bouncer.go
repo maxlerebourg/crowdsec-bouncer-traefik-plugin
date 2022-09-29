@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -144,7 +145,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 }
 
 // TODO the serve HTTP should be split as it's too long.
-// ServeHTTP principal function of plugin
+// ServeHTTP principal function of plugin.
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !a.enabled {
 		log.Printf("Crowdsec Bouncer not enabled")
@@ -197,7 +198,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
-	defer res.Body.Close()
+	defer closeBody(res.Body)
 	if res.StatusCode != 200 {
 		log.Printf("failed to get decision, status code: %d", res.StatusCode)
 		rw.WriteHeader(http.StatusForbidden)
@@ -243,7 +244,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // CUSTOM CODE.
 // TODO place in another file.
 
-// Decision: Body returned from Crowdsec LAPI.
+// Decision Body returned from Crowdsec LAPI.
 type Decision struct {
 	ID        int    `json:"id"`
 	Origin    string `json:"origin"`
@@ -255,7 +256,7 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
-// Stream: Body returned from Crowdsec Stream LAPI.
+// Stream Body returned from Crowdsec Stream LAPI.
 type Stream struct {
 	Deleted []Decision `json:"deleted"`
 	New     []Decision `json:"new"`
@@ -302,7 +303,7 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 	req, _ := http.NewRequest(http.MethodGet, streamURL.String(), nil)
 	req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
 	res, err := a.client.Do(req)
-	if err != nil || res.StatusCode == http.StatusForbidden {
+	if err != nil {
 		log.Printf("error while fetching decisions: %s", err)
 		a.crowdsecStreamHealthy = false
 		return
@@ -312,7 +313,7 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 		a.crowdsecStreamHealthy = false
 		return
 	}
-	defer res.Body.Close()
+	defer closeBody(res.Body)
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		log.Printf("error while reading body: %s", err)
@@ -336,4 +337,11 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 		cache.Del(decision.Value)
 	}
 	a.crowdsecStreamHealthy = true
+}
+
+func closeBody(Body io.ReadCloser) {
+	err := Body.Close()
+	if err != nil {
+		log.Printf("failed to close body reader: %s", err)
+	}
 }
