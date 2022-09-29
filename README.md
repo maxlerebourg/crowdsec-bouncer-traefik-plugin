@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/workflows/Main/badge.svg?branch=master)](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/actions)
+[![Build Status](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/workflows/Main/badge.svg?branch=main)](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/actions)
 
 # Crowdsec Bouncer Traefik plugin
 
