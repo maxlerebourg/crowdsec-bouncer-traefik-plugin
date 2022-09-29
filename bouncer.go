@@ -304,7 +304,7 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 	a.crowdsecStreamHealthy = true
 }
 
-func crowdsecQuery(a *Bouncer, stringURL string) ([]byte) {
+func crowdsecQuery(a *Bouncer, stringURL string) []byte {
 	req, _ := http.NewRequest(http.MethodGet, stringURL, nil)
 	req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
 	res, err := a.client.Do(req)
@@ -318,7 +318,7 @@ func crowdsecQuery(a *Bouncer, stringURL string) ([]byte) {
 		a.crowdsecStreamHealthy = false
 		return nil
 	}
-	defer func (body io.ReadCloser) {
+	defer func(body io.ReadCloser) {
 		err = body.Close()
 		if err != nil {
 			log.Printf("failed to close body reader: %s", err)
@@ -332,4 +332,3 @@ func crowdsecQuery(a *Bouncer, stringURL string) ([]byte) {
 	}
 	return body
 }
-
