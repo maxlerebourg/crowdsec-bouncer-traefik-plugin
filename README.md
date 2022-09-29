@@ -62,11 +62,11 @@ The recommanded mode for performance is the streaming mode, decisions are update
   - Used only in `alone` mode, password for Crowdsec CAPI
 - CrowdsecCapiScenarios
   - []string
-  - Used only in `alone` mode, login for Crowdsec CAPI
+  - Used only in `alone` mode, scenarios for Crowdsec CAPI
 - UpdateIntervalSeconds
   - int64
   - default: 60
-  - User only in `stream` mode, interval of time between fetching blacklisted IPs from LAPI
+  - User only in `stream` mode, interval between fetching blacklisted IPs from LAPI
 - DefaultDecisionSeconds
   - int64
   - default: 60
