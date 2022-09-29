@@ -242,7 +242,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // CUSTOM CODE
 // TODO place in another file
 
-// Decision: Body returned from Crowdsec LAPI
+// Decision: Body returned from Crowdsec LAPI.
 type Decision struct {
 	Id        int    `json:"id"`
 	Origin    string `json:"origin"`
@@ -254,7 +254,7 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
-// Stream: Body returned from Crowdsec Stream LAPI
+// Stream: Body returned from Crowdsec Stream LAPI.
 type Stream struct {
 	Deleted []Decision `json:"deleted"`
 	New     []Decision `json:"new"`
@@ -269,8 +269,8 @@ func contains(source []string, target string) bool {
 	return false
 }
 
-// Get Decision check in the cache if the IP has the banned / not banned value
-// Otherwise return with an error to add the IP in cache if we are on
+// Get Decision check in the cache if the IP has the banned / not banned value.
+// Otherwise return with an error to add the IP in cache if we are on.
 func getDecision(clientIP string) (bool, error) {
 	isBanned, ok := cache.Get(clientIP)
 	if ok && len(isBanned.(string)) > 0 {
