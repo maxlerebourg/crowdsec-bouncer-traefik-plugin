@@ -25,8 +25,6 @@ const (
 	cacheNoBannedValue  = "f"
 )
 
-var cache = ttl_map.New()
-
 // Config the plugin configuration.
 type Config struct {
 	Enabled                bool   `json:"enabled,omitempty"`
@@ -66,6 +64,7 @@ type Bouncer struct {
 	updateInterval         int64
 	defaultDecisionTimeout int64
 	client                 *http.Client
+	cache                  *ttl_map.Heap
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -136,6 +135,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			},
 			Timeout: 5 * time.Second,
 		},
+		cache: ttl_map.New(),
 	}
 	// if we are on a stream mode, we fetch in a go routine every minute the new decisions.
 	if config.CrowdsecMode == "stream" {
@@ -160,7 +160,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if a.crowdsecMode == "stream" || a.crowdsecMode == "live" {
-		isBanned, err := getDecision(remoteHost)
+		isBanned, err := getDecision(a.cache, remoteHost)
 		if err == nil {
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
@@ -215,7 +215,7 @@ func contains(source []string, target string) bool {
 
 // Get Decision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
-func getDecision(clientIP string) (bool, error) {
+func getDecision(cache *ttl_map.Heap, clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
 	if isCached && isValid && len(bannedString) > 0 {
@@ -224,7 +224,7 @@ func getDecision(clientIP string) (bool, error) {
 	return false, fmt.Errorf("no cache data")
 }
 
-func setDecision(clientIP string, isBanned bool, duration int64) {
+func setDecision(cache *ttl_map.Heap, clientIP string, isBanned bool, duration int64) {
 	if isBanned {
 		cache.Set(clientIP, cacheBannedValue, duration)
 	} else {
@@ -244,7 +244,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 
 	if bytes.Equal(body, []byte("null")) {
 		if a.crowdsecMode == "live" {
-			setDecision(remoteHost, false, a.defaultDecisionTimeout)
+			setDecision(a.cache, remoteHost, false, a.defaultDecisionTimeout)
 		}
 		a.next.ServeHTTP(rw, req)
 		return
@@ -259,7 +259,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	}
 	if len(decisions) == 0 {
 		if a.crowdsecMode == "live" {
-			setDecision(remoteHost, false, a.defaultDecisionTimeout)
+			setDecision(a.cache, remoteHost, false, a.defaultDecisionTimeout)
 		}
 		a.next.ServeHTTP(rw, req)
 		return
@@ -270,7 +270,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 		log.Printf("failed to parse duration: %s", err)
 		return
 	}
-	setDecision(remoteHost, true, int64(duration.Seconds()))
+	setDecision(a.cache, remoteHost, true, int64(duration.Seconds()))
 }
 
 func handleStreamCache(a *Bouncer, initialized bool) {
@@ -295,11 +295,11 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
-			setDecision(decision.Value, true, int64(duration.Seconds()))
+			setDecision(a.cache, decision.Value, true, int64(duration.Seconds()))
 		}
 	}
 	for _, decision := range stream.Deleted {
-		cache.Del(decision.Value)
+		a.cache.Del(decision.Value)
 	}
 	a.crowdsecStreamHealthy = true
 }
