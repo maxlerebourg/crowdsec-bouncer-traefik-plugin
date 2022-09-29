@@ -317,7 +317,7 @@ func crowdsecQuery(a *Bouncer, stringURL string) ([]byte) {
 		return nil
 	}
 	defer func (body io.ReadCloser) {
-		err := body.Close()
+		err = body.Close()
 		if err != nil {
 			log.Printf("failed to close body reader: %s", err)
 		}
