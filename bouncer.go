@@ -26,6 +26,7 @@ const (
 
 var cache = ttl_map.New()
 
+// Config the plugin configuration.
 type Config struct {
 	Enabled                bool   `json:"enabled,omitempty"`
 	CrowdsecMode           string `json:"crowdsecMode,omitempty"`
@@ -36,6 +37,7 @@ type Config struct {
 	DefaultDecisionSeconds int64  `json:"defaultDecisionSeconds,omitempty"`
 }
 
+// CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                false,
@@ -48,6 +50,7 @@ func CreateConfig() *Config {
 	}
 }
 
+// Bouncer a Bouncer plugin.
 type Bouncer struct {
 	next     http.Handler
 	name     string
@@ -238,6 +241,8 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // CUSTOM CODE
 // TODO place in another file
+
+// Decision: Body returned from Crowdsec LAPI
 type Decision struct {
 	Id        int    `json:"id"`
 	Origin    string `json:"origin"`
@@ -249,6 +254,7 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
+// Stream: Body returned from Crowdsec Stream LAPI
 type Stream struct {
 	Deleted []Decision `json:"deleted"`
 	New     []Decision `json:"new"`
@@ -268,11 +274,7 @@ func contains(source []string, target string) bool {
 func getDecision(clientIP string) (bool, error) {
 	isBanned, ok := cache.Get(clientIP)
 	if ok && len(isBanned.(string)) > 0 {
-		if isBanned == cacheNoBannedValue {
-			return false, nil
-		} else {
-			return true, nil
-		}
+		return isBanned == cacheNoBannedValue, nil
 	}
 	return false, fmt.Errorf("no data")
 }
