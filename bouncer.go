@@ -149,7 +149,6 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 // ServeHTTP principal function of plugin.
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !a.enabled {
-		log.Printf("Crowdsec Bouncer not enabled")
 		a.next.ServeHTTP(rw, req)
 		return
 	}
@@ -164,6 +163,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if a.crowdsecMode == "stream" || a.crowdsecMode == "live" {
 		isBanned, err := getDecision(remoteHost)
+		log.Printf("%v, %s", isBanned, err)
 		if err == nil {
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
@@ -181,47 +181,9 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		} else {
 			rw.WriteHeader(http.StatusForbidden)
 		}
-		return
+	} else {
+		handleNoStreamCache(a, rw, req, remoteHost)
 	}
-
-	// We are now in none or live mode.
-	routeURL := url.URL{
-		Scheme:   a.crowdsecScheme,
-		Host:     a.crowdsecHost,
-		Path:     crowdsecRoute,
-		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
-	}
-	body := crowdsecQuery(a, routeURL.String())
-	nullByte := []byte("null")
-	if !bytes.Equal(body, nullByte) {
-		var decisions []Decision
-		err := json.Unmarshal(body, &decisions)
-		if err != nil {
-			log.Printf("failed to parse body: %s", err)
-			rw.WriteHeader(http.StatusForbidden)
-			return
-		}
-		if len(decisions) == 0 {
-			if a.crowdsecMode == "live" {
-				setDecision(remoteHost, false, a.defaultDecisionTimeout)
-			}
-			a.next.ServeHTTP(rw, req)
-			return
-		}
-		duration, err := time.ParseDuration(decisions[0].Duration)
-		if err != nil {
-			log.Printf("failed to parse duration: %s", err)
-			rw.WriteHeader(http.StatusForbidden)
-			return
-		}
-		rw.WriteHeader(http.StatusForbidden)
-		setDecision(remoteHost, true, int64(duration.Seconds()))
-		return
-	}
-	if a.crowdsecMode == "live" {
-		setDecision(remoteHost, false, a.defaultDecisionTimeout)
-	}
-	a.next.ServeHTTP(rw, req)
 }
 
 // CUSTOM CODE.
@@ -259,7 +221,7 @@ func contains(source []string, target string) bool {
 func getDecision(clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
-	if isCached && !isValid && len(bannedString) > 0 {
+	if isCached && isValid && len(bannedString) > 0 {
 		return bannedString == cacheNoBannedValue, nil
 	}
 	return false, fmt.Errorf("no cache data")
@@ -271,6 +233,47 @@ func setDecision(clientIP string, isBanned bool, duration int64) {
 	} else {
 		cache.Set(clientIP, cacheNoBannedValue, duration)
 	}
+}
+
+func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, remoteHost string) {
+	// We are now in none or live mode.
+	routeURL := url.URL{
+		Scheme:   a.crowdsecScheme,
+		Host:     a.crowdsecHost,
+		Path:     crowdsecRoute,
+		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
+	}
+	body := crowdsecQuery(a, routeURL.String())
+
+	if bytes.Equal(body, []byte("null")) {
+		if a.crowdsecMode == "live" {
+			setDecision(remoteHost, false, a.defaultDecisionTimeout)
+		}
+		a.next.ServeHTTP(rw, req)
+		return
+	}
+
+	var decisions []Decision
+	err := json.Unmarshal(body, &decisions)
+	if err != nil {
+		log.Printf("failed to parse body: %s", err)
+		rw.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if len(decisions) == 0 {
+		if a.crowdsecMode == "live" {
+			setDecision(remoteHost, false, a.defaultDecisionTimeout)
+		}
+		a.next.ServeHTTP(rw, req)
+		return
+	}
+	rw.WriteHeader(http.StatusForbidden)
+	duration, err := time.ParseDuration(decisions[0].Duration)
+	if err != nil {
+		log.Printf("failed to parse duration: %s", err)
+		return
+	}
+	setDecision(remoteHost, true, int64(duration.Seconds()))
 }
 
 func handleStreamCache(a *Bouncer, initialized bool) {
