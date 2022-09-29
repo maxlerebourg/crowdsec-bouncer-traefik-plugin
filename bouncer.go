@@ -144,8 +144,6 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	return bouncer, nil
 }
 
-// TODO the ServeHTTP should be split as it's too long.
-
 // ServeHTTP principal function of plugin.
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !a.enabled {
@@ -163,7 +161,6 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if a.crowdsecMode == "stream" || a.crowdsecMode == "live" {
 		isBanned, err := getDecision(remoteHost)
-		log.Printf("%v, %s", isBanned, err)
 		if err == nil {
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
