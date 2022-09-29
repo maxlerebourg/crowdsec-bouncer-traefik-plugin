@@ -46,8 +46,8 @@ func CreateConfig() *Config {
 		CrowdsecLapiScheme:     "http",
 		CrowdsecLapiHost:       "crowdsec:8080",
 		CrowdsecLapiKey:        "",
-		UpdateIntervalSeconds:  60,
-		DefaultDecisionSeconds: 60,
+		UpdateIntervalSeconds:  10,
+		DefaultDecisionSeconds: 10,
 	}
 }
 
@@ -161,6 +161,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if a.crowdsecMode == "stream" || a.crowdsecMode == "live" {
 		isBanned, err := getDecision(remoteHost)
+		log.Printf("ip: %v, %v, %s", remoteHost, isBanned, err)
 		if err == nil {
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
@@ -218,8 +219,9 @@ func contains(source []string, target string) bool {
 func getDecision(clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
+	log.Printf("ip: %v, %v, %v", bannedString == cacheBannedValue, isCached, isValid)
 	if isCached && isValid && len(bannedString) > 0 {
-		return bannedString == cacheNoBannedValue, nil
+		return bannedString == cacheBannedValue, nil
 	}
 	return false, fmt.Errorf("no cache data")
 }
@@ -299,6 +301,7 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 		}
 	}
 	for _, decision := range stream.Deleted {
+		log.Printf("ip deleted: %v", decision.Value)
 		cache.Del(decision.Value)
 	}
 	a.crowdsecStreamHealthy = true
