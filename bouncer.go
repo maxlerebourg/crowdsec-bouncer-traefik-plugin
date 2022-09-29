@@ -257,7 +257,8 @@ func contains(source []string, target string) bool {
 // Otherwise return with an error to add the IP in cache if we are on.
 func getDecision(clientIP string) (bool, error) {
 	isBanned, ok := cache.Get(clientIP)
-	if ok && len(isBanned.(string)) > 0 {
+	banned, err := isBanned.(string)
+	if ok && err == nil && len(banned) > 0 {
 		return isBanned == cacheNoBannedValue, nil
 	}
 	return false, fmt.Errorf("no data")
