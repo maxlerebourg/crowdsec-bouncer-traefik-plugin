@@ -144,7 +144,8 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	return bouncer, nil
 }
 
-// TODO the serve HTTP should be split as it's too long.
+// TODO the ServeHTTP should be split as it's too long.
+
 // ServeHTTP principal function of plugin.
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !a.enabled {
