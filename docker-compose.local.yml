@@ -34,6 +34,9 @@ services:
       - "traefik.http.routers.whoami.middlewares=crowdsec@docker"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapilogin=3829a6c9870e4726a377d8951ebb64a1m8psGvMaq1ykJ3zX"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapipwd=Q5pgN8bRNInHGdx6QCksdPOJVLeLQ7ipJntSeuP3r8088zXzRVs4G8liXAKfI1k6"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/http-backdoors-attempts,baudneo/zoneminder-bf"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.1
