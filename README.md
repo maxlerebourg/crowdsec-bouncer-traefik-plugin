@@ -12,7 +12,7 @@ The crowdsec utility will provide the community blocklist which contains highly 
 
 When used with crowdsec it will leverage the local API which will analyze traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns against your website.
 
-There is 3 operating mode for this plugin:
+There are 3 operating modes (CrowdsecMode) for this plugin:
 - none -> If the client IP is on ban list, it will get a http code 403 response.
          Otherwise, request will continue as usual. All request call the Crowdsec LAPI
 
@@ -42,7 +42,7 @@ The following declaration (given here in YAML) defines a plugin:
 # Static configuration
 
 experimental:
-  localPlugins:
+  plugins:
     bouncer:
       moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 ```
@@ -58,7 +58,7 @@ http:
       entryPoints:
         - web
       middlewares:
-        - my-plugin
+        - crowdsec
 
   services:
     service-foo:
@@ -70,14 +70,15 @@ http:
     crowdsec:
       plugin:
         bouncer:
-          enabled: true
-          crowdseclapikey: 40796d93c2958f9e58345514e67740e5
+          enabled: false
+          crowdsecLapiKey: privateKey
+          crowdsecLapiHost: crowdsec:8080
+          crowdsecLapiScheme: http
+          crowdsecMode: stream
           updateIntervalSeconds: 60
           defaultDecisionSeconds: 60
-          crowdsecLapiHost: 
-          crowdsecLapiScheme: 
-          crowdsecMode: stream
 ```
+Except for the crowdsecLapiKey, these are the default value of the plugin.
 
 ### Local Mode
 
@@ -103,10 +104,10 @@ The source code of the plugin should be organized as follows:
                     └── vendor/* 
 ```
 
-For local developpement a docker-compose-local.yml is provided and reproduce the directory layout needed by traefik. This works once you have generated and filled your LAPI-KEY, if not look below for informations
+For local developpement a docker-compose.local.yml is provided and reproduce the directory layout needed by traefik. This works once you have generated and filled your LAPI-KEY (crowdsecLapiKey), if not look below for informations
 
 ```bash
-docker-compose -f docker-compose-local.yml up -d
+docker-compose -f docker-compose.local.yml up -d
 ```
 
 #### Generate LAPI-KEY
@@ -114,8 +115,8 @@ You need to generate a crowdsec API key for the LAPI.
 You can follow the documentation here: https://docs.crowdsec.net/docs/user_guides/lapi_mgmt/
 
 ```bash
-docker-compose -f docker-compose-local.yml up -d crowdsec
-docker exec crowdsec cscli bouncers add crowdsecBouncer
+docker-compose -f docker-compose.local.yml up -d crowdsec
+docker exec crowdsec cscli bouncers add TRAEFIK
 ```
 
 This LApi key must be set where is noted FIXME-LAPI-KEY in the docker-compose-test.yml
