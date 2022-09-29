@@ -141,16 +141,17 @@ docker-compose -f docker-compose-local.yml up -d
 
 ```bash
 docker-compose -f docker-compose-local.yml up -d crowdsec
-docker exec crowdsec cscli decisions add --ip 10.0.0.10
+docker exec crowdsec cscli decisions add --ip 10.0.0.10 # this will be effective 4h
+docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 ```
 
 ### About
 
 [maxlerebourg](https://github.com/maxlerebourg) and [I](https://github.com/mhanotaux) have been using traefik since 2020.
-We come from developper and security engineer background and wanted to add the power of a very promesing technologie (Crowdsec) into the edge router we love.
+We come from web developper and security engineer background and wanted to add the power of a very promesing technology (Crowdsec) into the edge router we love.
 
 We initially run into this project: https://github.com/fbonalair/traefik-crowdsec-bouncer
 It was using traefik and forward auth middleware to verify every requests.
 They had to go through a webserver which then contacts of another webservice (the crowdsec LAPI) to make a decision based on the source IP.
-We initially proposed some improvement by implementing a streaming mode and a local cache
+We initially proposed some improvement by implementing a streaming mode and a local cache.
 With the Traefik hackathon we deciced to implement our solution directly as a traefik plugin which could be found by every one on plugins.traefik.io and be more performant.
