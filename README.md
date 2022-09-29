@@ -137,6 +137,33 @@ You can then run all the containers:
 docker-compose -f docker-compose-local.yml up -d
 ```
 
+#### Generate LAPI-KEY
+You need to generate a crowdsec API key for the LAPI.
+You can follow the documentation here: https://docs.crowdsec.net/docs/user_guides/lapi_mgmt/
+
+```bash
+docker-compose -f docker-compose-local.yml up -d crowdsec
+docker exec crowdsec cscli bouncers add crowdsecBouncer
+```
+
+This LApi key must be set where is noted FIXME-LAPI-KEY in the docker-compose-test.yml
+```yaml
+...
+whoami:
+  labels:
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY"
+...
+crowdsec:
+  environment:
+    BOUNCER_KEY_TRAEFIK: FIXME-LAPI-KEY
+...
+```
+
+You can then run all the containers:
+```bash
+docker-compose -f docker-compose-local.yml up -d
+```
+
 #### Add manually an IP to the blocklist
 
 ```bash
