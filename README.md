@@ -142,6 +142,8 @@ This LAPI key must be set where is noted FIXME-LAPI-KEY in the docker-compose-te
 whoami:
   labels:
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=http"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapihost=crowdsec:8080"
 ...
 crowdsec:
   environment:

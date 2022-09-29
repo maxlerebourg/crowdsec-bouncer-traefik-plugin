@@ -19,14 +19,18 @@ import (
 )
 
 const (
-	crowdsecLapiHeader    = "X-Api-Key"
-	crowdsecCapiHeader    = "Authorization"
-	crowdsecLapiRoute         = "v1/decisions"
-	crowdsecLapiStreamRoute   = "v1/decisions/stream"
-	crowdsecCapiLogin     = "v2/watchers/login"
-	crowdsecCapiDecisions = "v2/decisions/stream"
-	cacheBannedValue      = "t"
-	cacheNoBannedValue    = "f"
+	aloneMode               = "alone"
+	streamMode              = "stream"
+	liveMode                = "live"
+	noneMode                = "none"
+	crowdsecLapiHeader      = "X-Api-Key"
+	crowdsecCapiHeader      = "Authorization"
+	crowdsecLapiRoute       = "v1/decisions"
+	crowdsecLapiStreamRoute = "v1/decisions/stream"
+	crowdsecCapiLogin       = "v2/watchers/login"
+	crowdsecCapiDecisions   = "v2/decisions/stream"
+	cacheBannedValue        = "t"
+	cacheNoBannedValue      = "f"
 )
 
 // Config the plugin configuration.
@@ -47,7 +51,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                false,
-		CrowdsecMode:           "alone",
+		CrowdsecMode:           streamMode,
 		CrowdsecLapiScheme:     "http",
 		CrowdsecLapiHost:       "crowdsec:8080",
 		CrowdsecLapiKey:        "",
@@ -83,7 +87,7 @@ type Bouncer struct {
 // New creates the crowdsec bouncer plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	var requiredStrings map[string]string
-	if config.CrowdsecMode == "alone" {
+	if config.CrowdsecMode == aloneMode {
 		requiredStrings = map[string]string{
 			"CrowdsecCapiLogin": config.CrowdsecLapiScheme,
 			"CrowdsecCapiPwd":   config.CrowdsecLapiHost,
@@ -119,7 +123,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			return nil, fmt.Errorf("%v: cannot be empty", key)
 		}
 	}
-	if !contains([]string{"none", "live", "stream", "alone"}, config.CrowdsecMode) {
+	if !contains([]string{noneMode, liveMode, streamMode, aloneMode}, config.CrowdsecMode) {
 		return nil, fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
 	}
 	if !contains([]string{"http", "https"}, config.CrowdsecLapiScheme) {
@@ -160,9 +164,9 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		cache: ttl_map.New(),
 	}
 	// if we are on a stream mode, we fetch in a go routine every minute the new decisions.
-	if config.CrowdsecMode == "stream" {
+	if config.CrowdsecMode == streamMode {
 		go handleStreamCache(bouncer, true)
-	} else if config.CrowdsecMode == "alone" {
+	} else if config.CrowdsecMode == aloneMode {
 		getToken(bouncer)
 		time.AfterFunc(10*time.Second, func() {
 			handleStreamCache(bouncer, false)
@@ -186,7 +190,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if a.crowdsecMode == "stream" || a.crowdsecMode == "live" {
+	if a.crowdsecMode == streamMode || a.crowdsecMode == liveMode {
 		isBanned, err := getDecision(a.cache, remoteHost)
 		if err == nil {
 			if isBanned {
@@ -199,7 +203,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Right here if we cannot join the stream we forbid the request to go on.
-	if a.crowdsecMode == "stream" {
+	if a.crowdsecMode == streamMode {
 		if a.crowdsecStreamHealthy {
 			a.next.ServeHTTP(rw, req)
 		} else {
@@ -278,7 +282,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	body := crowdsecQuery(a, routeURL.String(), false)
 
 	if bytes.Equal(body, []byte("null")) {
-		if a.crowdsecMode == "live" {
+		if a.crowdsecMode == liveMode {
 			setDecision(a.cache, remoteHost, false, a.defaultDecisionTimeout)
 		}
 		a.next.ServeHTTP(rw, req)
@@ -293,7 +297,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 		return
 	}
 	if len(decisions) == 0 {
-		if a.crowdsecMode == "live" {
+		if a.crowdsecMode == liveMode {
 			setDecision(a.cache, remoteHost, false, a.defaultDecisionTimeout)
 		}
 		a.next.ServeHTTP(rw, req)
@@ -315,7 +319,7 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 	})
 	var rawQuery string
 	var path string
-	if a.crowdsecMode == "alone" {
+	if a.crowdsecMode == aloneMode {
 		rawQuery = ""
 		path = crowdsecCapiDecisions
 	} else {
@@ -380,7 +384,7 @@ func crowdsecQuery(a *Bouncer, stringURL string, isPost bool) []byte {
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
-	if a.crowdsecMode == "alone" {
+	if a.crowdsecMode == aloneMode {
 		req.Header.Add(crowdsecCapiHeader, a.crowdsecKey)
 	} else {
 		req.Header.Add(crowdsecLapiHeader, a.crowdsecKey)
@@ -391,7 +395,7 @@ func crowdsecQuery(a *Bouncer, stringURL string, isPost bool) []byte {
 		a.crowdsecStreamHealthy = false
 		return nil
 	}
-	if res.StatusCode == http.StatusUnauthorized && a.crowdsecMode == "alone" {
+	if res.StatusCode == http.StatusUnauthorized && a.crowdsecMode == aloneMode {
 		oldToken := a.crowdsecKey
 		getToken(a)
 		if oldToken == a.crowdsecKey {
