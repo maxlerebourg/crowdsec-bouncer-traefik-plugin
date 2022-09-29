@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/workflows/Main/badge.svg?branch=main)](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/actions)
+[![Build Status](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/workflows/Main/badge.svg?branch=main)](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/actions/workflows/main/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin)](https://goreportcard.com/badge/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin)
 
 # Crowdsec Bouncer Traefik plugin
@@ -7,7 +7,7 @@ This plugins aims to implement a Crowdsec Bouncer into a traefik plugin.
 > [CrowdSec](https://www.crowdsec.net/) is an open-source and collaborative IPS (Intrusion Prevention   System) and a security suite.
 > We leverage local behavior analysis and crowd power to build the largest CTI network in the world.
 
-The purpose is to enable treafik to authorize and block requests from IP based and their reputation and behavior.
+The purpose is to enable treafik to authorize or block requests from IP based and their reputation and behavior.
 
 The crowdsec utility will provide the community blocklist which contains highly reported and validated IP banned from the crowdsec network.
 
@@ -17,7 +17,7 @@ There are 3 operating modes (CrowdsecMode) for this plugin:
 - none -> If the client IP is on ban list, it will get a http code 403 response.
          Otherwise, request will continue as usual. All request call the Crowdsec LAPI
 
-- live ->  If the client IP is on ban list, it will get a http code 403 response.
+- live -> If the client IP is on ban list, it will get a http code 403 response.
           Otherwise, request will continue as usual.
           The bouncer can leverage use of a local cache in order to reduce the number
           of requests made to the Crowdsec LAPI. It will keep in cache the status for
