@@ -86,57 +86,7 @@ type Bouncer struct {
 
 // New creates the crowdsec bouncer plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	var requiredStrings map[string]string
-	if config.CrowdsecMode == aloneMode {
-		requiredStrings = map[string]string{
-			"CrowdsecCapiLogin": config.CrowdsecLapiScheme,
-			"CrowdsecCapiPwd":   config.CrowdsecLapiHost,
-		}
-		for _, val := range config.CrowdsecCapiScenarios {
-			if len(val) == 0 {
-				return nil, fmt.Errorf("CrowdsecCapiScenarios: one or more scenario are empty")
-			}
-		}
-		config.UpdateIntervalSeconds = 7200
-		config.CrowdsecLapiKey = ""
-		config.CrowdsecLapiScheme = "https"
-		config.CrowdsecLapiHost = "api.crowdsec.net"
-	} else {
-		requiredStrings = map[string]string{
-			"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
-			"CrowdsecLapiHost":   config.CrowdsecLapiHost,
-			"CrowdsecLapiKey":    config.CrowdsecLapiKey,
-			"CrowdsecMode":       config.CrowdsecMode,
-		}
-		requiredInt := map[string]int64{
-			"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
-			"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
-		}
-		for key, val := range requiredInt {
-			if val < 1 {
-				return nil, fmt.Errorf("%v: cannot be less than 1", key)
-			}
-		}
-	}
-	for key, val := range requiredStrings {
-		if len(val) == 0 {
-			return nil, fmt.Errorf("%v: cannot be empty", key)
-		}
-	}
-	if !contains([]string{noneMode, liveMode, streamMode, aloneMode}, config.CrowdsecMode) {
-		return nil, fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
-	}
-	if !contains([]string{"http", "https"}, config.CrowdsecLapiScheme) {
-		return nil, fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
-	}
-	testURL := url.URL{
-		Scheme: config.CrowdsecLapiScheme,
-		Host:   config.CrowdsecLapiHost,
-	}
-	_, err := http.NewRequest(http.MethodGet, testURL.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
-	}
+	validateParams(config)
 
 	bouncer := &Bouncer{
 		next:     next,
@@ -422,4 +372,59 @@ func crowdsecQuery(a *Bouncer, stringURL string, isPost bool) []byte {
 		return nil
 	}
 	return body
+}
+
+func validateParams(config *Config) error {
+	var requiredStrings map[string]string
+	if config.CrowdsecMode == aloneMode {
+		requiredStrings = map[string]string{
+			"CrowdsecCapiLogin": config.CrowdsecLapiScheme,
+			"CrowdsecCapiPwd":   config.CrowdsecLapiHost,
+		}
+		for _, val := range config.CrowdsecCapiScenarios {
+			if len(val) == 0 {
+				return fmt.Errorf("CrowdsecCapiScenarios: one or more scenario are empty")
+			}
+		}
+		config.UpdateIntervalSeconds = 7200
+		config.CrowdsecLapiKey = ""
+		config.CrowdsecLapiScheme = "https"
+		config.CrowdsecLapiHost = "api.crowdsec.net"
+	} else {
+		requiredStrings = map[string]string{
+			"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
+			"CrowdsecLapiHost":   config.CrowdsecLapiHost,
+			"CrowdsecLapiKey":    config.CrowdsecLapiKey,
+			"CrowdsecMode":       config.CrowdsecMode,
+		}
+		requiredInt := map[string]int64{
+			"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
+			"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
+		}
+		for key, val := range requiredInt {
+			if val < 1 {
+				return fmt.Errorf("%v: cannot be less than 1", key)
+			}
+		}
+	}
+	for key, val := range requiredStrings {
+		if len(val) == 0 {
+			return fmt.Errorf("%v: cannot be empty", key)
+		}
+	}
+	if !contains([]string{noneMode, liveMode, streamMode, aloneMode}, config.CrowdsecMode) {
+		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
+	}
+	if !contains([]string{"http", "https"}, config.CrowdsecLapiScheme) {
+		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
+	}
+	testURL := url.URL{
+		Scheme: config.CrowdsecLapiScheme,
+		Host:   config.CrowdsecLapiHost,
+	}
+	_, err := http.NewRequest(http.MethodGet, testURL.String(), nil)
+	if err != nil {
+		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
+	}
+	return nil
 }
