@@ -339,8 +339,8 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 	a.crowdsecStreamHealthy = true
 }
 
-func closeBody(Body io.ReadCloser) {
-	err := Body.Close()
+func closeBody(body io.ReadCloser) {
+	err := body.Close()
 	if err != nil {
 		log.Printf("failed to close body reader: %s", err)
 	}
