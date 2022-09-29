@@ -185,35 +185,16 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// We are now in none or live mode.
-	noneURL := url.URL{
+	routeURL := url.URL{
 		Scheme:   a.crowdsecScheme,
 		Host:     a.crowdsecHost,
 		Path:     crowdsecRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
 	}
-	request, _ := http.NewRequest(http.MethodGet, noneURL.String(), nil)
-	request.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
-	res, err := a.client.Do(request)
-	if err != nil {
-		log.Printf("failed to get decision: %s", err)
-		rw.WriteHeader(http.StatusForbidden)
-		return
-	}
-	defer closeBody(res.Body)
-	if res.StatusCode != 200 {
-		log.Printf("failed to get decision, status code: %d", res.StatusCode)
-		rw.WriteHeader(http.StatusForbidden)
-		return
-	}
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf("failed to read body: %s", err)
-		rw.WriteHeader(http.StatusForbidden)
-		return
-	}
+	body := crowdsecQuery(a, routeURL.String())
 	if !bytes.Equal(body, []byte("null")) {
 		var decisions []Decision
-		err = json.Unmarshal(body, &decisions)
+		err := json.Unmarshal(body, &decisions)
 		if err != nil {
 			log.Printf("failed to parse body: %s", err)
 			rw.WriteHeader(http.StatusForbidden)
@@ -295,34 +276,15 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 	time.AfterFunc(time.Duration(a.updateInterval)*time.Second, func() {
 		handleStreamCache(a, false)
 	})
-	streamURL := url.URL{
+	streamRouteURL := url.URL{
 		Scheme:   a.crowdsecScheme,
 		Host:     a.crowdsecHost,
 		Path:     crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", initialized),
 	}
-	req, _ := http.NewRequest(http.MethodGet, streamURL.String(), nil)
-	req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
-	res, err := a.client.Do(req)
-	if err != nil {
-		log.Printf("error while fetching decisions: %s", err)
-		a.crowdsecStreamHealthy = false
-		return
-	}
-	if res.StatusCode == http.StatusForbidden {
-		log.Printf("error while fetching decisions, status code: %d", res.StatusCode)
-		a.crowdsecStreamHealthy = false
-		return
-	}
-	defer closeBody(res.Body)
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf("error while reading body: %s", err)
-		a.crowdsecStreamHealthy = false
-		return
-	}
+	body := crowdsecQuery(a, streamRouteURL.String())
 	var stream Stream
-	err = json.Unmarshal(body, &stream)
+	err := json.Unmarshal(body, &stream)
 	if err != nil {
 		log.Printf("error while parsing body: %s", err)
 		a.crowdsecStreamHealthy = false
@@ -340,9 +302,32 @@ func handleStreamCache(a *Bouncer, initialized bool) {
 	a.crowdsecStreamHealthy = true
 }
 
-func closeBody(body io.ReadCloser) {
-	err := body.Close()
+func crowdsecQuery(a *Bouncer, stringURL string) ([]byte) {
+	req, _ := http.NewRequest(http.MethodGet, stringURL, nil)
+	req.Header.Add(crowdsecAuthHeader, a.crowdsecKey)
+	res, err := a.client.Do(req)
 	if err != nil {
-		log.Printf("failed to close body reader: %s", err)
+		log.Printf("error while fetching %v: %s", stringURL, err)
+		a.crowdsecStreamHealthy = false
+		return nil
 	}
+	if res.StatusCode == http.StatusForbidden {
+		log.Printf("error while fetching %v, status code: %d", stringURL, res.StatusCode)
+		a.crowdsecStreamHealthy = false
+		return nil
+	}
+	defer func (body io.ReadCloser) {
+		err := body.Close()
+		if err != nil {
+			log.Printf("failed to close body reader: %s", err)
+		}
+	}(res.Body)
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Printf("error while reading body: %s", err)
+		a.crowdsecStreamHealthy = false
+		return nil
+	}
+	return body
 }
+
