@@ -144,6 +144,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 }
 
 // TODO the serve HTTP should be split as it's too long.
+// ServeHTTP principal function of plugin
 func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !a.enabled {
 		log.Printf("Crowdsec Bouncer not enabled")
@@ -244,7 +245,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // Decision: Body returned from Crowdsec LAPI.
 type Decision struct {
-	Id        int    `json:"id"`
+	ID        int    `json:"id"`
 	Origin    string `json:"origin"`
 	Type      string `json:"type"`
 	Scope     string `json:"scope"`
