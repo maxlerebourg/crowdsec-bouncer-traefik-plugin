@@ -192,7 +192,8 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
 	}
 	body := crowdsecQuery(a, routeURL.String())
-	if !bytes.Equal(body, []byte("null")) {
+	nullByte := []byte("null")
+	if !bytes.Equal(body, nullByte) {
 		var decisions []Decision
 		err := json.Unmarshal(body, &decisions)
 		if err != nil {
