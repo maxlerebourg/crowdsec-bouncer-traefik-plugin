@@ -17,21 +17,14 @@ The crowdsec utility will provide the community blocklist which contains highly 
 When used with crowdsec it will leverage the local API which will analyze traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns against your website.
 
 There are 4 operating modes (CrowdsecMode) for this plugin:
-- none -> If the client IP is on ban list, it will get a http code 403 response.
-    Otherwise, request will continue as usual. All request call the Crowdsec LAPI
-
-- live -> If the client IP is on ban list, it will get a http code 403 response.
-    Otherwise, request will continue as usual.
-    The bouncer can leverage use of a local cache in order to reduce the number
-    of requests made to the Crowdsec LAPI. It will keep in cache the status for
-    each IP that makes queries.
-
-- stream -> Stream Streaming mode allows you to keep in the local cache only the Banned IPs,
-    every requests that does not hit the cache is authorized.
-    Every minute, the cache is updated with news from the Crowdsec LAPI.
-
-- alone -> Streaming mode but the blacklisted IPs are fetched on the CAPI.
-    Every 2 hours, the cache is updated with news from the Crowdsec CAPI.
+|------|------|
+| Mode | Description |
+|------|------|
+| none | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. All request call the Crowdsec LAPI |
+| live | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual.    The bouncer can leverage use of a local cache in order to reduce the number of requests made to the Crowdsec LAPI. It will keep in cache the status for  each IP that makes queries. |
+| stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI. |
+| alone | Streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI.|
+|------|------|
 
 The recommanded mode for performance is the streaming mode, decisions are updated every 60 sec by default and that's the only communication between traefik and crowdsec. Every requests that happens hits the cache for quick decisions.
 
@@ -66,11 +59,11 @@ The recommanded mode for performance is the streaming mode, decisions are update
 - UpdateIntervalSeconds
   - int64
   - default: 60
-  - User only in `stream` mode, interval between fetching blacklisted IPs from LAPI
+  - Used only in `stream` mode, interval between fetching blacklisted IPs from LAPI
 - DefaultDecisionSeconds
   - int64
   - default: 60
-  - User only in `live` mode, decision duration of accepted IPs
+  - Used only in `live` mode, decision duration of accepted IPs
 
 ### Configuration
 
