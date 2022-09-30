@@ -17,7 +17,7 @@ The crowdsec utility will provide the community blocklist which contains highly 
 When used with crowdsec it will leverage the local API which will analyze traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns against your website.
 
 There are 4 operating modes (CrowdsecMode) for this plugin:
-|------|------|
+
 | Mode | Description |
 |------|------|
 | none | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. All request call the Crowdsec LAPI |
