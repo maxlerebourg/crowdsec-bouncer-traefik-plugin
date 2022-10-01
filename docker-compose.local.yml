@@ -61,8 +61,8 @@ services:
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - logs:/var/log/traefik:ro
-      - db:/var/lib/crowdsec/data/
-      - config:/etc/crowdsec/
+      - crowdsec-db:/var/lib/crowdsec/data/
+      - crowdsec-config:/etc/crowdsec/
 
 volumes:
   logs:
