@@ -51,15 +51,15 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                false,
-		CrowdsecMode:           streamMode,
+		CrowdsecMode:           aloneMode,
 		CrowdsecLapiScheme:     "http",
 		CrowdsecLapiHost:       "crowdsec:8080",
 		CrowdsecLapiKey:        "",
 		CrowdsecCapiLogin:      "",
 		CrowdsecCapiPwd:        "",
 		CrowdsecCapiScenarios:  []string{},
-		UpdateIntervalSeconds:  60,
-		DefaultDecisionSeconds: 60,
+		UpdateIntervalSeconds:  10,
+		DefaultDecisionSeconds: 10,
 	}
 }
 
@@ -147,7 +147,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if a.crowdsecMode == streamMode || a.crowdsecMode == aloneMode || a.crowdsecMode == liveMode {
-		isBanned, err := getDecision(a.cache, remoteHost)
+		isBanned, err := getDecision(a, remoteHost)
 		if err == nil {
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
@@ -213,8 +213,8 @@ func contains(source []string, target string) bool {
 
 // Get Decision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
-func getDecision(cache *ttl_map.Heap, clientIP string) (bool, error) {
-	banned, isCached := cache.Get(clientIP)
+func getDecision(a *Bouncer, clientIP string) (bool, error) {
+	banned, isCached := a.cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
 	if isCached && isValid && len(bannedString) > 0 {
 		return bannedString == cacheBannedValue, nil
@@ -222,12 +222,15 @@ func getDecision(cache *ttl_map.Heap, clientIP string) (bool, error) {
 	return false, fmt.Errorf("no cache data")
 }
 
-func setDecision(cache *ttl_map.Heap, clientIP string, isBanned bool, duration int64) {
+func setDecision(a *Bouncer, clientIP string, isBanned bool, duration int64) {
+	if a.crowdsecMode == noneMode {
+		return
+	}
 	if isBanned {
 		logger(fmt.Sprintf("%v banned", clientIP))
-		cache.Set(clientIP, cacheBannedValue, duration)
+		a.cache.Set(clientIP, cacheBannedValue, duration)
 	} else {
-		cache.Set(clientIP, cacheNoBannedValue, duration)
+		a.cache.Set(clientIP, cacheNoBannedValue, duration)
 	}
 }
 
@@ -242,9 +245,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	body := crowdsecQuery(a, routeURL.String(), false)
 
 	if bytes.Equal(body, []byte("null")) {
-		if a.crowdsecMode == liveMode {
-			setDecision(a.cache, remoteHost, false, a.defaultDecisionTimeout)
-		}
+		setDecision(a, remoteHost, false, a.defaultDecisionTimeout)
 		a.next.ServeHTTP(rw, req)
 		return
 	}
@@ -257,9 +258,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 		return
 	}
 	if len(decisions) == 0 {
-		if a.crowdsecMode == liveMode {
-			setDecision(a.cache, remoteHost, false, a.defaultDecisionTimeout)
-		}
+		setDecision(a, remoteHost, false, a.defaultDecisionTimeout)
 		a.next.ServeHTTP(rw, req)
 		return
 	}
@@ -269,7 +268,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 		logger(fmt.Sprintf("failed to parse duration: %s", err))
 		return
 	}
-	setDecision(a.cache, remoteHost, true, int64(duration.Seconds()))
+	setDecision(a, remoteHost, true, int64(duration.Seconds()))
 }
 
 func handleStreamCache(a *Bouncer) {
@@ -301,7 +300,7 @@ func handleStreamCache(a *Bouncer) {
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
-			setDecision(a.cache, decision.Value, true, int64(duration.Seconds()))
+			setDecision(a, decision.Value, true, int64(duration.Seconds()))
 		}
 	}
 	for _, decision := range stream.Deleted {
