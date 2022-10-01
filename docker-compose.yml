@@ -7,7 +7,7 @@ services:
     command:
       # - "--log.level=DEBUG"
       - "--accesslog"
-      - "--accesslog.filepath=/var/log/traefik/traefik.log"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"

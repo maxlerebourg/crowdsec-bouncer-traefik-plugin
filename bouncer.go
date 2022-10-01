@@ -122,6 +122,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		}
 		ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
 		go func() {
+			go handleStreamCache(bouncer)
 			for range ticker.C {
 				go handleStreamCache(bouncer)
 			}
