@@ -58,8 +58,8 @@ func CreateConfig() *Config {
 		CrowdsecCapiLogin:      "",
 		CrowdsecCapiPwd:        "",
 		CrowdsecCapiScenarios:  []string{},
-		UpdateIntervalSeconds:  10,
-		DefaultDecisionSeconds: 10,
+		UpdateIntervalSeconds:  60,
+		DefaultDecisionSeconds: 60,
 	}
 }
 
@@ -71,7 +71,6 @@ type Bouncer struct {
 
 	enabled                bool
 	crowdsecStreamHealthy  bool
-	needInit               bool
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
