@@ -146,7 +146,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if a.crowdsecMode == streamMode || a.crowdsecMode == liveMode {
+	if a.crowdsecMode == streamMode || a.crowdsecMode == aloneMode || a.crowdsecMode == liveMode {
 		isBanned, err := getDecision(a.cache, remoteHost)
 		if err == nil {
 			if isBanned {
@@ -159,7 +159,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Right here if we cannot join the stream we forbid the request to go on.
-	if a.crowdsecMode == streamMode {
+	if a.crowdsecMode == streamMode || a.crowdsecMode == aloneMode {
 		if a.crowdsecStreamHealthy {
 			a.next.ServeHTTP(rw, req)
 		} else {
