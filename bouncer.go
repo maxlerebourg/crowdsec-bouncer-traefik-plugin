@@ -58,8 +58,8 @@ func CreateConfig() *Config {
 		CrowdsecCapiLogin:      "",
 		CrowdsecCapiPwd:        "",
 		CrowdsecCapiScenarios:  []string{},
-		UpdateIntervalSeconds:  60,
-		DefaultDecisionSeconds: 60,
+		UpdateIntervalSeconds:  10,
+		DefaultDecisionSeconds: 10,
 	}
 }
 
@@ -71,6 +71,7 @@ type Bouncer struct {
 
 	enabled                bool
 	crowdsecStreamHealthy  bool
+	needInit               bool
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
@@ -116,14 +117,16 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		},
 		cache: ttl_map.New(),
 	}
-	// if we are on a stream mode, we fetch in a go routine every minute the new decisions.
-	if config.CrowdsecMode == streamMode {
-		go handleStreamCache(bouncer, true)
-	} else if config.CrowdsecMode == aloneMode {
-		getToken(bouncer)
-		time.AfterFunc(10*time.Second, func() {
-			handleStreamCache(bouncer, false)
-		})
+	if config.CrowdsecMode == streamMode || config.CrowdsecMode == aloneMode {
+		if config.CrowdsecMode == aloneMode {
+			getToken(bouncer)
+		}
+		ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
+		go func() {
+			for range ticker.C {
+				go handleStreamCache(bouncer)
+			}
+		}()
 	}
 	return bouncer, nil
 }
@@ -265,18 +268,15 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	setDecision(a.cache, remoteHost, true, int64(duration.Seconds()))
 }
 
-func handleStreamCache(a *Bouncer, initialized bool) {
+func handleStreamCache(a *Bouncer) {
 	// TODO clean properly on exit.
-	time.AfterFunc(time.Duration(a.updateInterval)*time.Second, func() {
-		handleStreamCache(a, false)
-	})
 	var rawQuery string
 	var path string
 	if a.crowdsecMode == aloneMode {
 		rawQuery = ""
 		path = crowdsecCapiDecisions
 	} else {
-		rawQuery = fmt.Sprintf("startup=%t", initialized)
+		rawQuery = fmt.Sprintf("startup=%t", !a.crowdsecStreamHealthy)
 		path = crowdsecLapiStreamRoute
 	}
 	streamRouteURL := url.URL{

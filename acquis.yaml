@@ -1,4 +1,4 @@
 filenames:
- - /var/log/traefik/*.log
+ - /var/log/traefik/traefik.log
 labels:
   type: traefik
