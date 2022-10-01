@@ -269,8 +269,10 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 
 func handleStreamCache(a *Bouncer, initialized bool) {
 	// TODO clean properly on exit.
-	// time.Duration(a.updateInterval) * time.Second
-	time.AfterFunc(time.Duration(a.updateInterval)*time.Second, func() {
+	log.Printf("%s Start handleStreamCache()", headerLog)
+	time.AfterFunc(10*time.Second, func() {
+		// we don't know already we have to pass false here
+		// if crowdsec is not setup, we'll never get the initialization
 		handleStreamCache(a, false)
 	})
 
