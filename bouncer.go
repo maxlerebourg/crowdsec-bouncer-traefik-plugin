@@ -273,6 +273,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 }
 
 func handleStreamCache(a *Bouncer) {
+	logger(fmt.Sprintf("Start handleStreamCache with health=%v", a.crowdsecStreamHealthy))
 	// TODO clean properly on exit.
 	var rawQuery string
 	var path string
