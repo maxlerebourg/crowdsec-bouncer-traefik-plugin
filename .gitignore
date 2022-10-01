@@ -3,3 +3,4 @@
 config
 db
 logs
+docker-compose.dev.yml

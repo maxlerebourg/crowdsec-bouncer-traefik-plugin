@@ -16,7 +16,7 @@ services:
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./logs:/var/log/traefik
+      - logs:/var/log/traefik
       - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     labels:
       - "traefik.enable=true"
@@ -60,9 +60,9 @@ services:
       BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - ./logs:/var/log/traefik:ro
-      - ./db:/var/lib/crowdsec/data/
-      - ./config:/etc/crowdsec/
+      - logs:/var/log/traefik:ro
+      - db:/var/lib/crowdsec/data/
+      - config:/etc/crowdsec/
 
 volumes:
   logs:
