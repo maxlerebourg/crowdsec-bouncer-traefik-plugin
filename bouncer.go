@@ -140,7 +140,7 @@ func (a *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// TODO Make sur remote address does not include the port.
 	remoteHost, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		log.Printf("failed to extract ip from remote address: %v", err)
+		logger(fmt.Sprintf("failed to extract ip from remote address: %v", err))
 		a.next.ServeHTTP(rw, req)
 		return
 	}
@@ -197,6 +197,10 @@ type Login struct {
 	Expire string `json:"expire"`
 }
 
+func logger(str string) {
+	log.Printf("Crowdsec Bouncer Traefik Plugin - %s", str)
+}
+
 func contains(source []string, target string) bool {
 	for _, a := range source {
 		if a == target {
@@ -219,7 +223,7 @@ func getDecision(cache *ttl_map.Heap, clientIP string) (bool, error) {
 
 func setDecision(cache *ttl_map.Heap, clientIP string, isBanned bool, duration int64) {
 	if isBanned {
-		log.Printf("%v banned", clientIP)
+		logger(fmt.Sprintf("%v banned", clientIP))
 		cache.Set(clientIP, cacheBannedValue, duration)
 	} else {
 		cache.Set(clientIP, cacheNoBannedValue, duration)
@@ -247,7 +251,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	var decisions []Decision
 	err := json.Unmarshal(body, &decisions)
 	if err != nil {
-		log.Printf("failed to parse body: %s", err)
+		logger(fmt.Sprintf("failed to parse body: %s", err))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -261,7 +265,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	rw.WriteHeader(http.StatusForbidden)
 	duration, err := time.ParseDuration(decisions[0].Duration)
 	if err != nil {
-		log.Printf("failed to parse duration: %s", err)
+		logger(fmt.Sprintf("failed to parse duration: %s", err))
 		return
 	}
 	setDecision(a.cache, remoteHost, true, int64(duration.Seconds()))
@@ -288,7 +292,7 @@ func handleStreamCache(a *Bouncer) {
 	var stream Stream
 	err := json.Unmarshal(body, &stream)
 	if err != nil {
-		log.Printf("error while parsing body: %s", err)
+		logger(fmt.Sprintf("error while parsing body: %s", err))
 		a.crowdsecStreamHealthy = false
 		return
 	}
@@ -314,7 +318,7 @@ func getToken(a *Bouncer) {
 	var login Login
 	err := json.Unmarshal(body, &login)
 	if err != nil {
-		log.Printf("error while parsing body: %s", err)
+		logger(fmt.Sprintf("error while parsing body: %s", err))
 		a.crowdsecStreamHealthy = false
 		return
 	}
@@ -343,7 +347,7 @@ func crowdsecQuery(a *Bouncer, stringURL string, isPost bool) []byte {
 	}
 	res, err := a.client.Do(req)
 	if err != nil {
-		log.Printf("error while fetching %v: %s", stringURL, err)
+		logger(fmt.Sprintf("error while fetching %v: %s", stringURL, err))
 		a.crowdsecStreamHealthy = false
 		return nil
 	}
@@ -357,19 +361,19 @@ func crowdsecQuery(a *Bouncer, stringURL string, isPost bool) []byte {
 		return crowdsecQuery(a, stringURL, false)
 	}
 	if res.StatusCode != http.StatusOK {
-		log.Printf("error while fetching %v, status code: %d", stringURL, res.StatusCode)
+		logger(fmt.Sprintf("error while fetching %v, status code: %d", stringURL, res.StatusCode))
 		a.crowdsecStreamHealthy = false
 		return nil
 	}
 	defer func(body io.ReadCloser) {
 		err = body.Close()
 		if err != nil {
-			log.Printf("failed to close body reader: %s", err)
+			logger(fmt.Sprintf("failed to close body reader: %s", err))
 		}
 	}(res.Body)
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Printf("error while reading body: %s", err)
+		logger(fmt.Sprintf("error while reading body: %s", err))
 		a.crowdsecStreamHealthy = false
 		return nil
 	}
