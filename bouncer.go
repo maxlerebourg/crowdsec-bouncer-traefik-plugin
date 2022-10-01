@@ -51,15 +51,15 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                false,
-		CrowdsecMode:           aloneMode,
+		CrowdsecMode:           streamMode,
 		CrowdsecLapiScheme:     "http",
 		CrowdsecLapiHost:       "crowdsec:8080",
 		CrowdsecLapiKey:        "",
 		CrowdsecCapiLogin:      "",
 		CrowdsecCapiPwd:        "",
 		CrowdsecCapiScenarios:  []string{},
-		UpdateIntervalSeconds:  10,
-		DefaultDecisionSeconds: 10,
+		UpdateIntervalSeconds:  60,
+		DefaultDecisionSeconds: 60,
 	}
 }
 
