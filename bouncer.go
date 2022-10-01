@@ -31,6 +31,7 @@ const (
 	crowdsecCapiDecisions   = "v2/decisions/stream"
 	cacheBannedValue        = "t"
 	cacheNoBannedValue      = "f"
+	headerLog               = "Crowdsec Bouncer plugin - "
 )
 
 // Config the plugin configuration.
@@ -86,6 +87,7 @@ type Bouncer struct {
 
 // New creates the crowdsec bouncer plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+	log.Printf("%s Start Bouncer", headerLog)
 	err := validateParams(config)
 	if err != nil {
 		return nil, err
@@ -212,12 +214,12 @@ func getDecision(cache *ttl_map.Heap, clientIP string) (bool, error) {
 	if isCached && isValid && len(bannedString) > 0 {
 		return bannedString == cacheBannedValue, nil
 	}
-	return false, fmt.Errorf("no cache data")
+	return false, fmt.Errorf("%vNo cache data", headerLog)
 }
 
 func setDecision(cache *ttl_map.Heap, clientIP string, isBanned bool, duration int64) {
 	if isBanned {
-		log.Printf("%v banned", clientIP)
+		log.Printf("%v%v banned", headerLog, clientIP)
 		cache.Set(clientIP, cacheBannedValue, duration)
 	} else {
 		cache.Set(clientIP, cacheNoBannedValue, duration)
@@ -245,7 +247,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	var decisions []Decision
 	err := json.Unmarshal(body, &decisions)
 	if err != nil {
-		log.Printf("failed to parse body: %s", err)
+		log.Printf("%sfailed to parse body: %s", headerLog, err)
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -259,7 +261,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	rw.WriteHeader(http.StatusForbidden)
 	duration, err := time.ParseDuration(decisions[0].Duration)
 	if err != nil {
-		log.Printf("failed to parse duration: %s", err)
+		log.Printf("%sfailed to parse duration: %s", headerLog, err)
 		return
 	}
 	setDecision(a.cache, remoteHost, true, int64(duration.Seconds()))
@@ -267,9 +269,11 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 
 func handleStreamCache(a *Bouncer, initialized bool) {
 	// TODO clean properly on exit.
+	// time.Duration(a.updateInterval) * time.Second
 	time.AfterFunc(time.Duration(a.updateInterval)*time.Second, func() {
 		handleStreamCache(a, false)
 	})
+
 	var rawQuery string
 	var path string
 	if a.crowdsecMode == aloneMode {
