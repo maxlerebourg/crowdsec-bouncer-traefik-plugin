@@ -7,7 +7,7 @@ services:
     command:
       # - "--log.level=DEBUG"
       - "--accesslog"
-      - "--accesslog.filepath=/var/log/traefik/traefik.log"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
@@ -15,28 +15,40 @@ services:
 
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "logs:/var/log/traefik"
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - logs:/var/log/traefik
       - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-    ports:
-      - 8000:80
-      - 8080:8080
-    depends_on:
-      - 'crowdsec'
-
-  whoami:
-    image: traefik/whoami
-    container_name: "simple-service"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`localhost`)"
-      - "traefik.http.routers.whoami.entrypoints=web"
-      - "traefik.http.routers.whoami.middlewares=crowdsec@docker"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapilogin=3829a6c9870e4726a377d8951ebb64a1m8psGvMaq1ykJ3zX"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapipwd=Q5pgN8bRNInHGdx6QCksdPOJVLeLQ7ipJntSeuP3r8088zXzRVs4G8liXAKfI1k6"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/http-backdoors-attempts,baudneo/zoneminder-bf"
+    ports:
+      - 8000:80
+      - 8080:8080
+    depends_on:
+      - crowdsec
+
+  whoami1:
+    image: traefik/whoami
+    container_name: "simple-service1"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`localhost`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami.middlewares=crowdsec@docker"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+  whoami2:
+    image: traefik/whoami
+    container_name: "simple-service2"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`localhost`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami.middlewares=crowdsec@docker"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.1
@@ -49,8 +61,8 @@ services:
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - logs:/var/log/traefik:ro
-      - crowdsec-db:/var/lib/crowdsec/data/
-      - crowdsec-config:/etc/crowdsec/
+      - db:/var/lib/crowdsec/data/
+      - config:/etc/crowdsec/
 
 volumes:
   logs:
