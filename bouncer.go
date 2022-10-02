@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -117,6 +118,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		cache: ttl_map.New(),
 	}
 	if config.CrowdsecMode == streamMode || config.CrowdsecMode == aloneMode {
+		rand.Seed(time.Now().UnixNano())
 		if config.CrowdsecMode == aloneMode {
 			getToken(bouncer)
 		}
@@ -271,9 +273,20 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	setDecision(a, remoteHost, true, int64(duration.Seconds()))
 }
 
+func wait_stream() {
+	logger("Start Wait Stream")
+	sec := rand.Int63n(30)
+	logger(fmt.Sprintf("Sec=%v", sec))
+	time.Sleep(time.Duration(sec) * time.Second)
+	logger("End Wait Stream")
+}
+
 func handleStreamCache(a *Bouncer) {
 	logger(fmt.Sprintf("Start handleStreamCache with health=%v", a.crowdsecStreamHealthy))
 	// TODO clean properly on exit.
+
+	wait_stream()
+	// wait random number of sec
 	var rawQuery string
 	var path string
 	if a.crowdsecMode == aloneMode {
@@ -307,6 +320,7 @@ func handleStreamCache(a *Bouncer) {
 		a.cache.Del(decision.Value)
 	}
 	a.crowdsecStreamHealthy = true
+	logger(fmt.Sprintf("End handleStreamCache with health=%v", a.crowdsecStreamHealthy))
 }
 
 func getToken(a *Bouncer) {

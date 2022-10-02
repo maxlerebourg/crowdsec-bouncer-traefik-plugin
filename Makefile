@@ -28,6 +28,15 @@ run_local:
 run:
 	docker-compose -f docker-compose.yml up -d --remove-orphans
 
+restart_docker_dev:
+	docker-compose -f docker-compose.dev.yml restart
+
+restart_docker_local:
+	docker-compose -f docker-compose.local.yml restart
+
+restart_docker:
+	docker-compose -f docker-compose.yml restart
+
 show_metrics:
 	docker exec crowdsec cscli metrics
 
