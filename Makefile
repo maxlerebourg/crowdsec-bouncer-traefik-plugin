@@ -18,3 +18,12 @@ vendor:
 
 clean:
 	rm -rf ./vendor
+
+run_dev:
+	docker-compose -f docker-compose.dev.yml up -d --remove-orphans
+
+run_local:
+	docker-compose -f docker-compose.local.yml up -d --remove-orphans
+
+run:
+	docker-compose -f docker-compose.yml up -d --remove-orphans

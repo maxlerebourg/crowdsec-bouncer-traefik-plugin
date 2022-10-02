@@ -29,6 +29,13 @@ The recommanded mode for performance is the streaming mode, decisions are update
 
 ## Usage
 
+To get started, use the `docker-compose.yml` file.
+
+You can run it with:
+```bash
+make run
+```
+
 ### Note
 Each middleware in traefik has it's own data and is instanciated by service.
 This means if there are 10 services protected by the bouncer in streaming alone or live mode, the cache will be duplicated to all 10 services.
