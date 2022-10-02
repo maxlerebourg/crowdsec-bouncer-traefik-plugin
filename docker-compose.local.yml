@@ -26,7 +26,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapipwd=Q5pgN8bRNInHGdx6QCksdPOJVLeLQ7ipJntSeuP3r8088zXzRVs4G8liXAKfI1k6"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/http-backdoors-attempts,baudneo/zoneminder-bf"
     ports:
-      - 8000:80
+      - 80:80
       - 8080:8080
     depends_on:
       - crowdsec
@@ -72,9 +72,9 @@ services:
       BOUNCER_KEY_TRAEFIK_2: 44c36dac5c4140af9f06f397508e82c7
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - logs:/var/log/traefik:ro
-      - crowdsec-db:/var/lib/crowdsec/data/
-      - crowdsec-config:/etc/crowdsec/
+      - logs-local:/var/log/traefik:ro
+      - crowdsec-db-local:/var/lib/crowdsec/data/
+      - crowdsec-config-local:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
 volumes:

@@ -273,7 +273,7 @@ func handleNoStreamCache(a *Bouncer, rw http.ResponseWriter, req *http.Request, 
 	setDecision(a, remoteHost, true, int64(duration.Seconds()))
 }
 
-func wait_stream() {
+func waitStream() {
 	logger("Start Wait Stream")
 	sec := rand.Int63n(30)
 	logger(fmt.Sprintf("Sec=%v", sec))
@@ -285,7 +285,7 @@ func handleStreamCache(a *Bouncer) {
 	logger(fmt.Sprintf("Start handleStreamCache with health=%v", a.crowdsecStreamHealthy))
 	// TODO clean properly on exit.
 
-	wait_stream()
+	waitStream()
 	// wait random number of sec
 	var rawQuery string
 	var path string
