@@ -23,11 +23,21 @@ There are 4 operating modes (CrowdsecMode) for this plugin:
 | none | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. All request call the Crowdsec LAPI |
 | live | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual.    The bouncer can leverage use of a local cache in order to reduce the number of requests made to the Crowdsec LAPI. It will keep in cache the status for  each IP that makes queries. |
 | stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI. |
-| alone | Streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI.|
+| alone | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any localy banned IP, but can work without a crowdsec service|
 
 The recommanded mode for performance is the streaming mode, decisions are updated every 60 sec by default and that's the only communication between traefik and crowdsec. Every requests that happens hits the cache for quick decisions.
 
 ## Usage
+
+### Note
+Each middleware in traefik has it's own data and is instanciated by service.
+This means if there are 10 services protected by the bouncer in streaming alone or live mode, the cache will be duplicated to all 10 services.
+This is because traefik does not allow plugins to store data locally that can be consummed.
+
+The synchronisation with the crowdsec service will happen also 10 times in the period selected.
+It should be taken into account when fixing this period so each middleware has time to sync data from crowdsec.
+
+At each start of synchronisation, the middleware will wait a random number of seconds to avoid simultaneous calls to crowdsec.
 
 ### Variables
 - Enabled
@@ -45,7 +55,7 @@ The recommanded mode for performance is the streaming mode, decisions are update
   - Crowdsec LAPI available on which host.
 - CrowdsecLapiKey
   - string
-  - Crowdsec LAPI generated key for the bouncer. 
+  - Crowdsec LAPI generated key for the bouncer : **must be unique by service**. 
 - CrowdsecCapiLogin
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
