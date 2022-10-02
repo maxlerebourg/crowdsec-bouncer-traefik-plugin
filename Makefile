@@ -27,3 +27,7 @@ run_local:
 
 run:
 	docker-compose -f docker-compose.yml up -d --remove-orphans
+
+show_metrics:
+	docker exec crowdsec cscli metrics
+
