@@ -9,9 +9,10 @@ import (
 	crowdsec_bouncer_traefik_plugin "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
 )
 
+// this does not test anything yet
 func TestCrowdSec(t *testing.T) {
 	cfg := crowdsec_bouncer_traefik_plugin.CreateConfig()
-	cfg.CrowdsecLapiKey = "caca"
+	cfg.CrowdsecLapiKey = "test"
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
