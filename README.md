@@ -51,7 +51,7 @@ At each start of synchronisation, the middleware will wait a random number of se
   - enable the plugin
 - CrowdsecMode
   - string
-  - default: `stream`, expected value are: `none`, `live`, `stream`
+  - default: `live`, expected value are: `none`, `live`, `stream`
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected value are: `http`, `https`

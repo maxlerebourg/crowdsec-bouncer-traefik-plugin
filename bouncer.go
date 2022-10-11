@@ -32,20 +32,20 @@ const (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled                bool     `json:"enabled,omitempty"`
-	CrowdsecMode           string   `json:"crowdsecMode,omitempty"`
-	CrowdsecLapiScheme     string   `json:"crowdsecLapiScheme,omitempty"`
-	CrowdsecLapiHost       string   `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiKey        string   `json:"crowdsecLapiKey,omitempty"`
-	UpdateIntervalSeconds  int64    `json:"updateIntervalSeconds,omitempty"`
-	DefaultDecisionSeconds int64    `json:"defaultDecisionSeconds,omitempty"`
+	Enabled                bool   `json:"enabled,omitempty"`
+	CrowdsecMode           string `json:"crowdsecMode,omitempty"`
+	CrowdsecLapiScheme     string `json:"crowdsecLapiScheme,omitempty"`
+	CrowdsecLapiHost       string `json:"crowdsecLapiHost,omitempty"`
+	CrowdsecLapiKey        string `json:"crowdsecLapiKey,omitempty"`
+	UpdateIntervalSeconds  int64  `json:"updateIntervalSeconds,omitempty"`
+	DefaultDecisionSeconds int64  `json:"defaultDecisionSeconds,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                false,
-		CrowdsecMode:           noneMode,
+		CrowdsecMode:           liveMode,
 		CrowdsecLapiScheme:     "http",
 		CrowdsecLapiHost:       "crowdsec:8080",
 		CrowdsecLapiKey:        "",

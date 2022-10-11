@@ -1,22 +1,20 @@
-package crowdsec_bouncer_traefik_plugin_test
+package crowdsec_bouncer_traefik_plugin
 
 import (
 	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	crowdsec_bouncer_traefik_plugin "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
 )
 
 func TestCrowdSec(t *testing.T) {
-	cfg := crowdsec_bouncer_traefik_plugin.CreateConfig()
-	cfg.CrowdsecLapiKey = "caca"
+	cfg := CreateConfig()
+	cfg.CrowdsecLapiKey = "test"
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
 
-	handler, err := crowdsec_bouncer_traefik_plugin.New(ctx, next, cfg, "demo-plugin")
+	handler, err := New(ctx, next, cfg, "demo-plugin")
 	if err != nil {
 		t.Fatal(err)
 	}
