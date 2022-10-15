@@ -30,6 +30,9 @@ const (
 	cacheNoBannedValue      = "f"
 )
 
+var cache = ttl_map.New()
+var master = true
+
 // Config the plugin configuration.
 type Config struct {
 	Enabled                    bool     `json:"enabled,omitempty"`
@@ -46,7 +49,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
-		CrowdsecMode:               liveMode,
+		CrowdsecMode:               streamMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",
@@ -72,7 +75,6 @@ type Bouncer struct {
 	defaultDecisionTimeout int64
 	poolStrategy           *ip.PoolStrategy
 	client                 *http.Client
-	cache                  *ttl_map.Heap
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -107,9 +109,9 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			},
 			Timeout: 5 * time.Second,
 		},
-		cache: ttl_map.New(),
 	}
-	if config.CrowdsecMode == streamMode {
+	if config.CrowdsecMode == streamMode && master {
+		master = false
 		go func() {
 			rand.Seed(time.Now().UnixNano())
 			timeout := rand.Int63n(30)
@@ -139,7 +141,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if bouncer.crowdsecMode != noneMode {
-		isBanned, err := getDecision(bouncer.cache, remoteHost)
+		isBanned, err := getDecision(remoteHost)
 		if err == nil {
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
@@ -212,7 +214,7 @@ func getRemoteIP(bouncer *Bouncer, req *http.Request) (string, error) {
 
 // Get Decision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
-func getDecision(cache *ttl_map.Heap, clientIP string) (bool, error) {
+func getDecision(clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
 	if isCached && isValid && len(bannedString) > 0 {
@@ -221,7 +223,7 @@ func getDecision(cache *ttl_map.Heap, clientIP string) (bool, error) {
 	return false, fmt.Errorf("no cache data")
 }
 
-func setDecision(cache *ttl_map.Heap, clientIP string, isBanned bool, duration int64) {
+func setDecision(clientIP string, isBanned bool, duration int64) {
 	if isBanned {
 		logger(fmt.Sprintf("%v banned", clientIP))
 		cache.Set(clientIP, cacheBannedValue, duration)
@@ -230,7 +232,7 @@ func setDecision(cache *ttl_map.Heap, clientIP string, isBanned bool, duration i
 	}
 }
 
-func deleteDecision(cache *ttl_map.Heap, clientIP string) {
+func deleteDecision(clientIP string) {
 	cache.Del(clientIP)
 }
 
@@ -246,7 +248,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 
 	if bytes.Equal(body, []byte("null")) {
 		if bouncer.crowdsecMode == liveMode {
-			setDecision(bouncer.cache, remoteHost, false, bouncer.defaultDecisionTimeout)
+			setDecision(remoteHost, false, bouncer.defaultDecisionTimeout)
 		}
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -261,7 +263,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	}
 	if len(decisions) == 0 {
 		if bouncer.crowdsecMode == liveMode {
-			setDecision(bouncer.cache, remoteHost, false, bouncer.defaultDecisionTimeout)
+			setDecision(remoteHost, false, bouncer.defaultDecisionTimeout)
 		}
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -273,7 +275,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 		return
 	}
 	if bouncer.crowdsecMode == liveMode {
-		setDecision(bouncer.cache, remoteHost, true, int64(duration.Seconds()))
+		setDecision(remoteHost, true, int64(duration.Seconds()))
 	}
 }
 
@@ -296,11 +298,11 @@ func handleStreamCache(bouncer *Bouncer) {
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
-			setDecision(bouncer.cache, decision.Value, true, int64(duration.Seconds()))
+			setDecision(decision.Value, true, int64(duration.Seconds()))
 		}
 	}
 	for _, decision := range stream.Deleted {
-		deleteDecision(bouncer.cache, decision.Value)
+		deleteDecision(decision.Value)
 	}
 	bouncer.crowdsecStreamHealthy = true
 }
