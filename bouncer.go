@@ -30,8 +30,11 @@ const (
 	cacheNoBannedValue      = "f"
 )
 
-var cache = ttl_map.New()
-var master = true
+var (
+	cache = ttl_map.New()
+  initiateStream = true
+  healthy = true
+)
 
 // Config the plugin configuration.
 type Config struct {
@@ -66,7 +69,6 @@ type Bouncer struct {
 	template *template.Template
 
 	enabled                bool
-	crowdsecStreamHealthy  bool
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
@@ -92,7 +94,6 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
 		enabled:                config.Enabled,
-		crowdsecStreamHealthy:  false,
 		crowdsecMode:           config.CrowdsecMode,
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
@@ -110,8 +111,8 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			Timeout: 5 * time.Second,
 		},
 	}
-	if config.CrowdsecMode == streamMode && master {
-		master = false
+	if config.CrowdsecMode == streamMode && initiateStream {
+		initiateStream = false
 		go func() {
 			rand.Seed(time.Now().UnixNano())
 			timeout := rand.Int63n(30)
@@ -154,7 +155,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == streamMode {
-		if bouncer.crowdsecStreamHealthy {
+		if healthy {
 			bouncer.next.ServeHTTP(rw, req)
 		} else {
 			rw.WriteHeader(http.StatusForbidden)
@@ -285,14 +286,14 @@ func handleStreamCache(bouncer *Bouncer) {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     crowdsecLapiStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !bouncer.crowdsecStreamHealthy),
+		RawQuery: fmt.Sprintf("startup=%t", !healthy),
 	}
 	body := crowdsecQuery(bouncer, streamRouteURL.String())
 	var stream Stream
 	err := json.Unmarshal(body, &stream)
 	if err != nil {
 		logger(fmt.Sprintf("error while parsing body: %s", err))
-		bouncer.crowdsecStreamHealthy = false
+		healthy = false
 		return
 	}
 	for _, decision := range stream.New {
@@ -304,7 +305,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	for _, decision := range stream.Deleted {
 		deleteDecision(decision.Value)
 	}
-	bouncer.crowdsecStreamHealthy = true
+	healthy = true
 }
 
 func crowdsecQuery(bouncer *Bouncer, stringURL string) []byte {
@@ -314,12 +315,12 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) []byte {
 	res, err := bouncer.client.Do(req)
 	if err != nil {
 		logger(fmt.Sprintf("error while fetching %v: %s", stringURL, err))
-		bouncer.crowdsecStreamHealthy = false
+		healthy = false
 		return nil
 	}
 	if res.StatusCode != http.StatusOK {
 		logger(fmt.Sprintf("error while fetching %v, status code: %d", stringURL, res.StatusCode))
-		bouncer.crowdsecStreamHealthy = false
+		healthy = false
 		return nil
 	}
 	defer func(body io.ReadCloser) {
@@ -331,7 +332,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) []byte {
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		logger(fmt.Sprintf("error while reading body: %s", err))
-		bouncer.crowdsecStreamHealthy = false
+		healthy = false
 		return nil
 	}
 	return body
