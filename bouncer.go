@@ -30,9 +30,9 @@ const (
 )
 
 var (
-	cache = ttl_map.New()
-  initiateStream = true
-  healthy = true
+	cache          = ttl_map.New()
+	initiateStream = true
+	healthy        = true
 )
 
 // Config the plugin configuration.
@@ -51,7 +51,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
-		CrowdsecMode:               streamMode,
+		CrowdsecMode:               liveMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",
@@ -240,7 +240,12 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 		Path:     crowdsecLapiRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
 	}
-	body := crowdsecQuery(bouncer, routeURL.String())
+	body, err := crowdsecQuery(bouncer, routeURL.String())
+	if err != nil {
+		logger(fmt.Sprintf("%w", err))
+		rw.WriteHeader(http.StatusForbidden)
+		return
+	}
 
 	if bytes.Equal(body, []byte("null")) {
 		if bouncer.crowdsecMode == liveMode {
@@ -251,7 +256,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	}
 
 	var decisions []Decision
-	err := json.Unmarshal(body, &decisions)
+	err = json.Unmarshal(body, &decisions)
 	if err != nil {
 		logger(fmt.Sprintf("failed to parse body: %s", err))
 		rw.WriteHeader(http.StatusForbidden)
@@ -283,9 +288,14 @@ func handleStreamCache(bouncer *Bouncer) {
 		Path:     crowdsecLapiStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !healthy),
 	}
-	body := crowdsecQuery(bouncer, streamRouteURL.String())
+	body, err := crowdsecQuery(bouncer, streamRouteURL.String())
+	if err != nil {
+		logger(fmt.Sprintf("%w", err))
+		healthy = false
+		return
+	}
 	var stream Stream
-	err := json.Unmarshal(body, &stream)
+	err = json.Unmarshal(body, &stream)
 	if err != nil {
 		logger(fmt.Sprintf("error while parsing body: %s", err))
 		healthy = false
@@ -303,20 +313,16 @@ func handleStreamCache(bouncer *Bouncer) {
 	healthy = true
 }
 
-func crowdsecQuery(bouncer *Bouncer, stringURL string) []byte {
+func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	var req *http.Request
 	req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	req.Header.Add(crowdsecLapiHeader, bouncer.crowdsecKey)
 	res, err := bouncer.client.Do(req)
 	if err != nil {
-		logger(fmt.Sprintf("error while fetching %v: %s", stringURL, err))
-		healthy = false
-		return nil
+		return nil, fmt.Errorf("error while fetching %v: %s", stringURL, err)
 	}
 	if res.StatusCode != http.StatusOK {
-		logger(fmt.Sprintf("error while fetching %v, status code: %d", stringURL, res.StatusCode))
-		healthy = false
-		return nil
+		return nil, fmt.Errorf("error while fetching %v, status code: %d", stringURL, res.StatusCode)
 	}
 	defer func(body io.ReadCloser) {
 		err = body.Close()
@@ -326,11 +332,9 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) []byte {
 	}(res.Body)
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		logger(fmt.Sprintf("error while reading body: %s", err))
-		healthy = false
-		return nil
+		return nil, fmt.Errorf("error while reading body: %s", err)
 	}
-	return body
+	return body, nil
 }
 
 func validateParams(config *Config) error {
