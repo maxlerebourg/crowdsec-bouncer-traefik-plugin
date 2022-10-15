@@ -30,9 +30,9 @@ const (
 )
 
 var (
-	cache          = ttl_map.New()
-	initiateStream = true
-	healthy        = true
+	cache                 = ttl_map.New()
+	initiateStream        = true
+	crowdsecStreamHealthy = true
 )
 
 // Config the plugin configuration.
@@ -150,7 +150,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == streamMode {
-		if healthy {
+		if crowdsecStreamHealthy {
 			bouncer.next.ServeHTTP(rw, req)
 		} else {
 			rw.WriteHeader(http.StatusForbidden)
@@ -286,19 +286,19 @@ func handleStreamCache(bouncer *Bouncer) {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     crowdsecLapiStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !healthy),
+		RawQuery: fmt.Sprintf("startup=%t", !crowdsecStreamHealthy),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String())
 	if err != nil {
 		logger(fmt.Sprintf("%w", err))
-		healthy = false
+		crowdsecStreamHealthy = false
 		return
 	}
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
 		logger(fmt.Sprintf("error while parsing body: %s", err))
-		healthy = false
+		crowdsecStreamHealthy = false
 		return
 	}
 	for _, decision := range stream.New {
@@ -310,7 +310,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	for _, decision := range stream.Deleted {
 		deleteDecision(decision.Value)
 	}
-	healthy = true
+	crowdsecStreamHealthy = true
 }
 
 func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
