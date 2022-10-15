@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -114,10 +113,6 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	if config.CrowdsecMode == streamMode && initiateStream {
 		initiateStream = false
 		go func() {
-			rand.Seed(time.Now().UnixNano())
-			timeout := rand.Int63n(30)
-			logger(fmt.Sprintf("Wait: %v", timeout))
-			time.Sleep(time.Duration(timeout) * time.Second)
 			go handleStreamCache(bouncer)
 			ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
 			for range ticker.C {
@@ -376,7 +371,7 @@ func validateParams(config *Config) error {
 	if len(config.ForwardedHeadersTrustedIPs) > 0 {
 		_, err = ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 		if err != nil {
-			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%v", err)
+			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%w", err)
 		}
 	} else {
 		logger("No IP provided for ForwardedHeadersTrustedIPs")

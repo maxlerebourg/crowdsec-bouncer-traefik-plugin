@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-//CHECKER
+// CHECKER
 
 // Checker allows to check that addresses are in a trusted IPs.
 type Checker struct {
