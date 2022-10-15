@@ -80,15 +80,7 @@ func parseIP(addr string) (net.IP, error) {
 	return userIP, nil
 }
 
-
-
-
-
 // STRATEGY
-
-const (
-	xForwardedFor = "X-Forwarded-For"
-)
 
 // PoolStrategy is a strategy based on an IP Checker.
 // It allows to check whether addresses are in a given pool of IPs.
@@ -99,12 +91,13 @@ type PoolStrategy struct {
 // GetIP checks the list of Forwarded IPs (most recent first) against the
 // Checker pool of IPs. It returns the first IP that is not in the pool, or the
 // empty string otherwise.
-func (s *PoolStrategy) GetIP(req *http.Request) string {
+func (s *PoolStrategy) GetIP(req *http.Request, customHeader string) string {
 	if s.Checker == nil {
 		return ""
 	}
 
-	xff := req.Header.Get(xForwardedFor)
+	xff := req.Header.Get(customHeader)
+
 	xffs := strings.Split(xff, ",")
 
 	for i := len(xffs) - 1; i >= 0; i-- {
