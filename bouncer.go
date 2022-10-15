@@ -27,11 +27,11 @@ const (
 	crowdsecLapiStreamRoute = "v1/decisions/stream"
 	cacheBannedValue        = "t"
 	cacheNoBannedValue      = "f"
+	cacheTimeoutKey         = "updated"
 )
 
 var (
 	cache                 = ttl_map.New()
-	initiateStream        = true
 	crowdsecStreamHealthy = true
 )
 
@@ -51,7 +51,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
-		CrowdsecMode:               liveMode,
+		CrowdsecMode:               streamMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",
@@ -110,8 +110,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			Timeout: 5 * time.Second,
 		},
 	}
-	if config.CrowdsecMode == streamMode && initiateStream {
-		initiateStream = false
+	if config.CrowdsecMode == streamMode {
 		go func() {
 			go handleStreamCache(bouncer)
 			ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
@@ -282,6 +281,14 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 
 func handleStreamCache(bouncer *Bouncer) {
 	// TODO clean properly on exit.
+	// Instead of blocking the goroutine interval for all the secondary node,
+	// if the master service is shut down, other goroutine can take the lead
+	// because updated routine information is in the cache
+	_, err := getDecision(cacheTimeoutKey)
+	if err == nil {
+		return
+	}
+	setDecision(cacheTimeoutKey, true, bouncer.updateInterval - 1)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
