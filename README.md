@@ -116,7 +116,7 @@ http:
           enabled: false
           updateIntervalSeconds: 60
           defaultDecisionSeconds: 60
-          crowdsecMode: stream
+          crowdsecMode: live
           crowdsecLapiKey: privateKey
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
