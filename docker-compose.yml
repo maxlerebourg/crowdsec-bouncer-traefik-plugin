@@ -14,7 +14,7 @@ services:
       - "--entrypoints.web.address=:80"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.0.6"
+      - "--experimental.plugins.bouncer.version=v1.0.9"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "logs:/var/log/traefik"
@@ -39,6 +39,8 @@ services:
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.enabled=true"
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY-1"
+      # forwardedheaderstrustedips should be the IP of the proxy that is in front of traefik (if any)
+      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
   
   whoami2:
     image: traefik/whoami
@@ -55,6 +57,8 @@ services:
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.enabled=true"
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY-2"
+      # forwardedheaderstrustedips should be the IP of the proxy that is in front of traefik (if any)
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.1

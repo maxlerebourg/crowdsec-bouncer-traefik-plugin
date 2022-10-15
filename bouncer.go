@@ -16,6 +16,7 @@ import (
 	"time"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/ip"
 )
 
 const (
@@ -23,7 +24,6 @@ const (
 	liveMode                = "live"
 	noneMode                = "none"
 	crowdsecLapiHeader      = "X-Api-Key"
-	crowdsecCapiHeader      = "Authorization"
 	crowdsecLapiRoute       = "v1/decisions"
 	crowdsecLapiStreamRoute = "v1/decisions/stream"
 	cacheBannedValue        = "t"
@@ -32,25 +32,27 @@ const (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled                bool   `json:"enabled,omitempty"`
-	CrowdsecMode           string `json:"crowdsecMode,omitempty"`
-	CrowdsecLapiScheme     string `json:"crowdsecLapiScheme,omitempty"`
-	CrowdsecLapiHost       string `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiKey        string `json:"crowdsecLapiKey,omitempty"`
-	UpdateIntervalSeconds  int64  `json:"updateIntervalSeconds,omitempty"`
-	DefaultDecisionSeconds int64  `json:"defaultDecisionSeconds,omitempty"`
+	Enabled                    bool     `json:"enabled,omitempty"`
+	CrowdsecMode               string   `json:"crowdsecMode,omitempty"`
+	CrowdsecLapiScheme         string   `json:"crowdsecLapiScheme,omitempty"`
+	CrowdsecLapiHost           string   `json:"crowdsecLapiHost,omitempty"`
+	CrowdsecLapiKey            string   `json:"crowdsecLapiKey,omitempty"`
+	UpdateIntervalSeconds      int64    `json:"updateIntervalSeconds,omitempty"`
+	DefaultDecisionSeconds     int64    `json:"defaultDecisionSeconds,omitempty"`
+	ForwardedHeadersTrustedIPs []string `json:"forwardedheaderstrustedips,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		Enabled:                false,
-		CrowdsecMode:           liveMode,
-		CrowdsecLapiScheme:     "http",
-		CrowdsecLapiHost:       "crowdsec:8080",
-		CrowdsecLapiKey:        "",
-		UpdateIntervalSeconds:  60,
-		DefaultDecisionSeconds: 60,
+		Enabled:                    false,
+		CrowdsecMode:               liveMode,
+		CrowdsecLapiScheme:         "http",
+		CrowdsecLapiHost:           "crowdsec:8080",
+		CrowdsecLapiKey:            "",
+		UpdateIntervalSeconds:      60,
+		DefaultDecisionSeconds:     60,
+		ForwardedHeadersTrustedIPs: []string{},
 	}
 }
 
@@ -60,16 +62,17 @@ type Bouncer struct {
 	name     string
 	template *template.Template
 
-	enabled                bool
-	crowdsecStreamHealthy  bool
-	crowdsecScheme         string
-	crowdsecHost           string
-	crowdsecKey            string
-	crowdsecMode           string
-	updateInterval         int64
-	defaultDecisionTimeout int64
-	client                 *http.Client
-	cache                  *ttl_map.Heap
+	enabled                      bool
+	crowdsecStreamHealthy        bool
+	crowdsecScheme               string
+	crowdsecHost                 string
+	crowdsecKey                  string
+	crowdsecMode                 string
+	updateInterval               int64
+	defaultDecisionTimeout       int64
+	forwardedHeadersPoolStrategy *ip.PoolStrategy
+	client                       *http.Client
+	cache                        *ttl_map.Heap
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -79,19 +82,24 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		return nil, err
 	}
 
+	var strategy ip.PoolStrategy
+	checker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
+	strategy = ip.PoolStrategy{Checker: checker}
+
 	bouncer := &Bouncer{
 		next:     next,
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
-		enabled:                config.Enabled,
-		crowdsecStreamHealthy:  false,
-		crowdsecMode:           config.CrowdsecMode,
-		crowdsecScheme:         config.CrowdsecLapiScheme,
-		crowdsecHost:           config.CrowdsecLapiHost,
-		crowdsecKey:            config.CrowdsecLapiKey,
-		updateInterval:         config.UpdateIntervalSeconds,
-		defaultDecisionTimeout: config.DefaultDecisionSeconds,
+		enabled:                      config.Enabled,
+		crowdsecStreamHealthy:        false,
+		crowdsecMode:                 config.CrowdsecMode,
+		crowdsecScheme:               config.CrowdsecLapiScheme,
+		crowdsecHost:                 config.CrowdsecLapiHost,
+		crowdsecKey:                  config.CrowdsecLapiKey,
+		updateInterval:               config.UpdateIntervalSeconds,
+		defaultDecisionTimeout:       config.DefaultDecisionSeconds,
+		forwardedHeadersPoolStrategy: &strategy,
 		client: &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConns:    10,
@@ -124,10 +132,8 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// TODO Make sur remote address does not include the port.
-	remoteHost, _, err := net.SplitHostPort(req.RemoteAddr)
+	remoteHost, err := getRemoteHost(bouncer, req)
 	if err != nil {
-		logger(fmt.Sprintf("failed to extract ip from remote address: %v", err))
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
@@ -195,6 +201,23 @@ func contains(source []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func getRemoteHost(bouncer *Bouncer, req *http.Request) (string, error) {
+	// It returns the first IP that is not in the pool, or the
+	// empty string otherwise.
+	remoteIP := bouncer.forwardedHeadersPoolStrategy.GetIP(req)
+	logger(remoteIP)
+	if remoteIP == "" {
+		remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
+		if err != nil {
+			logger(fmt.Sprintf("failed to extract ip from remote address: %v", err))
+			return "", err
+		}
+		logger(remoteIP)
+		return remoteIP, nil
+	}
+	return remoteIP, nil
 }
 
 // Get Decision check in the cache if the IP has the banned / not banned value.
@@ -350,5 +373,16 @@ func validateParams(config *Config) error {
 	if err != nil {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
+
+	// we need to check if there is more than 0 IP, if not we will not use it
+	if len(config.ForwardedHeadersTrustedIPs) > 0 {
+		_, err = ip.NewChecker(config.ForwardedHeadersTrustedIPs)
+		if err != nil {
+			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%v", err)
+		}
+	} else {
+		logger("No IP provided for ForwardedHeadersTrustedIPs")
+	}
+
 	return nil
 }
