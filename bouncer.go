@@ -51,7 +51,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
-		CrowdsecMode:               streamMode,
+		CrowdsecMode:               liveMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",
@@ -61,7 +61,7 @@ func CreateConfig() *Config {
 	}
 }
 
-// Bouncer a Bouncer plugin.
+// Bouncer a Bouncer struct.
 type Bouncer struct {
 	next     http.Handler
 	name     string
@@ -288,7 +288,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	if err == nil {
 		return
 	}
-	setDecision(cacheTimeoutKey, true, bouncer.updateInterval - 1)
+	setDecision(cacheTimeoutKey, true, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
