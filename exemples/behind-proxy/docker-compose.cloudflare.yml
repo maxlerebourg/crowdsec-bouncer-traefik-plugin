@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  cloudflare:
+    image: "traefik:v2.8.8"
+    container_name: "cloudflare"
+    command:
+      # - "--log.level=DEBUG"
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--api.insecure=true"
+      - "--entrypoints.web.address=:80"
+      - "--providers.file.filename=/cloud.yaml"
+      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./cloudflare-exemple.yaml:/cloud.yaml:ro
+      - logs-cloudflare:/var/log/traefik
+    ports:
+      - 80:80
+      - 8080:8080
+
+  traefik:
+    image: "traefik:v2.8.8"
+    container_name: "traefik"
+    command:
+      # - "--log.level=DEBUG"
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
+
+      - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.plugins.bouncer.version=v1.0.9"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - logs-dev:/var/log/traefik
+    ports:
+      - 90:80
+      - 9080:8080
+    depends_on:
+      - crowdsec
+
+  whoami1:
+    image: traefik/whoami
+    container_name: "simple-service1"
+    labels:
+      - "traefik.enable=true"
+      # Definition of the router
+      - "traefik.http.routers.router1.rule=Path(`/foo`)"
+      - "traefik.http.routers.router1.entrypoints=web"
+      - "traefik.http.routers.router1.middlewares=crowdsec1@docker" 
+      # Definition of the service
+      - "traefik.http.services.service1.loadbalancer.server.port=80"
+      # Definitin of the middleware
+      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.enabled=true"
+      # crowdseclapikey must be uniq to the middleware attached to the service
+      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+  
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.4.1
+    container_name: "crowdsec"
+    environment:
+      COLLECTIONS: crowdsecurity/traefik
+      CUSTOM_HOSTNAME: crowdsec
+      BOUNCER_KEY_TRAEFIK_DEV_1: 40796d93c2958f9e58345514e67740e5
+      BOUNCER_KEY_TRAEFIK_DEV_2: 44c36dac5c4140af9f06f397508e82c7
+    volumes:
+      - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - logs-dev:/var/log/traefik:ro
+      - crowdsec-db-dev:/var/lib/crowdsec/data/
+      - crowdsec-config-dev:/etc/crowdsec/
+    labels:
+      - "traefik.enable=false"
+
+volumes:
+  logs-dev:
+  logs-cloudflare:
+  crowdsec-db-dev:
+  crowdsec-config-dev:

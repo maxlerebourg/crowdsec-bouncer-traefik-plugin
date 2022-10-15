@@ -70,6 +70,10 @@ At each start of synchronisation, the middleware will wait a random number of se
   - int64
   - default: 60
   - Used only in `live` mode, decision duration of accepted IPs
+- ForwardedHeadersTrustedIPs
+  - []string
+  - default: []
+  - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
 
 ### Configuration
 
@@ -116,6 +120,9 @@ http:
           crowdsecLapiKey: privateKey
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
+          forwardedHeadersTrustedIPs: 
+            - 10.0.10.23/32
+            - 10.0.20.0/24
 ```
 These are the default values of the plugin except for LapiKey.
 
@@ -185,6 +192,33 @@ For local developpement a docker-compose.local.yml is provided and reproduce the
 ```bash
 docker-compose -f docker-compose.local.yml up -d
 ```
+Equivalent to
+```bash
+make run_local
+```
+
+### Exemples
+
+1. Behind another proxy service (ex: clouflare)
+
+You need to configure your Traefik to trust Forwarded headers by your front proxy
+In the exemple we use another instance of traefik with the container named cloudflare to simulate a front proxy
+
+The "internal" Traefik instance is configured to trust the cloudflare forward headers
+```yaml
+  - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
+```
+
+We configure the middleware to trust as well the IP:
+```yaml
+    - "traefik.http.middlewares.crowdsec1.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+```
+
+To run the environnement run:
+```bash
+make run_behind_proxy
+```
+
 
 ### About
 

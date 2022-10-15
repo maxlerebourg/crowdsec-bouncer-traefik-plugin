@@ -18,13 +18,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-local:/var/log/traefik
       - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapilogin=3829a6c9870e4726a377d8951ebb64a1m8psGvMaq1ykJ3zX"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapipwd=Q5pgN8bRNInHGdx6QCksdPOJVLeLQ7ipJntSeuP3r8088zXzRVs4G8liXAKfI1k6"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/http-backdoors-attempts,baudneo/zoneminder-bf"
     ports:
       - 80:80
       - 8080:8080
@@ -36,30 +29,24 @@ services:
     container_name: "simple-service1"
     labels:
       - "traefik.enable=true"
-      # Definition of the router
       - "traefik.http.routers.router1.rule=Host(`localhost`) && Path(`/foo`)"
       - "traefik.http.routers.router1.entrypoints=web"
       - "traefik.http.routers.router1.middlewares=crowdsec1@docker" 
-      # Definition of the service
       - "traefik.http.services.service1.loadbalancer.server.port=80"
-      # Definitin of the middleware
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.enabled=true"
-      # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.forwardedheaderstrustedips=172.26.0.1"
+
   whoami2:
     image: traefik/whoami
     container_name: "simple-service2"
     labels:
       - "traefik.enable=true"
-      # Definition of the router
       - "traefik.http.routers.router2.rule=Host(`localhost`) && Path(`/bar`)"
       - "traefik.http.routers.router2.entrypoints=web"
       - "traefik.http.routers.router2.middlewares=crowdsec2@docker"
-      # Definition of the service
       - "traefik.http.services.service2.loadbalancer.server.port=80"
-      # Definitin of the middleware
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.enabled=true"
-      # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
 
   crowdsec:
