@@ -42,6 +42,7 @@ type Config struct {
 	CrowdsecLapiScheme         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost           string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey            string   `json:"crowdsecLapiKey,omitempty"`
+	ForwardedHeadersCustomName string   `json:"forwardedheaderscustomheader,omitempty"`
 	UpdateIntervalSeconds      int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds     int64    `json:"defaultDecisionSeconds,omitempty"`
 	ForwardedHeadersTrustedIPs []string `json:"forwardedheaderstrustedips,omitempty"`
@@ -58,6 +59,7 @@ func CreateConfig() *Config {
 		UpdateIntervalSeconds:      60,
 		DefaultDecisionSeconds:     60,
 		ForwardedHeadersTrustedIPs: []string{},
+		ForwardedHeadersCustomName: "X-Forwarded-For",
 	}
 }
 
@@ -74,6 +76,7 @@ type Bouncer struct {
 	crowdsecMode           string
 	updateInterval         int64
 	defaultDecisionTimeout int64
+	customHeader           string
 	poolStrategy           *ip.PoolStrategy
 	client                 *http.Client
 }
@@ -98,6 +101,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		crowdsecHost:           config.CrowdsecLapiHost,
 		crowdsecKey:            config.CrowdsecLapiKey,
 		updateInterval:         config.UpdateIntervalSeconds,
+		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
 		poolStrategy: &ip.PoolStrategy{
 			Checker: checker,
@@ -195,7 +199,7 @@ func contains(source []string, target string) bool {
 
 // It returns the first IP that is not in the pool, or the empty string otherwise.
 func getRemoteIP(bouncer *Bouncer, req *http.Request) (string, error) {
-	remoteIP := bouncer.poolStrategy.GetIP(req)
+	remoteIP := bouncer.poolStrategy.GetIP(req, bouncer.customHeader)
 	if len(remoteIP) != 0 {
 		return remoteIP, nil
 	}
