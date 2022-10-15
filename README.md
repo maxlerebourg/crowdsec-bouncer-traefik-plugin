@@ -74,6 +74,10 @@ At each start of synchronisation, the middleware will wait a random number of se
   - []string
   - default: []
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
+- ForwardedHeadersCustomName
+  - string
+  - default: X-Forwarded-For
+  - Name of the header where the real IP of the client should be retrieved
 
 ### Configuration
 
@@ -123,6 +127,7 @@ http:
           forwardedHeadersTrustedIPs: 
             - 10.0.10.23/32
             - 10.0.20.0/24
+          forwardedHeadersCustomName: X-Custom-Header
 ```
 These are the default values of the plugin except for LapiKey.
 
