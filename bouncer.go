@@ -16,7 +16,7 @@ import (
 	"time"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/ip"
+	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/ip"
 )
 
 const (
@@ -62,17 +62,17 @@ type Bouncer struct {
 	name     string
 	template *template.Template
 
-	enabled                      bool
-	crowdsecStreamHealthy        bool
-	crowdsecScheme               string
-	crowdsecHost                 string
-	crowdsecKey                  string
-	crowdsecMode                 string
-	updateInterval               int64
-	defaultDecisionTimeout       int64
-	forwardedHeadersPoolStrategy *ip.PoolStrategy
-	client                       *http.Client
-	cache                        *ttl_map.Heap
+	enabled                bool
+	crowdsecStreamHealthy  bool
+	crowdsecScheme         string
+	crowdsecHost           string
+	crowdsecKey            string
+	crowdsecMode           string
+	updateInterval         int64
+	defaultDecisionTimeout int64
+	poolStrategy           *ip.PoolStrategy
+	client                 *http.Client
+	cache                  *ttl_map.Heap
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -82,24 +82,24 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		return nil, err
 	}
 
-	var strategy ip.PoolStrategy
 	checker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
-	strategy = ip.PoolStrategy{Checker: checker}
 
 	bouncer := &Bouncer{
 		next:     next,
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
-		enabled:                      config.Enabled,
-		crowdsecStreamHealthy:        false,
-		crowdsecMode:                 config.CrowdsecMode,
-		crowdsecScheme:               config.CrowdsecLapiScheme,
-		crowdsecHost:                 config.CrowdsecLapiHost,
-		crowdsecKey:                  config.CrowdsecLapiKey,
-		updateInterval:               config.UpdateIntervalSeconds,
-		defaultDecisionTimeout:       config.DefaultDecisionSeconds,
-		forwardedHeadersPoolStrategy: &strategy,
+		enabled:                config.Enabled,
+		crowdsecStreamHealthy:  false,
+		crowdsecMode:           config.CrowdsecMode,
+		crowdsecScheme:         config.CrowdsecLapiScheme,
+		crowdsecHost:           config.CrowdsecLapiHost,
+		crowdsecKey:            config.CrowdsecLapiKey,
+		updateInterval:         config.UpdateIntervalSeconds,
+		defaultDecisionTimeout: config.DefaultDecisionSeconds,
+		poolStrategy: &ip.PoolStrategy{
+			Checker: checker,
+		},
 		client: &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConns:    10,
@@ -132,14 +132,14 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	remoteHost, err := getRemoteHost(bouncer, req)
+	remoteHost, err := getRemoteIP(bouncer, req)
 	if err != nil {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
 
-	if bouncer.crowdsecMode == streamMode || bouncer.crowdsecMode == liveMode {
-		isBanned, err := getDecision(bouncer, remoteHost)
+	if bouncer.crowdsecMode != noneMode {
+		isBanned, err := getDecision(bouncer.cache, remoteHost)
 		if err == nil {
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
@@ -183,13 +183,6 @@ type Stream struct {
 	New     []Decision `json:"new"`
 }
 
-// Login Body returned from Crowdsec Login CAPI.
-type Login struct {
-	Code   int    `json:"code"`
-	Token  string `json:"token"`
-	Expire string `json:"expire"`
-}
-
 func logger(str string) {
 	log.Printf("Crowdsec Bouncer Traefik Plugin - %s", str)
 }
@@ -203,27 +196,24 @@ func contains(source []string, target string) bool {
 	return false
 }
 
-func getRemoteHost(bouncer *Bouncer, req *http.Request) (string, error) {
-	// It returns the first IP that is not in the pool, or the
-	// empty string otherwise.
-	remoteIP := bouncer.forwardedHeadersPoolStrategy.GetIP(req)
-	logger(remoteIP)
-	if remoteIP == "" {
-		remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
-		if err != nil {
-			logger(fmt.Sprintf("failed to extract ip from remote address: %v", err))
-			return "", err
-		}
-		logger(remoteIP)
+// It returns the first IP that is not in the pool, or the empty string otherwise.
+func getRemoteIP(bouncer *Bouncer, req *http.Request) (string, error) {
+	remoteIP := bouncer.poolStrategy.GetIP(req)
+	if len(remoteIP) != 0 {
 		return remoteIP, nil
+	}
+	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		logger(fmt.Sprintf("failed to extract ip from remote address: %v", err))
+		return "", err
 	}
 	return remoteIP, nil
 }
 
 // Get Decision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
-func getDecision(bouncer *Bouncer, clientIP string) (bool, error) {
-	banned, isCached := bouncer.cache.Get(clientIP)
+func getDecision(cache *ttl_map.Heap, clientIP string) (bool, error) {
+	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
 	if isCached && isValid && len(bannedString) > 0 {
 		return bannedString == cacheBannedValue, nil
@@ -231,20 +221,21 @@ func getDecision(bouncer *Bouncer, clientIP string) (bool, error) {
 	return false, fmt.Errorf("no cache data")
 }
 
-func setDecision(bouncer *Bouncer, clientIP string, isBanned bool, duration int64) {
-	if bouncer.crowdsecMode == noneMode {
-		return
-	}
+func setDecision(cache *ttl_map.Heap, clientIP string, isBanned bool, duration int64) {
 	if isBanned {
 		logger(fmt.Sprintf("%v banned", clientIP))
-		bouncer.cache.Set(clientIP, cacheBannedValue, duration)
+		cache.Set(clientIP, cacheBannedValue, duration)
 	} else {
-		bouncer.cache.Set(clientIP, cacheNoBannedValue, duration)
+		cache.Set(clientIP, cacheNoBannedValue, duration)
 	}
 }
 
+func deleteDecision(cache *ttl_map.Heap, clientIP string) {
+	cache.Del(clientIP)
+}
+
+// We are now in none or live mode.
 func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, remoteHost string) {
-	// We are now in none or live mode.
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
@@ -254,7 +245,9 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	body := crowdsecQuery(bouncer, routeURL.String())
 
 	if bytes.Equal(body, []byte("null")) {
-		setDecision(bouncer, remoteHost, false, bouncer.defaultDecisionTimeout)
+		if bouncer.crowdsecMode == liveMode {
+			setDecision(bouncer.cache, remoteHost, false, bouncer.defaultDecisionTimeout)
+		}
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
@@ -267,7 +260,9 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 		return
 	}
 	if len(decisions) == 0 {
-		setDecision(bouncer, remoteHost, false, bouncer.defaultDecisionTimeout)
+		if bouncer.crowdsecMode == liveMode {
+			setDecision(bouncer.cache, remoteHost, false, bouncer.defaultDecisionTimeout)
+		}
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
@@ -277,7 +272,9 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 		logger(fmt.Sprintf("failed to parse duration: %s", err))
 		return
 	}
-	setDecision(bouncer, remoteHost, true, int64(duration.Seconds()))
+	if bouncer.crowdsecMode == liveMode {
+		setDecision(bouncer.cache, remoteHost, true, int64(duration.Seconds()))
+	}
 }
 
 func handleStreamCache(bouncer *Bouncer) {
@@ -299,11 +296,11 @@ func handleStreamCache(bouncer *Bouncer) {
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
-			setDecision(bouncer, decision.Value, true, int64(duration.Seconds()))
+			setDecision(bouncer.cache, decision.Value, true, int64(duration.Seconds()))
 		}
 	}
 	for _, decision := range stream.Deleted {
-		bouncer.cache.Del(decision.Value)
+		deleteDecision(bouncer.cache, decision.Value)
 	}
 	bouncer.crowdsecStreamHealthy = true
 }
@@ -373,8 +370,6 @@ func validateParams(config *Config) error {
 	if err != nil {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
-
-	// we need to check if there is more than 0 IP, if not we will not use it
 	if len(config.ForwardedHeadersTrustedIPs) > 0 {
 		_, err = ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 		if err != nil {
