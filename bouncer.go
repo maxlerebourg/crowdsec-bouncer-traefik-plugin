@@ -57,7 +57,7 @@ func CreateConfig() *Config {
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",
-		UpdateIntervalSeconds:      10,
+		UpdateIntervalSeconds:      60,
 		DefaultDecisionSeconds:     60,
 		ForwardedHeadersTrustedIPs: []string{},
 		ForwardedHeadersCustomName: "X-Forwarded-For",
