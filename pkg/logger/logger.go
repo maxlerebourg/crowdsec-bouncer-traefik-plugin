@@ -21,7 +21,6 @@ func Init(logLevel string) {
 			loggerDebug.SetOutput(os.Stdout)
 		default:
 			loggerInfo.SetOutput(os.Stdout)
-			loggerDebug.SetOutput(os.Stdout)
 	}
 }
 
