@@ -14,8 +14,9 @@ import (
 	"text/template"
 	"time"
 
-	ttl_map "github.com/leprosus/golang-ttl-map"
-	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/ip"
+	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 const (
@@ -25,13 +26,10 @@ const (
 	crowdsecLapiHeader      = "X-Api-Key"
 	crowdsecLapiRoute       = "v1/decisions"
 	crowdsecLapiStreamRoute = "v1/decisions/stream"
-	cacheBannedValue        = "t"
-	cacheNoBannedValue      = "f"
 	cacheTimeoutKey         = "updated"
 )
 
 var (
-	cache                 = ttl_map.New()
 	crowdsecStreamHealthy = false
 	ticker                chan bool
 )
@@ -39,6 +37,7 @@ var (
 // Config the plugin configuration.
 type Config struct {
 	Enabled                    bool     `json:"enabled,omitempty"`
+	LogLevel                   string   `json:"logLevel,omitempty"`
 	CrowdsecMode               string   `json:"crowdsecMode,omitempty"`
 	CrowdsecLapiScheme         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost           string   `json:"crowdsecLapiHost,omitempty"`
@@ -53,11 +52,12 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
+		LogLevel:                   "INFO",
 		CrowdsecMode:               liveMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",
-		UpdateIntervalSeconds:      60,
+		UpdateIntervalSeconds:      10,
 		DefaultDecisionSeconds:     60,
 		ForwardedHeadersTrustedIPs: []string{},
 		ForwardedHeadersCustomName: "X-Forwarded-For",
@@ -84,8 +84,10 @@ type Bouncer struct {
 
 // New creates the crowdsec bouncer plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+	logger.Init(config.LogLevel)
 	err := validateParams(config)
 	if err != nil {
+		logger.Info(fmt.Sprintf("%w", err))
 		return nil, err
 	}
 
@@ -135,15 +137,18 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	remoteHost, err := getRemoteIP(bouncer, req)
+	remoteHost, err := ip.GetRemoteIP(req, bouncer.poolStrategy, bouncer.customHeader)
 	if err != nil {
+		logger.Info(fmt.Sprintf("%w", err))
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
+	logger.Debug(fmt.Sprintf("ServeHTTP ip:%v", remoteHost))
 
 	if bouncer.crowdsecMode != noneMode {
-		isBanned, err := getDecision(remoteHost)
+		isBanned, err := cache.GetDecision(remoteHost)
 		if err == nil {
+			logger.Debug(fmt.Sprintf("ServeHTTP cacheHit isBanned:%v", isBanned))
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
 			} else {
@@ -186,10 +191,6 @@ type Stream struct {
 	New     []Decision `json:"new"`
 }
 
-func logger(str string) {
-	log.Printf("Crowdsec Bouncer Traefik Plugin - %s", str)
-}
-
 func contains(source []string, target string) bool {
 	for _, item := range source {
 		if item == target {
@@ -199,25 +200,11 @@ func contains(source []string, target string) bool {
 	return false
 }
 
-// It returns the first IP that is not in the pool, or the empty string otherwise.
-func getRemoteIP(bouncer *Bouncer, req *http.Request) (string, error) {
-	remoteIP := bouncer.poolStrategy.GetIP(req, bouncer.customHeader)
-	if len(remoteIP) != 0 {
-		return remoteIP, nil
-	}
-	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
-	if err != nil {
-		logger(fmt.Sprintf("failed to extract ip from remote address: %v", err))
-		return "", err
-	}
-	return remoteIP, nil
-}
-
 func startTicker(config *Config, work func()) chan bool {
 	ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
-		defer log.Println("ticker stopped")
+		defer logger.Debug("ticker:stopped")
 		for {
 			select {
 			case <-ticker.C:
@@ -230,30 +217,6 @@ func startTicker(config *Config, work func()) chan bool {
 	return stop
 }
 
-// Get Decision check in the cache if the IP has the banned / not banned value.
-// Otherwise return with an error to add the IP in cache if we are on.
-func getDecision(clientIP string) (bool, error) {
-	banned, isCached := cache.Get(clientIP)
-	bannedString, isValid := banned.(string)
-	if isCached && isValid && len(bannedString) > 0 {
-		return bannedString == cacheBannedValue, nil
-	}
-	return false, fmt.Errorf("no cache data")
-}
-
-func setDecision(clientIP string, isBanned bool, duration int64) {
-	if isBanned {
-		logger(fmt.Sprintf("%v banned", clientIP))
-		cache.Set(clientIP, cacheBannedValue, duration)
-	} else {
-		cache.Set(clientIP, cacheNoBannedValue, duration)
-	}
-}
-
-func deleteDecision(clientIP string) {
-	cache.Del(clientIP)
-}
-
 // We are now in none or live mode.
 func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, remoteHost string) {
 	routeURL := url.URL{
@@ -264,14 +227,14 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String())
 	if err != nil {
-		logger(fmt.Sprintf("%w", err))
+		logger.Info(fmt.Sprintf("%w", err))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
 
 	if bytes.Equal(body, []byte("null")) {
 		if bouncer.crowdsecMode == liveMode {
-			setDecision(remoteHost, false, bouncer.defaultDecisionTimeout)
+			cache.SetDecision(remoteHost, false, bouncer.defaultDecisionTimeout)
 		}
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -280,13 +243,13 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	var decisions []Decision
 	err = json.Unmarshal(body, &decisions)
 	if err != nil {
-		logger(fmt.Sprintf("failed to parse body: %s", err))
+		logger.Info(fmt.Sprintf("failed to parse body: %s", err))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
 	if len(decisions) == 0 {
 		if bouncer.crowdsecMode == liveMode {
-			setDecision(remoteHost, false, bouncer.defaultDecisionTimeout)
+			cache.SetDecision(remoteHost, false, bouncer.defaultDecisionTimeout)
 		}
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -294,11 +257,11 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	rw.WriteHeader(http.StatusForbidden)
 	duration, err := time.ParseDuration(decisions[0].Duration)
 	if err != nil {
-		logger(fmt.Sprintf("failed to parse duration: %s", err))
+		logger.Info(fmt.Sprintf("failed to parse duration: %s", err))
 		return
 	}
 	if bouncer.crowdsecMode == liveMode {
-		setDecision(remoteHost, true, int64(duration.Seconds()))
+		cache.SetDecision(remoteHost, true, int64(duration.Seconds()))
 	}
 }
 
@@ -307,11 +270,12 @@ func handleStreamCache(bouncer *Bouncer) {
 	// Instead of blocking the goroutine interval for all the secondary node,
 	// if the master service is shut down, other goroutine can take the lead
 	// because updated routine information is in the cache
-	_, err := getDecision(cacheTimeoutKey)
+	logger.Debug("handleStreamCache")
+	_, err := cache.GetDecision(cacheTimeoutKey)
 	if err == nil {
 		return
 	}
-	setDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
+	cache.SetDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
@@ -320,25 +284,25 @@ func handleStreamCache(bouncer *Bouncer) {
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String())
 	if err != nil {
-		logger(fmt.Sprintf("%w", err))
+		logger.Info(fmt.Sprintf("%w", err))
 		crowdsecStreamHealthy = false
 		return
 	}
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
-		logger(fmt.Sprintf("error while parsing body: %s", err))
+		logger.Info(fmt.Sprintf("error while parsing body: %s", err))
 		crowdsecStreamHealthy = false
 		return
 	}
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
-			setDecision(decision.Value, true, int64(duration.Seconds()))
+			cache.SetDecision(decision.Value, true, int64(duration.Seconds()))
 		}
 	}
 	for _, decision := range stream.Deleted {
-		deleteDecision(decision.Value)
+		cache.DeleteDecision(decision.Value)
 	}
 	crowdsecStreamHealthy = true
 }
@@ -357,7 +321,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	defer func(body io.ReadCloser) {
 		err = body.Close()
 		if err != nil {
-			logger(fmt.Sprintf("failed to close body reader: %s", err))
+			logger.Info(fmt.Sprintf("failed to close body reader: %s", err))
 		}
 	}(res.Body)
 	body, err := ioutil.ReadAll(res.Body)
@@ -408,7 +372,7 @@ func validateParams(config *Config) error {
 			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%w", err)
 		}
 	} else {
-		logger("No IP provided for ForwardedHeadersTrustedIPs")
+		logger.Debug("No IP provided for ForwardedHeadersTrustedIPs")
 	}
 
 	return nil
