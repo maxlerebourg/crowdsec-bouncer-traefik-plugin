@@ -32,7 +32,8 @@ const (
 
 var (
 	cache                 = ttl_map.New()
-	crowdsecStreamHealthy = true
+	crowdsecStreamHealthy = false
+	ticker                chan bool
 )
 
 // Config the plugin configuration.
@@ -116,10 +117,11 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	}
 	if config.CrowdsecMode == streamMode {
 		go func() {
-			go handleStreamCache(bouncer)
-			ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
-			for range ticker.C {
+			if ticker == nil {
 				go handleStreamCache(bouncer)
+				ticker = startTicker(config, func() {
+					handleStreamCache(bouncer)
+				})
 			}
 		}()
 	}
@@ -165,6 +167,23 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // CUSTOM CODE.
 // TODO place in another file.
+
+func startTicker(config *Config, work func()) chan bool {
+	ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
+	stop := make(chan bool, 1)
+	go func() {
+		defer log.Println("ticker stopped")
+		for {
+			select {
+			case <-ticker.C:
+				go work()
+			case <-stop:
+				return
+			}
+		}
+	}()
+	return stop
+}
 
 // Decision Body returned from Crowdsec LAPI.
 type Decision struct {
@@ -292,7 +311,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	if err == nil {
 		return
 	}
-	setDecision(cacheTimeoutKey, true, bouncer.updateInterval-1)
+	setDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,

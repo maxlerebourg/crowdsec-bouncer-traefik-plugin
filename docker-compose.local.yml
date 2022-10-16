@@ -49,6 +49,30 @@ services:
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.forwardedheaderstrustedips=172.26.0.5"
+  
+  whoami3:
+    image: traefik/whoami
+    container_name: "simple-service3"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.router3.rule=Host(`localhost`) && Path(`/bar3`)"
+      - "traefik.http.routers.router3.entrypoints=web"
+      - "traefik.http.routers.router3.middlewares=crowdsec3@docker"
+      - "traefik.http.services.service3.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.crowdsec3.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec3.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
+  
+  whoami4:
+    image: traefik/whoami
+    container_name: "simple-service4"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.router4.rule=Host(`localhost`) && Path(`/bar4`)"
+      - "traefik.http.routers.router4.entrypoints=web"
+      - "traefik.http.routers.router4.middlewares=crowdsec4@docker"
+      - "traefik.http.services.service4.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.crowdsec4.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec4.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.1
