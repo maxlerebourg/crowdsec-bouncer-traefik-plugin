@@ -168,23 +168,6 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // CUSTOM CODE.
 // TODO place in another file.
 
-func startTicker(config *Config, work func()) chan bool {
-	ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
-	stop := make(chan bool, 1)
-	go func() {
-		defer log.Println("ticker stopped")
-		for {
-			select {
-			case <-ticker.C:
-				go work()
-			case <-stop:
-				return
-			}
-		}
-	}()
-	return stop
-}
-
 // Decision Body returned from Crowdsec LAPI.
 type Decision struct {
 	ID        int    `json:"id"`
@@ -228,6 +211,23 @@ func getRemoteIP(bouncer *Bouncer, req *http.Request) (string, error) {
 		return "", err
 	}
 	return remoteIP, nil
+}
+
+func startTicker(config *Config, work func()) chan bool {
+	ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
+	stop := make(chan bool, 1)
+	go func() {
+		defer log.Println("ticker stopped")
+		for {
+			select {
+			case <-ticker.C:
+				go work()
+			case <-stop:
+				return
+			}
+		}
+	}()
+	return stop
 }
 
 // Get Decision check in the cache if the IP has the banned / not banned value.
