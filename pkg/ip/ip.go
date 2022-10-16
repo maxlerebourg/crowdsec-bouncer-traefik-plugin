@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-//CHECKER
+// CHECKER
 
 // Checker allows to check that addresses are in a trusted IPs.
 type Checker struct {
@@ -91,7 +91,7 @@ type PoolStrategy struct {
 // GetIP checks the list of Forwarded IPs (most recent first) against the
 // Checker pool of IPs. It returns the first IP that is not in the pool, or the
 // empty string otherwise.
-func (s *PoolStrategy) GetIP(req *http.Request, customHeader string) string {
+func (s *PoolStrategy) getIP(req *http.Request, customHeader string) string {
 	if s.Checker == nil {
 		return ""
 	}
@@ -111,4 +111,17 @@ func (s *PoolStrategy) GetIP(req *http.Request, customHeader string) string {
 	}
 
 	return ""
+}
+
+// GetRemoteIP It returns the first IP that is not in the pool, or the empty string otherwise.
+func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string) (string, error) {
+	remoteIP := strategy.getIP(req, customHeader)
+	if len(remoteIP) != 0 {
+		return remoteIP, nil
+	}
+	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract ip from remote address: %w", err)
+	}
+	return remoteIP, nil
 }

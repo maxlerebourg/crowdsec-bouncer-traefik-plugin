@@ -49,6 +49,9 @@ At each start of synchronisation, the middleware will wait a random number of se
 - Enabled
   - bool
   - enable the plugin
+- LogLevel
+  - string
+  - default: `INFO`, expected value are: `INFO`, `DEBUG`
 - CrowdsecMode
   - string
   - default: `live`, expected value are: `none`, `live`, `stream`
@@ -120,7 +123,7 @@ http:
           enabled: false
           updateIntervalSeconds: 60
           defaultDecisionSeconds: 60
-          crowdsecMode: stream
+          crowdsecMode: live
           crowdsecLapiKey: privateKey
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
