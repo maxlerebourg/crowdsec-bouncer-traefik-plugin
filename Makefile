@@ -34,14 +34,23 @@ run_cacheredis:
 run:
 	docker-compose -f docker-compose.yml up -d --remove-orphans
 
-restart_docker_dev:
+restart_dev:
 	docker-compose -f docker-compose.dev.yml restart
 
-restart_docker_local:
+restart_local:
 	docker-compose -f docker-compose.local.yml restart
 
-restart_docker:
+restart:
 	docker-compose -f docker-compose.yml restart
+
+show_logs:
+	docker-compose -f docker-compose.yml restart
+
+show_local_logs:
+	docker-compose -f docker-compose.local.yml logs -f
+
+show_dev_logs:
+	docker-compose -f docker-compose.dev.yml logs -f
 
 clean_all_docker:
 	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml down --remove-orphans
