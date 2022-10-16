@@ -216,9 +216,15 @@ We configure the middleware to trust as well the IP:
 
 To run the environnement run:
 ```bash
-make run_behind_proxy
+make run_behindproxy
 ```
 
+2. With Redis as an external shared cache
+
+To run the demo environnement run:
+```bash
+make run_cacheredis
+```
 
 ### About
 

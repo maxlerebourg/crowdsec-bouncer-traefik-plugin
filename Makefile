@@ -28,6 +28,9 @@ run_local:
 run_behindproxy:
 	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml up -d --remove-orphans
 
+run_cacheredis:
+	docker-compose -f exemples/redis-cache/docker-compose.redis.yml up -d --remove-orphans
+
 run:
 	docker-compose -f docker-compose.yml up -d --remove-orphans
 
