@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   cloudflare:
-    image: "traefik:v2.8.8"
+    image: "traefik:v2.9.1"
     container_name: "cloudflare"
     command:
       # - "--log.level=DEBUG"
@@ -21,7 +21,7 @@ services:
       - 8080:8080
 
   traefik:
-    image: "traefik:v2.8.8"
+    image: "traefik:v2.9.1"
     container_name: "traefik"
     command:
       # - "--log.level=DEBUG"
@@ -34,7 +34,7 @@ services:
       - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.0.9"
+      - "--experimental.plugins.bouncer.version=v1.1.0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-dev:/var/log/traefik
