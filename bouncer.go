@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -125,6 +126,9 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	}
 	if config.RedisCacheEnabled {
 		cache.InitRedisClient(config.RedisCacheAddr, config.RedisCachePort, config.RedisCachePassword)
+		c, _ := redis.Dial("tcp", ":6379")
+
+		defer c.Close()
 	}
 	if config.CrowdsecMode == streamMode {
 		go func() {
