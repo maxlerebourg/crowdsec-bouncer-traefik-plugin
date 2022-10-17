@@ -44,11 +44,10 @@ type Config struct {
 	ForwardedHeadersCustomName string   `json:"forwardedheaderscustomheader,omitempty"`
 	UpdateIntervalSeconds      int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds     int64    `json:"defaultDecisionSeconds,omitempty"`
-	ForwardedHeadersTrustedIPs []string `json:"forwardedheaderstrustedips,omitempty"`
-	RedisCacheEnabled          bool     `json:"rediscacheenabled,omitempty"`
-	RedisCacheAddr             string   `json:"rediscacheaddr,omitempty"`
-	RedisCachePort             int      `json:"rediscacheport,omitempty"`
-	RedisCachePassword         string   `json:"rediscachepassword,omitempty"`
+	ForwardedHeadersTrustedIPs []string `json:"forwardedHeadersTrustedIps,omitempty"`
+	RedisCacheEnabled          bool     `json:"redisCacheEnabled,omitempty"`
+	RedisCacheHost             string   `json:"redisCacheHost,omitempty"`
+	RedisCachePassword         string   `json:"redisCachePassword,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -65,8 +64,7 @@ func CreateConfig() *Config {
 		ForwardedHeadersTrustedIPs: []string{},
 		ForwardedHeadersCustomName: "X-Forwarded-For",
 		RedisCacheEnabled:          false,
-		RedisCacheAddr:             "localhost",
-		RedisCachePort:             6379,
+		RedisCacheHost:             "redis:6379",
 		RedisCachePassword:         "",
 	}
 }
@@ -125,10 +123,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		},
 	}
 	if config.RedisCacheEnabled {
-		cache.InitRedisClient(config.RedisCacheAddr, config.RedisCachePort, config.RedisCachePassword)
-		c, _ := redis.Dial("tcp", ":6379")
-
-		defer c.Close()
+		cache.InitRedisClient(config.RedisCacheHost, config.RedisCachePassword)
 	}
 	if config.CrowdsecMode == streamMode {
 		go func() {
