@@ -45,6 +45,7 @@ services:
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.rediscacheenabled=true"
     networks:
       - services
 
@@ -64,6 +65,7 @@ services:
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.rediscacheenabled=true"
     networks:
       - services
 
