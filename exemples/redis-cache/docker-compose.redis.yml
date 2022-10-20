@@ -1,4 +1,5 @@
 version: "3.8"
+
 services:
   traefik:
     image: "traefik:v2.8.8"
@@ -22,9 +23,6 @@ services:
     ports:
       - 80:80
       - 8080:8080
-    networks:
-      - redis
-      - services
     depends_on:
       - crowdsec
       - redis
@@ -35,19 +33,16 @@ services:
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router1.rule=Path(`/foo`)"
+      - "traefik.http.routers.router1.rule=Host(`localhost`) && Path(`/foo`)"
       - "traefik.http.routers.router1.entrypoints=web"
       - "traefik.http.routers.router1.middlewares=crowdsec1@docker" 
       # Definition of the service
       - "traefik.http.services.service1.loadbalancer.server.port=80"
-      # Definitin of the middleware
+      # Definition of the middleware
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.enabled=true"
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdsecmode=live"
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.rediscacheenabled=true"
-    networks:
-      - services
 
   whoami2:
     image: traefik/whoami
@@ -55,19 +50,16 @@ services:
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router2.rule=Path(`/bar`)"
+      - "traefik.http.routers.router2.rule=Host(`localhost`) && Path(`/bar`)"
       - "traefik.http.routers.router2.entrypoints=web"
       - "traefik.http.routers.router2.middlewares=crowdsec1@docker" 
       # Definition of the service
       - "traefik.http.services.service2.loadbalancer.server.port=80"
-      # Definitin of the middleware
+      # Definition of the middleware
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.enabled=true"
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
-      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdsecmode=live"
-      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.rediscacheenabled=true"
-    networks:
-      - services
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.rediscacheenabled=false"
 
 
   crowdsec:
@@ -87,20 +79,16 @@ services:
       - "traefik.enable=false"
   
   redis:
-    image: "redis:7.0.5"
+    image: "redis:7.0.5-alpine"
     container_name: "redis"
     command: "redis-server --save 60 1"
     volumes:
       - redis-data:/data
-    networks:
-      - redis
+    ports:
+      - 6379:6379
 
 volumes:
   logs-redis:
   crowdsec-db-redis:
   crowdsec-config-redis:
   redis-data:
-
-networks:
-  redis:
-  services:

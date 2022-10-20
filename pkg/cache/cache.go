@@ -7,7 +7,7 @@ import (
 	ttl_map "github.com/leprosus/golang-ttl-map"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	redis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/redis"
+	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/redis"
 )
 
 const (
@@ -15,9 +15,8 @@ const (
 	cacheNoBannedValue = "f"
 )
 
-var ctx = context.Background()
 var cache = ttl_map.New()
-
+var redis simpleredis.SimpleRedis
 
 var redisEnabled = false
 
@@ -40,18 +39,17 @@ func DeleteDecisionLocalCache(clientIP string) {
 }
 
 func getDecisionRedisCache(clientIP string) (bool, error) {
-	// banned, err := redis.Do(ctx, redis.B().Get().Key("key").Build()).ToString()
-	// if err != nil {
-	// 	return false, fmt.Errorf("no cache data")
-	// } else {
-	// 	return banned == cacheBannedValue, nil
-	// }
-	return false, nil
+	banned, err := redis.Do("GET", clientIP, nil)
+	bannedString := string(banned)
+	logger.Info(fmt.Sprintf("%v banned", bannedString))
+	if err == nil && len(bannedString) > 0 {
+		return bannedString == cacheBannedValue, nil
+	}
+	return false, fmt.Errorf("no cache data")
 }
 
 func SetDecisionRedisCache(clientIP string, value string, duration int64) {
-	// ctx := context.Background()
-	// redis.Do(ctx, redis.B().Set().Key("key").Value("val").Nx().Build()).Error()
+	redis.Do("SET", clientIP, []byte(value))
 }
 
 func DeleteDecisionRedisCache(clientIP string) {
@@ -70,7 +68,6 @@ func DeleteDecision(clientIP string) {
 	} else {
 		DeleteDecisionLocalCache(clientIP)
 	}
-
 }
 // Get Decision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
@@ -97,15 +94,8 @@ func SetDecision(clientIP string, isBanned bool, duration int64) {
 	}
 }
 
-func InitRedisClient(host string, password string) error {
-	// redis, err := rueidis.NewClient(rueidis.ClientOption{
-	// 	InitAddress: []string{host},
-	// })
-	// if err != nil {
-	// 	return fmt.Errorf("error instanciate redis: %w", err)
-	// }
-	// redisEnabled = true
-	writter, reader := redis.Init(host, password)
-	// writter.PrintfLine("[caca, true, caca]")
-	return nil
+func InitRedisClient(host string, password string) {
+	logger.Debug("connect to redis")
+	redisEnabled = true
+	redis.Init(host)
 }

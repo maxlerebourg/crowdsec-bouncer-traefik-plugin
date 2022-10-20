@@ -124,15 +124,11 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	if config.RedisCacheEnabled {
 		cache.InitRedisClient(config.RedisCacheHost, config.RedisCachePassword)
 	}
-	if config.CrowdsecMode == streamMode {
-		go func() {
-			if ticker == nil {
-				go handleStreamCache(bouncer)
-				ticker = startTicker(config, func() {
-					handleStreamCache(bouncer)
-				})
-			}
-		}()
+	if config.CrowdsecMode == streamMode && ticker == nil {
+		ticker = startTicker(config, func() {
+			handleStreamCache(bouncer)
+		})
+		go handleStreamCache(bouncer)
 	}
 
 	return bouncer, nil
