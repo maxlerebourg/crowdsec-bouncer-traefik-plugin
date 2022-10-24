@@ -2,22 +2,20 @@ package simpleredis
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/tehnerd/goUtils/netutils"
-
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 type RedisCmd struct {
-	Command string
-	Name    string
-	Data    []byte
-	Error   error
+	Command  string
+	Name     string
+	Data     []byte
+	Duration int64
+	Error    error
 }
 
 type SimpleRedis struct {
@@ -27,26 +25,17 @@ type SimpleRedis struct {
 	redisCmd       RedisCmd
 }
 
-func GenRedisArray(params ...[]byte) []byte {
-	CRLF := "\r\n"
+func genRedisArray(params ...[]byte) []byte {
 	MSG := ""
 	for cntr := 0; cntr < len(params); cntr++ {
 		MSG = strings.Join([]string{MSG, string(params[cntr])}, " ")
 	}
 	MSG = strings.Trim(MSG, " ")
-	MSG = strings.Join([]string{MSG, CRLF}, "")
+	MSG = strings.Join([]string{MSG, "\r\n"}, "")
 	return []byte(MSG)
 }
 
-func RedisSet(name string, data []byte) []byte {
-	return GenRedisArray([]byte("SET"), []byte(name), data)
-}
-
-func RedisGet(name string) []byte {
-	return GenRedisArray([]byte("GET"), []byte(name))
-}
-
-func ParseRedisResponse(response []byte, dataBuf []byte, Len *int) ([]byte, []byte, error) {
+func parseResponse(response []byte, dataBuf []byte, Len *int) ([]byte, []byte, error) {
 	dataBuf = append(dataBuf, response...)
 	lenCRLF := 2
 	if *Len != 0 {
@@ -116,7 +105,7 @@ func ParseRedisResponse(response []byte, dataBuf []byte, Len *int) ([]byte, []by
 	return nil, dataBuf, nil
 }
 
-func RedisContext(hostnamePort string, redisCmdWrite, redisCmdRead chan RedisCmd) {
+func initContext(hostnamePort string, redisCmdWrite, redisCmdRead chan RedisCmd) {
 	tcpRemoteAddress, err := net.ResolveTCPAddr("tcp", hostnamePort)
 	if err != nil {
 		panic("cant resolve remote redis address")
@@ -131,23 +120,23 @@ func RedisContext(hostnamePort string, redisCmdWrite, redisCmdRead chan RedisCmd
 	<-readChan
 	dataBuf := make([]byte, 0)
 	dataLen := 0
-	for true {
+	for {
 		select {
 		case cmd := <-redisCmdWrite:
 			switch cmd.Command {
 			case "SET":
-				data := RedisSet(cmd.Name, cmd.Data)
+				data := genRedisArray([]byte("SET"), []byte(cmd.Name), cmd.Data, []byte("EX"), []byte(fmt.Sprintf("%v", cmd.Duration)))
 				writeChan <- data
 			case "GET":
-				data := RedisGet(cmd.Name)
+				data := genRedisArray([]byte("GET"), []byte(cmd.Name))
 				writeChan <- data
 			}
 		case response := <-readChan:
-			data, dataBuf, err := ParseRedisResponse(response, dataBuf, &dataLen)
+			data, dataBuf, err := parseResponse(response, dataBuf, &dataLen)
 			if dataLen != 0 {
 				for data == nil {
 					response = <-readChan
-					data, dataBuf, err = ParseRedisResponse(response, dataBuf, &dataLen)
+					data, dataBuf, err = parseResponse(response, dataBuf, &dataLen)
 				}
 			}
 			if err != nil {
@@ -182,17 +171,30 @@ func (sr *SimpleRedis) Init(redisHost string) {
 	sr.redisHost = redisHost
 	sr.redisChanWrite = make(chan RedisCmd)
 	sr.redisChanRead = make(chan RedisCmd)
-	go RedisContext(sr.redisHost, sr.redisChanWrite, sr.redisChanRead)
+	go initContext(sr.redisHost, sr.redisChanWrite, sr.redisChanRead)
 }
 
-func (sr *SimpleRedis) Do(cmd, name string, data []byte) ([]byte, error) {
-	sr.redisCmd.Command = cmd
+func (sr *SimpleRedis) Get(name string) ([]byte, error) {
+	sr.redisCmd.Command = "GET"
 	sr.redisCmd.Name = name
-	sr.redisCmd.Data = data
+	sr.redisCmd.Data = nil
 	sr.redisChanWrite <- sr.redisCmd
-	resp := <- sr.redisChanRead
+	resp := <-sr.redisChanRead
 	if resp.Error != nil {
 		return nil, resp.Error
 	}
 	return resp.Data, nil
+}
+
+func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
+	sr.redisCmd.Command = "SET"
+	sr.redisCmd.Name = name
+	sr.redisCmd.Data = data
+	sr.redisCmd.Duration = duration
+	sr.redisChanWrite <- sr.redisCmd
+	resp := <-sr.redisChanRead
+	if resp.Error != nil {
+		return resp.Error
+	}
+	return nil
 }
