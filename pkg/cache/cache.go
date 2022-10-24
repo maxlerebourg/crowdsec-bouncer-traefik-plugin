@@ -51,11 +51,7 @@ func setDecisionRedisCache(clientIP string, value string, duration int64) {
 }
 
 func deleteDecisionRedisCache(clientIP string) {
-	// err := rdb.Del(ctx, clientIP).Err()
-	// if err != nil {
-	// 	logger.Info("Error, could not delete in redis cache IP")
-	// }
-	// errors are not handled
+	redis.Del(clientIP)
 }
 
 func DeleteDecision(clientIP string) {

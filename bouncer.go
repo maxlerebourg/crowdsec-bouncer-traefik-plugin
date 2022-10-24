@@ -54,7 +54,7 @@ func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
 		LogLevel:                   "INFO",
-		CrowdsecMode:               liveMode,
+		CrowdsecMode:               streamMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",

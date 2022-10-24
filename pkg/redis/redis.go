@@ -130,6 +130,9 @@ func initContext(hostnamePort string, redisCmdWrite, redisCmdRead chan RedisCmd)
 			case "GET":
 				data := genRedisArray([]byte("GET"), []byte(cmd.Name))
 				writeChan <- data
+			case "DEL":
+				data := genRedisArray([]byte("DEL"), []byte(cmd.Name))
+				writeChan <- data
 			}
 		case response := <-readChan:
 			data, dataBuf, err := parseResponse(response, dataBuf, &dataLen)
@@ -177,7 +180,6 @@ func (sr *SimpleRedis) Init(redisHost string) {
 func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 	sr.redisCmd.Command = "GET"
 	sr.redisCmd.Name = name
-	sr.redisCmd.Data = nil
 	sr.redisChanWrite <- sr.redisCmd
 	resp := <-sr.redisChanRead
 	if resp.Error != nil {
@@ -191,6 +193,17 @@ func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 	sr.redisCmd.Name = name
 	sr.redisCmd.Data = data
 	sr.redisCmd.Duration = duration
+	sr.redisChanWrite <- sr.redisCmd
+	resp := <-sr.redisChanRead
+	if resp.Error != nil {
+		return resp.Error
+	}
+	return nil
+}
+
+func (sr *SimpleRedis) Del(name string) error {
+	sr.redisCmd.Command = "DEL"
+	sr.redisCmd.Name = name
 	sr.redisChanWrite <- sr.redisCmd
 	resp := <-sr.redisChanRead
 	if resp.Error != nil {
