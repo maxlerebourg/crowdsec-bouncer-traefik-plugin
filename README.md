@@ -26,6 +26,9 @@ There are 3 operating modes (CrowdsecMode) for this plugin:
 
 The recommanded mode for performance is the streaming mode, decisions are updated every 60 sec by default and that's the only communication between traefik and crowdsec. Every requests that happens hits the cache for quick decisions.
 
+The cache can be local to the Traefik instance using the filesystem or make use of a separated redis instance.
+The redis instance is currently in beta and support Redis 7.0.X version
+
 ## Usage
 
 To get started, use the `docker-compose.yml` file.
@@ -36,8 +39,11 @@ make run
 ```
 
 ### Note
+
+**/!\ Since Release 1.10, cache is no longer duplicated but shared by all services**
+
 Each middleware in traefik has it's own data and is instanciated by service.
-This means if there are 10 services protected by the bouncer in streaming alone or live mode, the cache will be duplicated to all 10 services.
+This means if there are 10 services protected by the bouncer in streaming or live mode, the cache will be duplicated to all 10 services.
 This is because traefik does not allow plugins to store data locally that can be consummed.
 
 The synchronisation with the crowdsec service will happen also 10 times in the period selected.
@@ -45,10 +51,12 @@ It should be taken into account when fixing this period so each middleware has t
 
 At each start of synchronisation, the middleware will wait a random number of seconds to avoid simultaneous calls to crowdsec.
 
+
 ### Variables
 - Enabled
   - bool
   - enable the plugin
+  - default: true
 - LogLevel
   - string
   - default: `INFO`, expected value are: `INFO`, `DEBUG`
@@ -61,7 +69,7 @@ At each start of synchronisation, the middleware will wait a random number of se
 - CrowdsecLapiHost
   - string
   - default: "crowdsec:8080"
-  - Crowdsec LAPI available on which host.
+  - Crowdsec LAPI available on which host and port.
 - CrowdsecLapiKey
   - string
   - Crowdsec LAPI generated key for the bouncer : **must be unique by service**. 
@@ -79,8 +87,17 @@ At each start of synchronisation, the middleware will wait a random number of se
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
 - ForwardedHeadersCustomName
   - string
-  - default: X-Forwarded-For
+  - default: "X-Forwarded-For"
   - Name of the header where the real IP of the client should be retrieved
+- RedisCacheEnabled
+  - bool
+  - default: false
+  - enable redis cache instead of filesystem cache
+- RedisCacheHost
+  - string 
+  - default: "redis:6379"
+  - hostname and port for the redis service
+
 
 ### Configuration
 
@@ -131,6 +148,8 @@ http:
             - 10.0.10.23/32
             - 10.0.20.0/24
           forwardedHeadersCustomName: X-Custom-Header
+          redisCacheEnabled: false
+          redisCacheHost: "redis:6379"
 ```
 These are the default values of the plugin except for LapiKey.
 
@@ -228,6 +247,12 @@ make run_behindproxy
 ```
 
 2. With Redis as an external shared cache
+
+The plugin must be configured to connect to a redis instance
+```yaml
+  redisCacheHost: "redis:6379"
+```
+Here **redis** is the hostname of a container located in the same network as Traefik and **6379** the default port of redis
 
 To run the demo environnement run:
 ```bash
