@@ -26,7 +26,7 @@ There are 3 operating modes (CrowdsecMode) for this plugin:
 
 The recommanded mode for performance is the streaming mode, decisions are updated every 60 sec by default and that's the only communication between traefik and crowdsec. Every requests that happens hits the cache for quick decisions.
 
-The cache can be local to the Traefik instance using the filesystem or make use of a separated redis instance.
+The cache can be local to the Traefik instance using the filesystem or use of a separated redis instance.  
 The redis instance is currently in beta and support Redis 7.0.X version
 
 ## Usage
@@ -41,6 +41,7 @@ make run
 ### Note
 
 **/!\ Since Release 1.10, cache is no longer duplicated but shared by all services**
+*This lowers the overhead of the cache in memory and the numbers of cache to fetch it from crowdsec in situation with many services*
 
 Each middleware in traefik has it's own data and is instanciated by service.
 This means if there are 10 services protected by the bouncer in streaming or live mode, the cache will be duplicated to all 10 services.
