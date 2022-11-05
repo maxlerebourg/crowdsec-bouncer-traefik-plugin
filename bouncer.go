@@ -12,7 +12,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -55,7 +54,7 @@ func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
 		LogLevel:                   "INFO",
-		CrowdsecMode:               liveMode,
+		CrowdsecMode:               streamMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",
@@ -125,15 +124,11 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	if config.RedisCacheEnabled {
 		cache.InitRedisClient(config.RedisCacheHost, config.RedisCachePassword)
 	}
-	if config.CrowdsecMode == streamMode {
-		go func() {
-			if ticker == nil {
-				go handleStreamCache(bouncer)
-				ticker = startTicker(config, func() {
-					handleStreamCache(bouncer)
-				})
-			}
-		}()
+	if config.CrowdsecMode == streamMode && ticker == nil {
+		ticker = startTicker(config, func() {
+			handleStreamCache(bouncer)
+		})
+		go handleStreamCache(bouncer)
 	}
 
 	return bouncer, nil

@@ -1,6 +1,6 @@
-# github.com/gomodule/redigo v1.8.9
-## explicit; go 1.16
-github.com/gomodule/redigo/redis
 # github.com/leprosus/golang-ttl-map v1.1.7
 ## explicit; go 1.15
 github.com/leprosus/golang-ttl-map
+# github.com/tehnerd/goUtils v0.0.0-20150515130609-5a2d8fb2ded8
+## explicit
+github.com/tehnerd/goUtils/netutils
