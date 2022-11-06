@@ -102,7 +102,6 @@ func parseResponse(response []byte, dataBuf []byte, Len *int) ([]byte, []byte, e
 			}
 		}
 	}
-	return nil, dataBuf, nil
 }
 
 func initContext(hostnamePort string, redisCmdWrite, redisCmdRead chan RedisCmd) {
