@@ -43,7 +43,9 @@ type Config struct {
 	ForwardedHeadersCustomName string   `json:"forwardedheaderscustomheader,omitempty"`
 	UpdateIntervalSeconds      int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds     int64    `json:"defaultDecisionSeconds,omitempty"`
-	ForwardedHeadersTrustedIPs []string `json:"forwardedheaderstrustedips,omitempty"`
+	ForwardedHeadersTrustedIPs []string `json:"forwardedHeadersTrustedIps,omitempty"`
+	RedisCacheEnabled          bool     `json:"redisCacheEnabled,omitempty"`
+	RedisCacheHost             string   `json:"redisCacheHost,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -59,6 +61,8 @@ func CreateConfig() *Config {
 		DefaultDecisionSeconds:     60,
 		ForwardedHeadersTrustedIPs: []string{},
 		ForwardedHeadersCustomName: "X-Forwarded-For",
+		RedisCacheEnabled:          false,
+		RedisCacheHost:             "redis:6379",
 	}
 }
 
@@ -115,16 +119,16 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			Timeout: 5 * time.Second,
 		},
 	}
-	if config.CrowdsecMode == streamMode {
-		go func() {
-			if ticker == nil {
-				go handleStreamCache(bouncer)
-				ticker = startTicker(config, func() {
-					handleStreamCache(bouncer)
-				})
-			}
-		}()
+	if config.RedisCacheEnabled {
+		cache.InitRedisClient(config.RedisCacheHost)
 	}
+	if config.CrowdsecMode == streamMode && ticker == nil {
+		ticker = startTicker(config, func() {
+			handleStreamCache(bouncer)
+		})
+		go handleStreamCache(bouncer)
+	}
+
 	return bouncer, nil
 }
 
