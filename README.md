@@ -43,15 +43,6 @@ make run
 **/!\ Since Release 1.10, cache is no longer duplicated but shared by all services**
 *This lowers the overhead of the cache in memory and the numbers of cache to fetch it from crowdsec in situation with many services*
 
-Each middleware in traefik has it's own data and is instanciated by service.
-This means if there are 10 services protected by the bouncer in streaming or live mode, the cache will be duplicated to all 10 services.
-This is because traefik does not allow plugins to store data locally that can be consummed.
-
-The synchronisation with the crowdsec service will happen also 10 times in the period selected.
-It should be taken into account when fixing this period so each middleware has time to sync data from crowdsec.
-
-At each start of synchronisation, the middleware will wait a random number of seconds to avoid simultaneous calls to crowdsec.
-
 
 ### Variables
 - Enabled
