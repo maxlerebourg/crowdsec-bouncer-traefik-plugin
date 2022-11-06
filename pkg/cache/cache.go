@@ -86,7 +86,7 @@ func SetDecision(clientIP string, isBanned bool, duration int64) {
 	}
 }
 
-func InitRedisClient(host string, password string) {
+func InitRedisClient(host string) {
 	redisEnabled = true
 	redis.Init(host)
 	logger.Debug("connect to redis")

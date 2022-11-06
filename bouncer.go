@@ -46,7 +46,6 @@ type Config struct {
 	ForwardedHeadersTrustedIPs []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	RedisCacheEnabled          bool     `json:"redisCacheEnabled,omitempty"`
 	RedisCacheHost             string   `json:"redisCacheHost,omitempty"`
-	RedisCachePassword         string   `json:"redisCachePassword,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -54,7 +53,7 @@ func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
 		LogLevel:                   "INFO",
-		CrowdsecMode:               streamMode,
+		CrowdsecMode:               liveMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
 		CrowdsecLapiKey:            "",
@@ -64,7 +63,6 @@ func CreateConfig() *Config {
 		ForwardedHeadersCustomName: "X-Forwarded-For",
 		RedisCacheEnabled:          false,
 		RedisCacheHost:             "redis:6379",
-		RedisCachePassword:         "",
 	}
 }
 
@@ -122,7 +120,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		},
 	}
 	if config.RedisCacheEnabled {
-		cache.InitRedisClient(config.RedisCacheHost, config.RedisCachePassword)
+		cache.InitRedisClient(config.RedisCacheHost)
 	}
 	if config.CrowdsecMode == streamMode && ticker == nil {
 		ticker = startTicker(config, func() {

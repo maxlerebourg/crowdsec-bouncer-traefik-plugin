@@ -29,7 +29,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router1.rule=Host(`localhost`) && Path(`/foo`)"
+      - "traefik.http.routers.router1.rule=Path(`/foo`)"
       - "traefik.http.routers.router1.entrypoints=web"
       - "traefik.http.routers.router1.middlewares=crowdsec2@docker"
       # Definition of the service
@@ -47,7 +47,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router2.rule=Host(`localhost`) && Path(`/bar`)"
+      - "traefik.http.routers.router2.rule=Path(`/bar`)"
       - "traefik.http.routers.router2.entrypoints=web"
       - "traefik.http.routers.router2.middlewares=crowdsec2@docker"
       # Definition of the service

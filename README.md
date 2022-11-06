@@ -57,7 +57,7 @@ At each start of synchronisation, the middleware will wait a random number of se
 - Enabled
   - bool
   - enable the plugin
-  - default: true
+  - default: false
 - LogLevel
   - string
   - default: `INFO`, expected value are: `INFO`, `DEBUG`
