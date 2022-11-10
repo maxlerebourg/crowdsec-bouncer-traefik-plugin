@@ -14,13 +14,13 @@ var (
 // Init Set Default log level to info in case log level to defined
 func Init(logLevel string) {
 	switch logLevel {
-		case "INFO":
-			loggerInfo.SetOutput(os.Stdout)
-		case "DEBUG":
-			loggerInfo.SetOutput(os.Stdout)
-			loggerDebug.SetOutput(os.Stdout)
-		default:
-			loggerInfo.SetOutput(os.Stdout)
+	case "INFO":
+		loggerInfo.SetOutput(os.Stdout)
+	case "DEBUG":
+		loggerInfo.SetOutput(os.Stdout)
+		loggerDebug.SetOutput(os.Stdout)
+	default:
+		loggerInfo.SetOutput(os.Stdout)
 	}
 }
 

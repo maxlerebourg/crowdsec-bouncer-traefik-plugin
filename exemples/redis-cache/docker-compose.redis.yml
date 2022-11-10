@@ -45,16 +45,18 @@ services:
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.rediscacheenabled=true"
 
   whoami2:
-    image: traefik/whoami
+    image: 4206969/spiderfoot
     container_name: "simple-service2"
+    volumes:
+      - ./spiderfoot-data:/var/lib/spiderfoot
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router2.rule=Path(`/bar`)"
+      - "traefik.http.routers.router2.rule=PathPrefix(`/`)"
       - "traefik.http.routers.router2.entrypoints=web"
       - "traefik.http.routers.router2.middlewares=crowdsec1@docker" 
       # Definition of the service
-      - "traefik.http.services.service2.loadbalancer.server.port=80"
+      - "traefik.http.services.service2.loadbalancer.server.port=5001"
       # Definition of the middleware
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.enabled=true"
       # crowdseclapikey must be uniq to the middleware attached to the service
