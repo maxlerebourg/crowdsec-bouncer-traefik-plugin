@@ -19,6 +19,8 @@ var redis simpleredis.SimpleRedis
 
 var redisEnabled = false
 
+// CLASSIC
+
 func getDecisionLocalCache(clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
@@ -35,6 +37,8 @@ func setDecisionLocalCache(clientIP string, value string, duration int64) {
 func deleteDecisionLocalCache(clientIP string) {
 	cache.Del(clientIP)
 }
+
+// REDIS
 
 func getDecisionRedisCache(clientIP string) (bool, error) {
 	banned, err := redis.Get(clientIP)
@@ -53,6 +57,7 @@ func deleteDecisionRedisCache(clientIP string) {
 	redis.Del(clientIP)
 }
 
+// DeleteDecision delete decision in cache
 func DeleteDecision(clientIP string) {
 	if redisEnabled {
 		deleteDecisionRedisCache(clientIP)
@@ -89,5 +94,5 @@ func SetDecision(clientIP string, isBanned bool, duration int64) {
 func InitRedisClient(host string) {
 	redisEnabled = true
 	redis.Init(host)
-	logger.Debug("connect to redis")
+	logger.Debug("Redis initialized")
 }
