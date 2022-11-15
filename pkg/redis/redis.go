@@ -47,15 +47,15 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 	case "SET":
 		data := genRedisArray([]byte("SET"), []byte(cmd.Name), []byte(cmd.Data), []byte("EX"), []byte(fmt.Sprintf("%v", cmd.Duration)))
 		writer.PrintfLine(string(data))
-		logger.Info("set")
+		logger.Debug("Redis set")
 	case "DEL":
 		data := genRedisArray([]byte("DEL"), []byte(cmd.Name))
 		writer.PrintfLine(string(data))
-		logger.Info("del")
+		logger.Debug("Redis del")
 	case "GET":
 		data := genRedisArray([]byte("GET"), []byte(cmd.Name))
 		writer.PrintfLine(string(data))
-		logger.Info("get")
+		logger.Debug("Redis get")
 		for {
 			select {
 			case <-time.After(time.Second * 1):
