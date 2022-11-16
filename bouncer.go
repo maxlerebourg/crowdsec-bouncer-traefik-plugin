@@ -40,10 +40,11 @@ type Config struct {
 	CrowdsecLapiScheme         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost           string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey            string   `json:"crowdsecLapiKey,omitempty"`
-	ForwardedHeadersCustomName string   `json:"forwardedheaderscustomheader,omitempty"`
 	UpdateIntervalSeconds      int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds     int64    `json:"defaultDecisionSeconds,omitempty"`
+	ForwardedHeadersCustomName string   `json:"forwardedheaderscustomheader,omitempty"`
 	ForwardedHeadersTrustedIPs []string `json:"forwardedHeadersTrustedIps,omitempty"`
+	TrustedIPs                 []string `json:"TrustedIps,omitempty"`
 	RedisCacheEnabled          bool     `json:"redisCacheEnabled,omitempty"`
 	RedisCacheHost             string   `json:"redisCacheHost,omitempty"`
 }
@@ -60,6 +61,7 @@ func CreateConfig() *Config {
 		UpdateIntervalSeconds:      60,
 		DefaultDecisionSeconds:     60,
 		ForwardedHeadersTrustedIPs: []string{},
+		TrustedIPs:                 []string{},
 		ForwardedHeadersCustomName: "X-Forwarded-For",
 		RedisCacheEnabled:          false,
 		RedisCacheHost:             "redis:6379",
@@ -81,6 +83,8 @@ type Bouncer struct {
 	defaultDecisionTimeout int64
 	customHeader           string
 	poolStrategy           *ip.PoolStrategy
+	poolStrategyTrusted    *ip.PoolStrategy
+	CheckerTrusted         *ip.Checker
 	client                 *http.Client
 }
 
@@ -94,6 +98,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	}
 
 	checker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
+	checkerTrusted, _ := ip.NewChecker(config.TrustedIPs)
 
 	bouncer := &Bouncer{
 		next:     next,
@@ -111,6 +116,10 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		poolStrategy: &ip.PoolStrategy{
 			Checker: checker,
 		},
+		poolStrategyTrusted: &ip.PoolStrategy{
+			Checker: checkerTrusted,
+		},
+		CheckerTrusted: checkerTrusted,
 		client: &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConns:    10,
@@ -138,8 +147,24 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
-
-	remoteHost, err := ip.GetRemoteIP(req, bouncer.poolStrategy, bouncer.customHeader)
+	// Here we check for the trusted IPs in the customHeader
+	remoteHost, err := ip.GetRemoteIP(req, bouncer.poolStrategyTrusted, bouncer.customHeader)
+	if err != nil {
+		logger.Info(fmt.Sprintf("%w", err))
+		bouncer.next.ServeHTTP(rw, req)
+		return
+	}
+	trusted, err := bouncer.CheckerTrusted.Contains(remoteHost)
+	if err != nil {
+		logger.Info(fmt.Sprintf("%w", err))
+		return
+	}
+	// if our IP is in the trusted list we bypass the next checks
+	if trusted {
+		bouncer.next.ServeHTTP(rw, req)
+	}
+	// Here we get the IP from the trusted header customHeader
+	remoteHost, err = ip.GetRemoteIP(req, bouncer.poolStrategy, bouncer.customHeader)
 	if err != nil {
 		logger.Info(fmt.Sprintf("%w", err))
 		bouncer.next.ServeHTTP(rw, req)
