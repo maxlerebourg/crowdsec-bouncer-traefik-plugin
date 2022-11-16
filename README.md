@@ -89,7 +89,10 @@ make run
   - string 
   - default: "redis:6379"
   - hostname and port for the redis service
-
+- TrustedIPs
+  - string 
+  - default: []
+  - List of IPs we trust, they will bypass any more check to the bouncer or cache (usefull for LAN or VPN IP)
 
 ### Configuration
 
