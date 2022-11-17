@@ -93,12 +93,20 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	logger.Init(config.LogLevel)
 	err := validateParams(config)
 	if err != nil {
-		logger.Info(fmt.Sprintf("%w", err))
+		logger.Info(err.Error())
 		return nil, err
 	}
 
-	checker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
+	checker, err := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
+	if err != nil {
+		logger.Debug("Checker == nil")
+		logger.Debug(err.Error())
+	}
 	checkerTrusted, err := ip.NewChecker(config.TrustedIPs)
+	if err != nil {
+		logger.Debug("CheckerTrusted == nil")
+		logger.Debug(err.Error())
+	}
 
 	bouncer := &Bouncer{
 		next:     next,
@@ -150,23 +158,29 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Here we check for the trusted IPs in the customHeader
 	remoteHost, err := ip.GetRemoteIP(req, bouncer.poolStrategyTrusted, bouncer.customHeader)
 	if err != nil {
-		logger.Info(fmt.Sprintf("%w", err))
+		logger.Info(err.Error())
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
-	trusted, err := bouncer.CheckerTrusted.Contains(remoteHost)
-	if err != nil {
-		logger.Info(fmt.Sprintf("%w", err))
-		return
+	logger.Debug(fmt.Sprintf("ServeHTTP ip:%v", remoteHost))
+	if bouncer.CheckerTrusted == nil {
+		logger.Debug("CheckerTrusted == nil")
+	} else {
+		trusted, err := bouncer.CheckerTrusted.Contains(remoteHost)
+		if err != nil {
+			logger.Info(err.Error())
+			return
+		}
+		// if our IP is in the trusted list we bypass the next checks
+		if trusted {
+			bouncer.next.ServeHTTP(rw, req)
+		}
 	}
-	// if our IP is in the trusted list we bypass the next checks
-	if trusted {
-		bouncer.next.ServeHTTP(rw, req)
-	}
+
 	// Here we get the IP from the trusted header customHeader
 	remoteHost, err = ip.GetRemoteIP(req, bouncer.poolStrategy, bouncer.customHeader)
 	if err != nil {
-		logger.Info(fmt.Sprintf("%w", err))
+		logger.Info(err.Error())
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
