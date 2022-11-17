@@ -53,7 +53,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
-		LogLevel:                   "INFO",
+		LogLevel:                   "DEBUG",
 		CrowdsecMode:               liveMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
@@ -98,7 +98,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	}
 
 	checker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
-	checkerTrusted, _ := ip.NewChecker(config.TrustedIPs)
+	checkerTrusted, err := ip.NewChecker(config.TrustedIPs)
 
 	bouncer := &Bouncer{
 		next:     next,
@@ -400,6 +400,14 @@ func validateParams(config *Config) error {
 		}
 	} else {
 		logger.Debug("No IP provided for ForwardedHeadersTrustedIPs")
+	}
+	if len(config.TrustedIPs) > 0 {
+		_, err = ip.NewChecker(config.TrustedIPs)
+		if err != nil {
+			return fmt.Errorf("TrustedIPs must be a list of IP/CIDR :%w", err)
+		}
+	} else {
+		logger.Debug("No IP provided for TrustedIPs")
 	}
 
 	return nil
