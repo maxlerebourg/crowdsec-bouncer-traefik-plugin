@@ -15,6 +15,7 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/redis"
 )
 
 const (
@@ -89,7 +90,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	logger.Init(config.LogLevel)
 	err := validateParams(config)
 	if err != nil {
-		logger.Info(fmt.Sprintf("%w", err))
+		logger.Info(err.Error())
 		return nil, err
 	}
 
@@ -141,16 +142,22 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	remoteHost, err := ip.GetRemoteIP(req, bouncer.poolStrategy, bouncer.customHeader)
 	if err != nil {
-		logger.Info(fmt.Sprintf("%w", err))
+		logger.Info(err.Error())
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
 	logger.Debug(fmt.Sprintf("ServeHTTP ip:%v", remoteHost))
 
+	healthy := crowdsecStreamHealthy
 	if bouncer.crowdsecMode != noneMode {
 		isBanned, err := cache.GetDecision(remoteHost)
-		if err == nil {
-			logger.Debug(fmt.Sprintf("ServeHTTP cacheHit isBanned:%v", isBanned))
+		if err != nil {
+			logger.Debug(err.Error())
+			if err.Error() == simpleredis.RedisUnreachable {
+				healthy = false
+			}
+		} else  {
+			logger.Debug(fmt.Sprintf("ServeHTTP cache:hit isBanned:%v", isBanned))
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
 			} else {
@@ -162,7 +169,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == streamMode {
-		if crowdsecStreamHealthy {
+		if healthy {
 			bouncer.next.ServeHTTP(rw, req)
 		} else {
 			rw.WriteHeader(http.StatusForbidden)
@@ -229,7 +236,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String())
 	if err != nil {
-		logger.Info(fmt.Sprintf("%w", err))
+		logger.Info(err.Error())
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -286,7 +293,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String())
 	if err != nil {
-		logger.Info(fmt.Sprintf("%w", err))
+		logger.Info(err.Error())
 		crowdsecStreamHealthy = false
 		return
 	}

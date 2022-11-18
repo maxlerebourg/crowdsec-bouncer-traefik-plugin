@@ -43,6 +43,7 @@ services:
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec1.plugin.bouncer.rediscacheenabled=true"
+      - "traefik.http.middlewares.crowdsec1.plugin.bouncer.loglevel=DEBUG"
 
   whoami2:
     image: 4206969/spiderfoot
