@@ -143,8 +143,9 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	return bouncer, nil
 }
 
-//nolint:nestif
 // ServeHTTP principal function of plugin.
+//
+//nolint:nestif
 func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !bouncer.enabled {
 		bouncer.next.ServeHTTP(rw, req)

@@ -62,6 +62,8 @@ linters:
     - forbidigo
     - varnamelen
     - wastedassign # is disabled because of generics
+    - gofumpt
+    - gci
 
 issues:
   exclude-use-default: false
