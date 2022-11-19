@@ -89,7 +89,10 @@ make run
   - string 
   - default: "redis:6379"
   - hostname and port for the redis service
-
+- ClientTrustedIPs
+  - string 
+  - default: []
+  - List of client IPs we trust, they will bypass any more check to the bouncer or cache (usefull for LAN or VPN IP)
 
 ### Configuration
 
@@ -139,6 +142,8 @@ http:
           forwardedHeadersTrustedIPs: 
             - 10.0.10.23/32
             - 10.0.20.0/24
+          clientTrustedIPs: 
+            - 192.168.1.0/24
           forwardedHeadersCustomName: X-Custom-Header
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
@@ -178,7 +183,7 @@ docker-compose up -d
 
 ```bash
 docker-compose up -d crowdsec
-docker exec crowdsec cscli decisions add --ip 10.0.0.10 # this will be effective 4h
+docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 ```
 
@@ -224,6 +229,7 @@ You need to configure your Traefik to trust Forwarded headers by your front prox
 In the exemple we use another instance of traefik with the container named cloudflare to simulate a front proxy
 
 The "internal" Traefik instance is configured to trust the cloudflare forward headers
+This helps Traefik choose the right IP of the client: see https://doc.traefik.io/traefik/routing/entrypoints/#forwarded-headers
 ```yaml
   - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
 ```
@@ -233,7 +239,7 @@ We configure the middleware to trust as well the IP:
     - "traefik.http.middlewares.crowdsec1.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
 ```
 
-To run the environnement run:
+To play the demo environnement run:
 ```bash
 make run_behindproxy
 ```
@@ -246,9 +252,48 @@ The plugin must be configured to connect to a redis instance
 ```
 Here **redis** is the hostname of a container located in the same network as Traefik and **6379** the default port of redis
 
-To run the demo environnement run:
+To play the demo environnement run:
 ```bash
 make run_cacheredis
+```
+
+3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
+
+You need to configure your Traefik to trust Forwarded headers by your front proxy
+In the exemple we use a whoami container protected by crowdsec, and we ban or IP before allowing using TrustedIPs
+
+If you are using another proxy in front, you need to add it's IP in the trusted IP for the forwarded headers.
+This helps Traefik choose the right IP of the client: see https://doc.traefik.io/traefik/routing/entrypoints/#forwarded-headers
+The "internal" Traefik instance is configured to trust the forward headers
+```yaml
+  - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
+```
+
+We configure the middleware to trust as well the IP of the intermediate proxy if needed:
+```yaml
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+```
+
+Add your IP to the ban list
+```bash
+docker exec crowdsec cscli decisions add --ip 10.0.10.30 -d 10m
+```
+You should get a 403 on http://localhost/foo
+
+> Replace *10.0.10.30* by your IP
+
+Add the IPs that will not be filtered by the plugin
+```yaml
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.clientTrustedips=10.0.10.30/32"
+```
+
+> Replace *10.0.10.30/32* by your IP or IP range, so it's not getting checked against ban cache of crowdsec
+
+You should get a 200 on http://localhost/foo even if you are on the ban cache
+
+To play the demo environnement run:
+```bash
+make run_trustedips
 ```
 
 ### About

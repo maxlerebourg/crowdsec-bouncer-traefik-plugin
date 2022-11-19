@@ -41,10 +41,11 @@ type Config struct {
 	CrowdsecLapiScheme         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost           string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey            string   `json:"crowdsecLapiKey,omitempty"`
-	ForwardedHeadersCustomName string   `json:"forwardedheaderscustomheader,omitempty"`
 	UpdateIntervalSeconds      int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds     int64    `json:"defaultDecisionSeconds,omitempty"`
+	ForwardedHeadersCustomName string   `json:"forwardedheaderscustomheader,omitempty"`
 	ForwardedHeadersTrustedIPs []string `json:"forwardedHeadersTrustedIps,omitempty"`
+	ClientTrustedIPs           []string `json:"clientTrustedIps,omitempty"`
 	RedisCacheEnabled          bool     `json:"redisCacheEnabled,omitempty"`
 	RedisCacheHost             string   `json:"redisCacheHost,omitempty"`
 }
@@ -61,6 +62,7 @@ func CreateConfig() *Config {
 		UpdateIntervalSeconds:      60,
 		DefaultDecisionSeconds:     60,
 		ForwardedHeadersTrustedIPs: []string{},
+		ClientTrustedIPs:           []string{},
 		ForwardedHeadersCustomName: "X-Forwarded-For",
 		RedisCacheEnabled:          false,
 		RedisCacheHost:             "redis:6379",
@@ -81,7 +83,8 @@ type Bouncer struct {
 	updateInterval         int64
 	defaultDecisionTimeout int64
 	customHeader           string
-	poolStrategy           *ip.PoolStrategy
+	serverPoolStrategy     *ip.PoolStrategy
+	clientPoolStrategy     *ip.PoolStrategy
 	client                 *http.Client
 }
 
@@ -94,7 +97,8 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		return nil, err
 	}
 
-	checker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
+	serverChecker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
+	clientChecker, _ := ip.NewChecker(config.ClientTrustedIPs)
 
 	bouncer := &Bouncer{
 		next:     next,
@@ -109,8 +113,11 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		updateInterval:         config.UpdateIntervalSeconds,
 		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
-		poolStrategy: &ip.PoolStrategy{
-			Checker: checker,
+		serverPoolStrategy: &ip.PoolStrategy{
+			Checker: serverChecker,
+		},
+		clientPoolStrategy: &ip.PoolStrategy{
+			Checker: clientChecker,
 		},
 		client: &http.Client{
 			Transport: &http.Transport{
@@ -139,14 +146,25 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
-
-	remoteHost, err := ip.GetRemoteIP(req, bouncer.poolStrategy, bouncer.customHeader)
+	// Here we check for the trusted IPs in the customHeader
+	remoteHost, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
 	if err != nil {
 		logger.Info(err.Error())
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
-	logger.Debug(fmt.Sprintf("ServeHTTP ip:%v", remoteHost))
+
+	trusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteHost)
+	if err != nil {
+		logger.Info(err.Error())
+		return
+	}
+	// if our IP is in the trusted list we bypass the next checks
+	logger.Debug(fmt.Sprintf("ServeHTTP ip:%v isTrusted:%v", remoteHost, trusted))
+	if trusted {
+		bouncer.next.ServeHTTP(rw, req)
+		return
+	}
 
 	healthy := crowdsecStreamHealthy
 	if bouncer.crowdsecMode != noneMode {
@@ -156,7 +174,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			if err.Error() == simpleredis.RedisUnreachable {
 				healthy = false
 			}
-		} else  {
+		} else {
 			logger.Debug(fmt.Sprintf("ServeHTTP cache:hit isBanned:%v", isBanned))
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
@@ -382,6 +400,14 @@ func validateParams(config *Config) error {
 		}
 	} else {
 		logger.Debug("No IP provided for ForwardedHeadersTrustedIPs")
+	}
+	if len(config.ClientTrustedIPs) > 0 {
+		_, err = ip.NewChecker(config.ClientTrustedIPs)
+		if err != nil {
+			return fmt.Errorf("TrustedIPs must be a list of IP/CIDR :%w", err)
+		}
+	} else {
+		logger.Debug("No IP provided for TrustedIPs")
 	}
 
 	return nil
