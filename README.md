@@ -259,8 +259,7 @@ make run_cacheredis
 3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
 
 You need to configure your Traefik to trust Forwarded headers by your front proxy
-FIXME
-// In the exemple we use another instance of traefik with the container to simulate a front proxy
+In the exemple we use a whoami container protected by crowdsec, and we ban or IP before allowing using TrustedIPs
 
 The "internal" Traefik instance is configured to trust the forward headers
 ```yaml
