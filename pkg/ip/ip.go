@@ -32,7 +32,7 @@ func NewChecker(trustedIPs []string) (*Checker, error) {
 
 		_, ipAddr, err := net.ParseCIDR(ipMask)
 		if err != nil {
-			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %s", ipAddr, err.Error())
+			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipAddr, err)
 		}
 		checker.authorizedIPsNet = append(checker.authorizedIPsNet, ipAddr)
 		logger.Debug(fmt.Sprintf("IP network %v is trusted", ipAddr))
@@ -49,7 +49,7 @@ func (ip *Checker) Contains(addr string) (bool, error) {
 
 	ipAddr, err := parseIP(addr)
 	if err != nil {
-		return false, fmt.Errorf("Contains:parseAddress addr:%s %s", addr, err.Error())
+		return false, fmt.Errorf("Contains:parseAddress addr:%s %w", addr, err)
 	}
 
 	return ip.ContainsIP(ipAddr), nil
@@ -122,7 +122,7 @@ func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string)
 	}
 	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		return "", fmt.Errorf("GetRemoteIP:extractIP: %s", err.Error())
+		return "", fmt.Errorf("GetRemoteIP:extractIP: %w", err)
 	}
 	return remoteIP, nil
 }

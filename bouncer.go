@@ -154,7 +154,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Here we check for the trusted IPs in the customHeader
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
 	if err != nil {
-		logger.Error(fmt.Sprintf("ServeHTTP ip:%s %s", remoteIP, err.Error()))
+		logger.Error(fmt.Sprintf("ServeHTTP ip:%s %w", remoteIP, err))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -275,7 +275,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	var decisions []Decision
 	err = json.Unmarshal(body, &decisions)
 	if err != nil {
-		logger.Error(fmt.Sprintf("handleNoStreamCache:parseBody: %s", err))
+		logger.Error(fmt.Sprintf("handleNoStreamCache:parseBody: %w", err))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -289,7 +289,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	rw.WriteHeader(http.StatusForbidden)
 	duration, err := time.ParseDuration(decisions[0].Duration)
 	if err != nil {
-		logger.Error(fmt.Sprintf("handleNoStreamCache:parseDuration %s", err))
+		logger.Error(fmt.Sprintf("handleNoStreamCache:parseDuration %w", err))
 		return
 	}
 	if bouncer.crowdsecMode == liveMode {
@@ -323,7 +323,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
-		logger.Error(fmt.Sprintf("handleStreamCache:parsingBody %s", err))
+		logger.Error(fmt.Sprintf("handleStreamCache:parsingBody %w", err))
 		crowdsecStreamHealthy = false
 		return
 	}
@@ -345,20 +345,20 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	req.Header.Add(crowdsecLapiHeader, bouncer.crowdsecKey)
 	res, err := bouncer.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("crowdsecQuery url:%s %s", stringURL, err.Error())
+		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("crowdsecQuery url:%s, statusCode:%d", stringURL, res.StatusCode)
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
-			logger.Error(fmt.Sprintf("crowdsecQuery:closeBody %s", err.Error()))
+			logger.Error(fmt.Sprintf("crowdsecQuery:closeBody %w", err))
 		}
 	}()
 	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
-		return nil, fmt.Errorf("crowdsecQuery:readBody %s", err.Error())
+		return nil, fmt.Errorf("crowdsecQuery:readBody %w", err)
 	}
 	return body, nil
 }
@@ -401,7 +401,7 @@ func validateParams(config *Config) error {
 	if len(config.ForwardedHeadersTrustedIPs) > 0 {
 		_, err = ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 		if err != nil {
-			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%s", err.Error())
+			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%w", err)
 		}
 	} else {
 		logger.Debug("No IP provided for ForwardedHeadersTrustedIPs")
@@ -409,7 +409,7 @@ func validateParams(config *Config) error {
 	if len(config.ClientTrustedIPs) > 0 {
 		_, err = ip.NewChecker(config.ClientTrustedIPs)
 		if err != nil {
-			return fmt.Errorf("TrustedIPs must be a list of IP/CIDR :%s", err.Error())
+			return fmt.Errorf("TrustedIPs must be a list of IP/CIDR :%w", err)
 		}
 	} else {
 		logger.Debug("No IP provided for TrustedIPs")
