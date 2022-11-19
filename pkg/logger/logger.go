@@ -1,4 +1,5 @@
-//
+// Package logger implements utility routines to write to stdout and stderr.
+// It supports debug, info and error level
 package logger
 
 import (

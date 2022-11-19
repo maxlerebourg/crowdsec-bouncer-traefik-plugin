@@ -20,7 +20,6 @@ import (
 	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
-//nolint:gochecknoglobals
 const (
 	streamMode              = "stream"
 	liveMode                = "live"
@@ -346,7 +345,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	req.Header.Add(crowdsecLapiHeader, bouncer.crowdsecKey)
 	res, err := bouncer.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error while fetching %v: %s", stringURL, err)
+		return nil, fmt.Errorf("error while fetching %v: %s", stringURL, err.Error())
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error while fetching %v, status code: %d", stringURL, res.StatusCode)
@@ -354,12 +353,12 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	defer func(body io.ReadCloser) {
 		err = body.Close()
 		if err != nil {
-			logger.Info(fmt.Sprintf("failed to close body reader: %s", err))
+			logger.Info(fmt.Sprintf("failed to close body reader: %s", err.Error()))
 		}
 	}(res.Body)
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error while reading body: %s", err)
+		return nil, fmt.Errorf("error while reading body: %s", err.Error())
 	}
 	return body, nil
 }

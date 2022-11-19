@@ -11,16 +11,17 @@ import (
 	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
-//nolint:gochecknoglobals
 const (
 	cacheBannedValue   = "t"
 	cacheNoBannedValue = "f"
 )
 
 //nolint:gochecknoglobals
-var cache = ttl_map.New()
-var redis simpleredis.SimpleRedis
-var redisEnabled = false
+var (
+	cache        = ttl_map.New()
+	redis        simpleredis.SimpleRedis
+	redisEnabled = false
+)
 
 // FileSystem Cache
 
