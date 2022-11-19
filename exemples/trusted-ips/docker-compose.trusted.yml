@@ -19,16 +19,15 @@ services:
       # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - logs-redis:/var/log/traefik
+      - logs-trustedips:/var/log/traefik
       - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 80:80
       - 8080:8080
     depends_on:
       - crowdsec
-      - redis
 
-  whoami-foo:
+  whoami1:
     image: traefik/whoami
     container_name: "simple-service-foo"
     restart: unless-stopped
@@ -44,10 +43,11 @@ services:
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.rediscacheenabled=true"
+      # Replace 10.0.10.30/32 by your IP range which is "trusted"
+      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.clienttrustedips=10.0.10.30/32"
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
-
-  whoami-bar:
+  
+  whoami2:
     image: traefik/whoami
     container_name: "simple-service-bar"
     restart: unless-stopped
@@ -63,7 +63,8 @@ services:
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
       # crowdseclapikey must be uniq to the middleware attached to the service
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.rediscacheenabled=true"
+      # Replace 10.0.10.30/32 by your IP range which is "trusted"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.clienttrustedips=10.0.10.30/32"
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.loglevel=DEBUG"
 
 
@@ -78,24 +79,13 @@ services:
       BOUNCER_KEY_TRAEFIK_DEV_2: 44c36dac5c4140af9f06f397508e82c7
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - logs-redis:/var/log/traefik:ro
-      - crowdsec-db-redis:/var/lib/crowdsec/data/
-      - crowdsec-config-redis:/etc/crowdsec/
+      - logs-trustedips:/var/log/traefik:ro
+      - crowdsec-db-trustedips:/var/lib/crowdsec/data/
+      - crowdsec-config-trustedips:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
-
-  redis:
-    image: "redis:7.0.5-alpine"
-    container_name: "redis"
-    restart: unless-stopped
-    command: "redis-server --save 60 1"
-    volumes:
-      - redis-data:/data
-    ports:
-      - 6379:6379
-
+  
 volumes:
-  logs-redis:
-  crowdsec-db-redis:
-  crowdsec-config-redis:
-  redis-data:
+  logs-trustedips:
+  crowdsec-db-trustedips:
+  crowdsec-config-trustedips:

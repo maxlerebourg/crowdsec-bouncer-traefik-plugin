@@ -31,6 +31,9 @@ run_behindproxy:
 run_cacheredis:
 	docker-compose -f exemples/redis-cache/docker-compose.redis.yml up -d --remove-orphans
 
+run_trustedips:
+	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml up -d --remove-orphans
+
 run:
 	docker-compose -f docker-compose.yml up -d --remove-orphans
 
@@ -43,6 +46,15 @@ restart_local:
 restart:
 	docker-compose -f docker-compose.yml restart
 
+restart_behindproxy:
+	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml restart
+
+restart_cacheredis:
+	docker-compose -f exemples/redis-cache/docker-compose.redis.yml restart
+
+restart_trustedips:
+	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml restart
+
 show_logs:
 	docker-compose -f docker-compose.yml restart
 
@@ -54,7 +66,8 @@ show_dev_logs:
 
 clean_all_docker:
 	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml down --remove-orphans
-	docker-compose -f exemples/behind-proxy/docker-compose.redis.yml down --remove-orphans
+	docker-compose -f exemples/redis-cache/docker-compose.redis.yml down --remove-orphans
+	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml down --remove-orphans
 	docker-compose -f docker-compose.local.yml down --remove-orphans
 	docker-compose -f docker-compose.yml down --remove-orphans
 
