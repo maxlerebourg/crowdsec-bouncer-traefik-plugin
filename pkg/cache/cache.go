@@ -27,7 +27,7 @@ func getDecisionLocalCache(clientIP string) (bool, error) {
 	if isCached && isValid && len(bannedString) > 0 {
 		return bannedString == cacheBannedValue, nil
 	}
-	return false, fmt.Errorf("no cache data")
+	return false, fmt.Errorf("cache:miss")
 }
 
 func setDecisionLocalCache(clientIP string, value string, duration int64) {
@@ -46,7 +46,7 @@ func getDecisionRedisCache(clientIP string) (bool, error) {
 	if err == nil && len(bannedString) > 0 {
 		return bannedString == cacheBannedValue, nil
 	}
-	return false, fmt.Errorf("no cache data")
+	return false, err
 }
 
 func setDecisionRedisCache(clientIP string, value string, duration int64) {

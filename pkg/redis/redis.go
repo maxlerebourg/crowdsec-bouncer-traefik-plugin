@@ -11,6 +11,12 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
+const (
+	RedisUnreachable = "redis:unreachable"
+	RedisMiss = "redis:miss"
+	RedisTimeout = "redis:timeout"
+)
+
 type RedisCmd struct {
 	Command  string
 	Name     string
@@ -34,8 +40,10 @@ func genRedisArray(params ...[]byte) []byte {
 }
 
 func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
-	conn, err := net.Dial("tcp", hostnamePort)
+	dialer := net.Dialer{Timeout: 2 * time.Second}
+	conn, err := dialer.Dial("tcp", hostnamePort)
 	if err != nil {
+		channel <- RedisCmd{Error: fmt.Errorf(RedisUnreachable)}
 		return
 	}
 	defer conn.Close()
@@ -47,24 +55,24 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 	case "SET":
 		data := genRedisArray([]byte("SET"), []byte(cmd.Name), []byte(cmd.Data), []byte("EX"), []byte(fmt.Sprintf("%v", cmd.Duration)))
 		writer.PrintfLine(string(data))
-		logger.Debug("Redis set")
+		logger.Debug("redis:set")
 	case "DEL":
 		data := genRedisArray([]byte("DEL"), []byte(cmd.Name))
 		writer.PrintfLine(string(data))
-		logger.Debug("Redis del")
+		logger.Debug("redis:del")
 	case "GET":
 		data := genRedisArray([]byte("GET"), []byte(cmd.Name))
 		writer.PrintfLine(string(data))
-		logger.Debug("Redis get")
+		logger.Debug("redis:get")
 		for {
 			select {
 			case <-time.After(time.Second * 1):
-				channel <- RedisCmd{Error: fmt.Errorf("timeout")}
+				channel <- RedisCmd{Error: fmt.Errorf(RedisTimeout)}
 				return
 			default:
 				read, _ := reader.ReadLineBytes()
 				if string(read) != "$1" {
-					channel <- RedisCmd{Error: fmt.Errorf("miss")}
+					channel <- RedisCmd{Error: fmt.Errorf(RedisMiss)}
 					return
 				}
 				read, _ = reader.ReadLineBytes()
