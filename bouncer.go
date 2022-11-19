@@ -1,6 +1,6 @@
 // Package crowdsec_bouncer_traefik_plugin implements a middleware that communicates with crowdsec.
 // It can cache results to filesystem or redis, or even ask crowdsec for every requests.
-package crowdsec_bouncer_traefik_plugin //nolint:var-naming
+package crowdsec_bouncer_traefik_plugin //nolint:revive
 
 import (
 	"bytes"
@@ -135,6 +135,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	return bouncer, nil
 }
 
+//nolint:nestif
 // ServeHTTP principal function of plugin.
 func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !bouncer.enabled {
