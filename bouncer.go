@@ -1,4 +1,6 @@
-package crowdsec_bouncer_traefik_plugin
+// Package crowdsec_bouncer_traefik_plugin implements a middleware that communicates with crowdsec.
+// It can cache results to filesystem or redis, or even ask crowdsec for every requests.
+package crowdsec_bouncer_traefik_plugin //nolint:var-naming
 
 import (
 	"bytes"

@@ -14,7 +14,7 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// Error strings for redis
+// Error strings for redis.
 const (
 	RedisUnreachable = "redis:unreachable"
 	RedisMiss        = "redis:miss"

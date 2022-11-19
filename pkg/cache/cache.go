@@ -77,15 +77,15 @@ func DeleteDecision(clientIP string) {
 func GetDecision(clientIP string) (bool, error) {
 	if redisEnabled {
 		return getDecisionRedisCache(clientIP)
-	} else {
-		return getDecisionLocalCache(clientIP)
 	}
+	return getDecisionLocalCache(clientIP)
 }
 
+// SetDecision update the cache with the IP as key and the value banned / not banned.
 func SetDecision(clientIP string, isBanned bool, duration int64) {
 	var value string
 	if isBanned {
-		logger.Debug(fmt.Sprintf("%v banned", clientIP))
+		logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v banned", clientIP))
 		value = cacheBannedValue
 	} else {
 		value = cacheNoBannedValue
@@ -97,8 +97,9 @@ func SetDecision(clientIP string, isBanned bool, duration int64) {
 	}
 }
 
+// InitRedisClient loads variables.
 func InitRedisClient(host string) {
 	redisEnabled = true
 	redis.Init(host)
-	logger.Debug("Redis initialized")
+	logger.Debug("cache:InitRedisClient redis:initialized")
 }
