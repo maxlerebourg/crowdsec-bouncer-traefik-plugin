@@ -13,8 +13,8 @@ import (
 
 const (
 	RedisUnreachable = "redis:unreachable"
-	RedisMiss = "redis:miss"
-	RedisTimeout = "redis:timeout"
+	RedisMiss        = "redis:miss"
+	RedisTimeout     = "redis:timeout"
 )
 
 type RedisCmd struct {
@@ -39,6 +39,14 @@ func genRedisArray(params ...[]byte) []byte {
 	return []byte(MSG)
 }
 
+func send(wr *textproto.Writer, method string, data []byte) {
+	if err := wr.PrintfLine(string(data)); err != nil {
+		logger.Error(fmt.Sprintf("redis:%s  %s", method, err.Error()))
+	} else {
+		logger.Debug(fmt.Sprintf("redis:%s", method))
+	}
+}
+
 func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 	dialer := net.Dialer{Timeout: 2 * time.Second}
 	conn, err := dialer.Dial("tcp", hostnamePort)
@@ -46,7 +54,11 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 		channel <- RedisCmd{Error: fmt.Errorf(RedisUnreachable)}
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logger.Error(fmt.Sprintf("redis:connClose %s", err.Error()))
+		}
+	}()
 
 	writer := textproto.NewWriter(bufio.NewWriter(conn))
 	reader := textproto.NewReader(bufio.NewReader(conn))
@@ -54,16 +66,13 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 	switch cmd.Command {
 	case "SET":
 		data := genRedisArray([]byte("SET"), []byte(cmd.Name), []byte(cmd.Data), []byte("EX"), []byte(fmt.Sprintf("%v", cmd.Duration)))
-		writer.PrintfLine(string(data))
-		logger.Debug("redis:set")
+		send(writer, "set", data)
 	case "DEL":
 		data := genRedisArray([]byte("DEL"), []byte(cmd.Name))
-		writer.PrintfLine(string(data))
-		logger.Debug("redis:del")
+		send(writer, "del", data)
 	case "GET":
 		data := genRedisArray([]byte("GET"), []byte(cmd.Name))
-		writer.PrintfLine(string(data))
-		logger.Debug("redis:get")
+		send(writer, "get", data)
 		for {
 			select {
 			case <-time.After(time.Second * 1):
