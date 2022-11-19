@@ -1,3 +1,4 @@
+//
 package logger
 
 import (
@@ -12,27 +13,26 @@ var (
 	loggerError = log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 )
 
-// Init Set Default log level to info in case log level to defined
+// Init Set Default log level to info in case log level to defined.
 func Init(logLevel string) {
 	loggerError.SetOutput(os.Stderr)
 	loggerInfo.SetOutput(os.Stdout)
-	switch logLevel {
-	case "DEBUG":
+	if logLevel == "DEBUG" {
 		loggerDebug.SetOutput(os.Stdout)
 	}
 }
 
-// Log info
+// Info log to Stdout.
 func Info(str string) {
 	loggerInfo.Printf(str)
 }
 
-// Log debug
+// Debug log to Stdout.
 func Debug(str string) {
 	loggerDebug.Printf(str)
 }
 
-// Log error
+// Error log to Stderr.
 func Error(str string) {
 	loggerError.Printf(str)
 }

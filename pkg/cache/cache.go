@@ -1,3 +1,5 @@
+// Package cache implements utility routines for manipulating cache.
+// It supports currently local file and redis cache.
 package cache
 
 import (
@@ -6,7 +8,7 @@ import (
 	ttl_map "github.com/leprosus/golang-ttl-map"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/redis"
+	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
 const (
@@ -50,14 +52,18 @@ func getDecisionRedisCache(clientIP string) (bool, error) {
 }
 
 func setDecisionRedisCache(clientIP string, value string, duration int64) {
-	redis.Set(clientIP, []byte(value), duration)
+	if err := redis.Set(clientIP, []byte(value), duration); err != nil {
+		logger.Error(fmt.Sprintf("cache:setDecisionRedisCache %s", err.Error()))
+	}
 }
 
 func deleteDecisionRedisCache(clientIP string) {
-	redis.Del(clientIP)
+	if err := redis.Del(clientIP); err != nil {
+		logger.Error(fmt.Sprintf("cache:deleteDecisionRedisCache %s", err.Error()))
+	}
 }
 
-// DeleteDecision delete decision in cache
+// DeleteDecision delete decision in cache.
 func DeleteDecision(clientIP string) {
 	if redisEnabled {
 		deleteDecisionRedisCache(clientIP)

@@ -1,3 +1,6 @@
+// Package simpleredis implements utility routines for interacting.
+// It supports currently the following operations: GET, SET, DELETE,
+// and support timetoleave for keys.
 package simpleredis
 
 import (
@@ -11,12 +14,14 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
+// Error strings for redis
 const (
 	RedisUnreachable = "redis:unreachable"
 	RedisMiss        = "redis:miss"
 	RedisTimeout     = "redis:timeout"
 )
 
+// A RedisCmd is used to communicate with redis at low level using commands.
 type RedisCmd struct {
 	Command  string
 	Name     string
@@ -25,6 +30,7 @@ type RedisCmd struct {
 	Error    error
 }
 
+// A SimpleRedis is used to communicate with redis.
 type SimpleRedis struct {
 	redisHost string
 }
@@ -92,10 +98,12 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 	}
 }
 
+// Init sets the redisHost used to connect to redis.
 func (sr *SimpleRedis) Init(redisHost string) {
 	sr.redisHost = redisHost
 }
 
+// Get fetches the value for key name in redis.
 func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 	redisCmd := RedisCmd{
 		Command: "GET",
@@ -110,6 +118,7 @@ func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 	return resp.Data, nil
 }
 
+// Set update the value for key name in redis with value data for duration.
 func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 	redisCmd := RedisCmd{
 		Command:  "SET",
@@ -121,6 +130,7 @@ func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 	return nil
 }
 
+// Del remove the key name in redis.
 func (sr *SimpleRedis) Del(name string) error {
 	redisCmd := RedisCmd{
 		Command: "DEL",
