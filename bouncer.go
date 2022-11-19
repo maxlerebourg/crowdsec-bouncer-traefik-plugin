@@ -353,12 +353,12 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	defer func(body io.ReadCloser) {
 		err = body.Close()
 		if err != nil {
-			logger.Info(fmt.Sprintf("failed to close body reader: %s", err.Error()))
+			logger.Error(fmt.Sprintf("failed to close body reader: %s", err.Error()))
 		}
 	}(res.Body)
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error while reading body: %s", err.Error())
+		return nil, fmt.Errorf("error while reading body: %w", err)
 	}
 	return body, nil
 }
