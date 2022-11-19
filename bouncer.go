@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"text/template"
@@ -357,7 +356,8 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 			logger.Error(fmt.Sprintf("failed to close body reader: %s", err.Error()))
 		}
 	}(res.Body)
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+
 	if err != nil {
 		return nil, fmt.Errorf("error while reading body: %w", err)
 	}
