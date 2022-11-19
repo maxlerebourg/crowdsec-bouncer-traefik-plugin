@@ -345,7 +345,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	req.Header.Add(crowdsecLapiHeader, bouncer.crowdsecKey)
 	res, err := bouncer.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error while fetching %v: %s", stringURL, err.Error())
+		return nil, fmt.Errorf("error while fetching %v: %w", stringURL, err)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error while fetching %v, status code: %d", stringURL, res.StatusCode)
