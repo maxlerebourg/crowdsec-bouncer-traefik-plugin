@@ -53,7 +53,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:                    false,
-		LogLevel:                   "DEBUG",
+		LogLevel:                   "INFO",
 		CrowdsecMode:               liveMode,
 		CrowdsecLapiScheme:         "http",
 		CrowdsecLapiHost:           "crowdsec:8080",
@@ -162,7 +162,6 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
-	logger.Debug(fmt.Sprintf("ServeHTTP ip:%v", remoteHost))
 	if bouncer.CheckerTrusted == nil {
 		logger.Debug("CheckerTrusted == nil")
 	} else {
@@ -173,7 +172,9 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 		// if our IP is in the trusted list we bypass the next checks
 		if trusted {
+			logger.Debug(fmt.Sprintf("IP %v is trusted", remoteHost))
 			bouncer.next.ServeHTTP(rw, req)
+			return
 		}
 	}
 

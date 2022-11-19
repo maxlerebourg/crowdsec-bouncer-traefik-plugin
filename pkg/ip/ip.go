@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // CHECKER
@@ -27,6 +29,7 @@ func NewChecker(trustedIPs []string) (*Checker, error) {
 	for _, ipMask := range trustedIPs {
 		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
 			checker.authorizedIPs = append(checker.authorizedIPs, &ipAddr)
+			logger.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
 			continue
 		}
 
@@ -35,6 +38,7 @@ func NewChecker(trustedIPs []string) (*Checker, error) {
 			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipAddr, err)
 		}
 		checker.authorizedIPsNet = append(checker.authorizedIPsNet, ipAddr)
+		logger.Debug(fmt.Sprintf("IP network %v is trusted", ipAddr))
 	}
 
 	return checker, nil

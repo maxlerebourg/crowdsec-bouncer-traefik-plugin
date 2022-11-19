@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  traefik:
+    image: "traefik:v2.9.4"
+    container_name: "traefik"
+    command:
+      # - "--log.level=DEBUG"
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+
+      - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.plugins.bouncer.version=v1.1.2"
+      # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - logs-trustedips:/var/log/traefik
+      - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+    ports:
+      - 80:80
+      - 8080:8080
+    depends_on:
+      - crowdsec
+
+  whoami1:
+    image: traefik/whoami
+    container_name: "simple-service1"
+    labels:
+      - "traefik.enable=true"
+      # Definition of the router
+      - "traefik.http.routers.router1.rule=Path(`/foo`)"
+      - "traefik.http.routers.router1.entrypoints=web"
+      - "traefik.http.routers.router1.middlewares=crowdsec@docker" 
+      # Definition of the service
+      - "traefik.http.services.service1.loadbalancer.server.port=80"
+      # Definition of the middleware
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      # crowdseclapikey must be uniq to the middleware attached to the service
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      # Replace 10.0.10.30/32 by your IP range which is "trusted"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.trustedips=10.0.10.30/32"
+
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.4.1
+    container_name: "crowdsec"
+    environment:
+      COLLECTIONS: crowdsecurity/traefik
+      CUSTOM_HOSTNAME: crowdsec
+      BOUNCER_KEY_TRAEFIK_DEV_1: 40796d93c2958f9e58345514e67740e5
+    volumes:
+      - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - logs-trustedips:/var/log/traefik:ro
+      - crowdsec-db-trustedips:/var/lib/crowdsec/data/
+      - crowdsec-config-trustedips:/etc/crowdsec/
+    labels:
+      - "traefik.enable=false"
+  
+volumes:
+  logs-trustedips:
+  crowdsec-db-trustedips:
+  crowdsec-config-trustedips:

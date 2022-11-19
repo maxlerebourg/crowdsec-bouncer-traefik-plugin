@@ -33,7 +33,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router1.rule=Host(`localhost`)"
+      - "traefik.http.routers.router1.rule=Path(`/foo`)"
       - "traefik.http.routers.router1.entrypoints=web"
       - "traefik.http.routers.router1.middlewares=crowdsec1@docker" 
       # Definition of the service
