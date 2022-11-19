@@ -1,3 +1,5 @@
+// Package logger implements utility routines to write to stdout and stderr.
+// It supports debug, info and error level
 package logger
 
 import (
@@ -7,29 +9,31 @@ import (
 )
 
 var (
-	loggerInfo  = log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	loggerDebug = log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
+	loggerInfo  = log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)  //nolint:gochecknoglobals
+	loggerDebug = log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime) //nolint:gochecknoglobals
+	loggerError = log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime) //nolint:gochecknoglobals
 )
 
-// Init Set Default log level to info in case log level to defined
+// Init Set Default log level to info in case log level to defined.
 func Init(logLevel string) {
-	switch logLevel {
-	case "INFO":
-		loggerInfo.SetOutput(os.Stdout)
-	case "DEBUG":
-		loggerInfo.SetOutput(os.Stdout)
+	loggerError.SetOutput(os.Stderr)
+	loggerInfo.SetOutput(os.Stdout)
+	if logLevel == "DEBUG" {
 		loggerDebug.SetOutput(os.Stdout)
-	default:
-		loggerInfo.SetOutput(os.Stdout)
 	}
 }
 
-// Info Log info
+// Info log to Stdout.
 func Info(str string) {
 	loggerInfo.Printf(str)
 }
 
-// Info Log debug
+// Debug log to Stdout.
 func Debug(str string) {
 	loggerDebug.Printf(str)
+}
+
+// Error log to Stderr.
+func Error(str string) {
+	loggerError.Printf(str)
 }

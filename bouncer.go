@@ -1,4 +1,6 @@
-package crowdsec_bouncer_traefik_plugin
+// Package crowdsec_bouncer_traefik_plugin implements a middleware that communicates with crowdsec.
+// It can cache results to filesystem or redis, or even ask crowdsec for every requests.
+package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"bytes"
@@ -15,7 +17,7 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/redis"
+	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
 const (
@@ -28,6 +30,7 @@ const (
 	cacheTimeoutKey         = "updated"
 )
 
+//nolint:gochecknoglobals
 var (
 	crowdsecStreamHealthy = false
 	ticker                chan bool
@@ -61,8 +64,8 @@ func CreateConfig() *Config {
 		CrowdsecLapiKey:            "",
 		UpdateIntervalSeconds:      60,
 		DefaultDecisionSeconds:     60,
-		ForwardedHeadersTrustedIPs: []string{},
 		ClientTrustedIPs:           []string{},
+		ForwardedHeadersTrustedIPs: []string{},
 		ForwardedHeadersCustomName: "X-Forwarded-For",
 		RedisCacheEnabled:          false,
 		RedisCacheHost:             "redis:6379",
@@ -83,8 +86,8 @@ type Bouncer struct {
 	updateInterval         int64
 	defaultDecisionTimeout int64
 	customHeader           string
-	serverPoolStrategy     *ip.PoolStrategy
 	clientPoolStrategy     *ip.PoolStrategy
+	serverPoolStrategy     *ip.PoolStrategy
 	client                 *http.Client
 }
 
@@ -141,41 +144,44 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 }
 
 // ServeHTTP principal function of plugin.
+//
+//nolint:nestif
 func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !bouncer.enabled {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
+
 	// Here we check for the trusted IPs in the customHeader
-	remoteHost, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
+	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
 	if err != nil {
-		logger.Info(err.Error())
-		bouncer.next.ServeHTTP(rw, req)
+		logger.Error(fmt.Sprintf("ServeHTTP ip:%s %s", remoteIP, err.Error()))
+		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
-
-	trusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteHost)
+	trusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
 		logger.Info(err.Error())
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
-	logger.Debug(fmt.Sprintf("ServeHTTP ip:%v isTrusted:%v", remoteHost, trusted))
+	logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, trusted))
 	if trusted {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
 
+	// TODO This should be simplified
 	healthy := crowdsecStreamHealthy
 	if bouncer.crowdsecMode != noneMode {
-		isBanned, err := cache.GetDecision(remoteHost)
+		isBanned, err := cache.GetDecision(remoteIP)
 		if err != nil {
-			logger.Debug(err.Error())
+			logger.Error(err.Error())
 			if err.Error() == simpleredis.RedisUnreachable {
 				healthy = false
 			}
 		} else {
-			logger.Debug(fmt.Sprintf("ServeHTTP cache:hit isBanned:%v", isBanned))
+			logger.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, isBanned))
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
 			} else {
@@ -193,7 +199,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			rw.WriteHeader(http.StatusForbidden)
 		}
 	} else {
-		handleNoStreamCache(bouncer, rw, req, remoteHost)
+		handleNoStreamCache(bouncer, rw, req, remoteIP)
 	}
 }
 
@@ -245,12 +251,12 @@ func startTicker(config *Config, work func()) chan bool {
 }
 
 // We are now in none or live mode.
-func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, remoteHost string) {
+func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, remoteIP string) {
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     crowdsecLapiRoute,
-		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteHost),
+		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String())
 	if err != nil {
@@ -261,7 +267,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 
 	if bytes.Equal(body, []byte("null")) {
 		if bouncer.crowdsecMode == liveMode {
-			cache.SetDecision(remoteHost, false, bouncer.defaultDecisionTimeout)
+			cache.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
 		}
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -276,7 +282,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	}
 	if len(decisions) == 0 {
 		if bouncer.crowdsecMode == liveMode {
-			cache.SetDecision(remoteHost, false, bouncer.defaultDecisionTimeout)
+			cache.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
 		}
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -288,7 +294,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 		return
 	}
 	if bouncer.crowdsecMode == liveMode {
-		cache.SetDecision(remoteHost, true, int64(duration.Seconds()))
+		cache.SetDecision(remoteIP, true, int64(duration.Seconds()))
 	}
 }
 
@@ -340,7 +346,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	req.Header.Add(crowdsecLapiHeader, bouncer.crowdsecKey)
 	res, err := bouncer.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error while fetching %v: %s", stringURL, err)
+		return nil, fmt.Errorf("error while fetching %v: %w", stringURL, err)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error while fetching %v, status code: %d", stringURL, res.StatusCode)
@@ -348,12 +354,12 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	defer func(body io.ReadCloser) {
 		err = body.Close()
 		if err != nil {
-			logger.Info(fmt.Sprintf("failed to close body reader: %s", err))
+			logger.Error(fmt.Sprintf("failed to close body reader: %s", err.Error()))
 		}
 	}(res.Body)
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error while reading body: %s", err)
+		return nil, fmt.Errorf("error while reading body: %w", err)
 	}
 	return body, nil
 }

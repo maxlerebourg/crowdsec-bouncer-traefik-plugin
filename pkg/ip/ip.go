@@ -1,3 +1,5 @@
+// Package ip implements utility routines for to manipulates IP and CIDR.
+// It allows to find on IP on a list, and find if an IP is part of a list of CIDR.
 package ip
 
 import (

@@ -1,3 +1,6 @@
+// Package simpleredis implements utility routines for interacting.
+// It supports currently the following operations: GET, SET, DELETE,
+// and support timetoleave for keys.
 package simpleredis
 
 import (
@@ -11,12 +14,14 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
+// Error strings for redis.
 const (
 	RedisUnreachable = "redis:unreachable"
-	RedisMiss = "redis:miss"
-	RedisTimeout = "redis:timeout"
+	RedisMiss        = "redis:miss"
+	RedisTimeout     = "redis:timeout"
 )
 
+// A RedisCmd is used to communicate with redis at low level using commands.
 type RedisCmd struct {
 	Command  string
 	Name     string
@@ -25,6 +30,7 @@ type RedisCmd struct {
 	Error    error
 }
 
+// A SimpleRedis is used to communicate with redis.
 type SimpleRedis struct {
 	redisHost string
 }
@@ -39,6 +45,14 @@ func genRedisArray(params ...[]byte) []byte {
 	return []byte(MSG)
 }
 
+func send(wr *textproto.Writer, method string, data []byte) {
+	if err := wr.PrintfLine(string(data)); err != nil {
+		logger.Error(fmt.Sprintf("redis:%s  %s", method, err.Error()))
+	} else {
+		logger.Debug(fmt.Sprintf("redis:%s", method))
+	}
+}
+
 func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 	dialer := net.Dialer{Timeout: 2 * time.Second}
 	conn, err := dialer.Dial("tcp", hostnamePort)
@@ -46,24 +60,25 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 		channel <- RedisCmd{Error: fmt.Errorf(RedisUnreachable)}
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logger.Error(fmt.Sprintf("redis:connClose %s", err.Error()))
+		}
+	}()
 
 	writer := textproto.NewWriter(bufio.NewWriter(conn))
 	reader := textproto.NewReader(bufio.NewReader(conn))
 
 	switch cmd.Command {
 	case "SET":
-		data := genRedisArray([]byte("SET"), []byte(cmd.Name), []byte(cmd.Data), []byte("EX"), []byte(fmt.Sprintf("%v", cmd.Duration)))
-		writer.PrintfLine(string(data))
-		logger.Debug("redis:set")
+		data := genRedisArray([]byte("SET"), []byte(cmd.Name), cmd.Data, []byte("EX"), []byte(fmt.Sprintf("%d", cmd.Duration)))
+		send(writer, "set", data)
 	case "DEL":
 		data := genRedisArray([]byte("DEL"), []byte(cmd.Name))
-		writer.PrintfLine(string(data))
-		logger.Debug("redis:del")
+		send(writer, "del", data)
 	case "GET":
 		data := genRedisArray([]byte("GET"), []byte(cmd.Name))
-		writer.PrintfLine(string(data))
-		logger.Debug("redis:get")
+		send(writer, "get", data)
 		for {
 			select {
 			case <-time.After(time.Second * 1):
@@ -83,10 +98,12 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 	}
 }
 
+// Init sets the redisHost used to connect to redis.
 func (sr *SimpleRedis) Init(redisHost string) {
 	sr.redisHost = redisHost
 }
 
+// Get fetches the value for key name in redis.
 func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 	redisCmd := RedisCmd{
 		Command: "GET",
@@ -101,6 +118,7 @@ func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 	return resp.Data, nil
 }
 
+// Set update the value for key name in redis with value data for duration.
 func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 	redisCmd := RedisCmd{
 		Command:  "SET",
@@ -112,6 +130,7 @@ func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 	return nil
 }
 
+// Del remove the key name in redis.
 func (sr *SimpleRedis) Del(name string) error {
 	redisCmd := RedisCmd{
 		Command: "DEL",

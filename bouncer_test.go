@@ -1,4 +1,4 @@
-package crowdsec_bouncer_traefik_plugin
+package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"

@@ -1,3 +1,5 @@
+// Package cache implements utility routines for manipulating cache.
+// It supports currently local file and redis cache.
 package cache
 
 import (
@@ -6,7 +8,7 @@ import (
 	ttl_map "github.com/leprosus/golang-ttl-map"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/redis"
+	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
 const (
@@ -14,12 +16,14 @@ const (
 	cacheNoBannedValue = "f"
 )
 
-var cache = ttl_map.New()
-var redis simpleredis.SimpleRedis
+//nolint:gochecknoglobals
+var (
+	cache        = ttl_map.New()
+	redis        simpleredis.SimpleRedis
+	redisEnabled = false
+)
 
-var redisEnabled = false
-
-// CLASSIC
+// FileSystem Cache
 
 func getDecisionLocalCache(clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
@@ -38,7 +42,7 @@ func deleteDecisionLocalCache(clientIP string) {
 	cache.Del(clientIP)
 }
 
-// REDIS
+// Redis Cache
 
 func getDecisionRedisCache(clientIP string) (bool, error) {
 	banned, err := redis.Get(clientIP)
@@ -50,14 +54,18 @@ func getDecisionRedisCache(clientIP string) (bool, error) {
 }
 
 func setDecisionRedisCache(clientIP string, value string, duration int64) {
-	redis.Set(clientIP, []byte(value), duration)
+	if err := redis.Set(clientIP, []byte(value), duration); err != nil {
+		logger.Error(fmt.Sprintf("cache:setDecisionRedisCache %s", err.Error()))
+	}
 }
 
 func deleteDecisionRedisCache(clientIP string) {
-	redis.Del(clientIP)
+	if err := redis.Del(clientIP); err != nil {
+		logger.Error(fmt.Sprintf("cache:deleteDecisionRedisCache %s", err.Error()))
+	}
 }
 
-// DeleteDecision delete decision in cache
+// DeleteDecision delete decision in cache.
 func DeleteDecision(clientIP string) {
 	if redisEnabled {
 		deleteDecisionRedisCache(clientIP)
@@ -71,15 +79,15 @@ func DeleteDecision(clientIP string) {
 func GetDecision(clientIP string) (bool, error) {
 	if redisEnabled {
 		return getDecisionRedisCache(clientIP)
-	} else {
-		return getDecisionLocalCache(clientIP)
 	}
+	return getDecisionLocalCache(clientIP)
 }
 
+// SetDecision update the cache with the IP as key and the value banned / not banned.
 func SetDecision(clientIP string, isBanned bool, duration int64) {
 	var value string
 	if isBanned {
-		logger.Debug(fmt.Sprintf("%v banned", clientIP))
+		logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v banned", clientIP))
 		value = cacheBannedValue
 	} else {
 		value = cacheNoBannedValue
@@ -91,8 +99,9 @@ func SetDecision(clientIP string, isBanned bool, duration int64) {
 	}
 }
 
+// InitRedisClient loads variables.
 func InitRedisClient(host string) {
 	redisEnabled = true
 	redis.Init(host)
-	logger.Debug("Redis initialized")
+	logger.Debug("cache:InitRedisClient redis:initialized")
 }
