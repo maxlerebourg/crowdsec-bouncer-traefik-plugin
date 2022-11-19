@@ -1,4 +1,4 @@
-package crowdsec_bouncer_traefik_plugin //nolint:golint,unused
+package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"

@@ -71,7 +71,7 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 
 	switch cmd.Command {
 	case "SET":
-		data := genRedisArray([]byte("SET"), []byte(cmd.Name), []byte(cmd.Data), []byte("EX"), []byte(fmt.Sprintf("%v", cmd.Duration)))
+		data := genRedisArray([]byte("SET"), []byte(cmd.Name), cmd.Data, []byte("EX"), []byte(fmt.Sprintf("%d", cmd.Duration)))
 		send(writer, "set", data)
 	case "DEL":
 		data := genRedisArray([]byte("DEL"), []byte(cmd.Name))

@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	loggerInfo  = log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	loggerDebug = log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	loggerError = log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
+	loggerInfo  = log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)  //nolint:gochecknoglobals
+	loggerDebug = log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime) //nolint:gochecknoglobals
+	loggerError = log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime) //nolint:gochecknoglobals
 )
 
 // Init Set Default log level to info in case log level to defined.

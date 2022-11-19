@@ -1,6 +1,6 @@
 // Package crowdsec_bouncer_traefik_plugin implements a middleware that communicates with crowdsec.
 // It can cache results to filesystem or redis, or even ask crowdsec for every requests.
-package crowdsec_bouncer_traefik_plugin //nolint:revive
+package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"bytes"
@@ -20,6 +20,7 @@ import (
 	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
+//nolint:gochecknoglobals
 const (
 	streamMode              = "stream"
 	liveMode                = "live"
@@ -30,6 +31,7 @@ const (
 	cacheTimeoutKey         = "updated"
 )
 
+//nolint:gochecknoglobals
 var (
 	crowdsecStreamHealthy = false
 	ticker                chan bool
