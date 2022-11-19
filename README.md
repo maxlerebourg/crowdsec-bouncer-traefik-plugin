@@ -184,7 +184,7 @@ docker-compose up -d
 ```bash
 docker-compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
-docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -d 10m
+docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 ```
 
 ### Local Mode
