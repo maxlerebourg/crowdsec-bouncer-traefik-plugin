@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   cloudflare:
-    image: "traefik:v2.9.1"
+    image: "traefik:v2.9.4"
     container_name: "cloudflare"
     command:
       # - "--log.level=DEBUG"
@@ -21,7 +21,7 @@ services:
       - 8080:8080
 
   traefik:
-    image: "traefik:v2.9.1"
+    image: "traefik:v2.9.4"
     container_name: "traefik"
     command:
       # - "--log.level=DEBUG"

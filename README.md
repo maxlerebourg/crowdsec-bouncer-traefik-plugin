@@ -89,10 +89,10 @@ make run
   - string 
   - default: "redis:6379"
   - hostname and port for the redis service
-- TrustedIPs
+- ClientTrustedIPs
   - string 
   - default: []
-  - List of IPs we trust, they will bypass any more check to the bouncer or cache (usefull for LAN or VPN IP)
+  - List of client IPs we trust, they will bypass any more check to the bouncer or cache (usefull for LAN or VPN IP)
 
 ### Configuration
 
@@ -142,7 +142,7 @@ http:
           forwardedHeadersTrustedIPs: 
             - 10.0.10.23/32
             - 10.0.20.0/24
-          trustedIPs: 
+          clientTrustedIPs: 
             - 192.168.1.0/24
           forwardedHeadersCustomName: X-Custom-Header
           redisCacheEnabled: false
@@ -229,6 +229,7 @@ You need to configure your Traefik to trust Forwarded headers by your front prox
 In the exemple we use another instance of traefik with the container named cloudflare to simulate a front proxy
 
 The "internal" Traefik instance is configured to trust the cloudflare forward headers
+This helps Traefik choose the right IP of the client: see https://doc.traefik.io/traefik/routing/entrypoints/#forwarded-headers
 ```yaml
   - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
 ```
@@ -261,12 +262,14 @@ make run_cacheredis
 You need to configure your Traefik to trust Forwarded headers by your front proxy
 In the exemple we use a whoami container protected by crowdsec, and we ban or IP before allowing using TrustedIPs
 
+If you are using another proxy in front, you need to add it's IP in the trusted IP for the forwarded headers.
+This helps Traefik choose the right IP of the client: see https://doc.traefik.io/traefik/routing/entrypoints/#forwarded-headers
 The "internal" Traefik instance is configured to trust the forward headers
 ```yaml
   - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
 ```
 
-We configure the middleware to trust as well the IP:
+We configure the middleware to trust as well the IP of the intermediate proxy if needed:
 ```yaml
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
 ```
@@ -279,14 +282,14 @@ You should get a 403 on http://localhost/foo
 
 > Replace *10.0.10.30* by your IP
 
-And the IPS that will not be filtered by the plugin
+Add the IPs that will not be filtered by the plugin
 ```yaml
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.trustedips=10.0.10.30/32"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.clientTrustedips=10.0.10.30/32"
 ```
 
 > Replace *10.0.10.30/32* by your IP or IP range, so it's not getting checked against ban cache of crowdsec
 
-You should get a 200 on http://localhost/foo
+You should get a 200 on http://localhost/foo even if you are on the ban cache
 
 To play the demo environnement run:
 ```bash

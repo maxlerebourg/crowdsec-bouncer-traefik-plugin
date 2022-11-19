@@ -20,10 +20,6 @@ type Checker struct {
 
 // NewChecker builds a new Checker given a list of CIDR-Strings to trusted IPs.
 func NewChecker(trustedIPs []string) (*Checker, error) {
-	if len(trustedIPs) == 0 {
-		return nil, errors.New("no trusted IPs provided")
-	}
-
 	checker := &Checker{}
 
 	for _, ipMask := range trustedIPs {
