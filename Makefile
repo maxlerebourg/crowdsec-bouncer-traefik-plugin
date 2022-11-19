@@ -67,7 +67,7 @@ show_dev_logs:
 clean_all_docker:
 	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml down --remove-orphans
 	docker-compose -f exemples/redis-cache/docker-compose.redis.yml down --remove-orphans
-	docker-compose -f exemples/trusted-ips/docker-compose.redis.yml down --remove-orphans
+	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml down --remove-orphans
 	docker-compose -f docker-compose.local.yml down --remove-orphans
 	docker-compose -f docker-compose.yml down --remove-orphans
 

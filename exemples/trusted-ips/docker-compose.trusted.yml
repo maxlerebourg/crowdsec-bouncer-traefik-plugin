@@ -4,6 +4,7 @@ services:
   traefik:
     image: "traefik:v2.9.4"
     container_name: "traefik"
+    restart: unless-stopped
     command:
       # - "--log.level=DEBUG"
       - "--accesslog"
@@ -14,7 +15,7 @@ services:
       - "--entrypoints.web.address=:80"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.1.2"
+      - "--experimental.plugins.bouncer.version=v1.1.3"
       # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -28,30 +29,54 @@ services:
 
   whoami1:
     image: traefik/whoami
-    container_name: "simple-service1"
+    container_name: "simple-service-foo"
+    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router1.rule=Path(`/foo`)"
-      - "traefik.http.routers.router1.entrypoints=web"
-      - "traefik.http.routers.router1.middlewares=crowdsec@docker" 
+      - "traefik.http.routers.router-foo.rule=Path(`/foo`)"
+      - "traefik.http.routers.router-foo.entrypoints=web"
+      - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
       # Definition of the service
-      - "traefik.http.services.service1.loadbalancer.server.port=80"
+      - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       # Definition of the middleware
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
       # crowdseclapikey must be uniq to the middleware attached to the service
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       # Replace 10.0.10.30/32 by your IP range which is "trusted"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.clienttrustedips=10.0.50.30/32"
+      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.clienttrustedips=10.0.10.30/32"
+      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
+  
+  whoami2:
+    image: traefik/whoami
+    container_name: "simple-service-bar"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      # Definition of the router
+      - "traefik.http.routers.router-bar.rule=Path(`/bar`)"
+      - "traefik.http.routers.router-bar.entrypoints=web"
+      - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker" 
+      # Definition of the service
+      - "traefik.http.services.service-bar.loadbalancer.server.port=80"
+      # Definition of the middleware
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
+      # crowdseclapikey must be uniq to the middleware attached to the service
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
+      # Replace 10.0.10.30/32 by your IP range which is "trusted"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.clienttrustedips=10.0.10.30/32"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.loglevel=DEBUG"
 
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.1
     container_name: "crowdsec"
+    restart: unless-stopped
     environment:
       COLLECTIONS: crowdsecurity/traefik
       CUSTOM_HOSTNAME: crowdsec
       BOUNCER_KEY_TRAEFIK_DEV_1: 40796d93c2958f9e58345514e67740e5
+      BOUNCER_KEY_TRAEFIK_DEV_2: 44c36dac5c4140af9f06f397508e82c7
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - logs-trustedips:/var/log/traefik:ro
