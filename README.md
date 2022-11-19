@@ -40,7 +40,7 @@ make run
 
 ### Note
 
-**/!\ Since Release 1.10, cache is no longer duplicated but shared by all services**
+**/!\ Since Release 1.1.0, cache is no longer duplicated but shared by all services**
 *This lowers the overhead of the cache in memory and the numbers of cache to fetch it from crowdsec in situation with many services*
 
 
