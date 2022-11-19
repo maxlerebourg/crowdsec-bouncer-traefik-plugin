@@ -175,7 +175,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if bouncer.crowdsecMode != noneMode {
 		isBanned, err := cache.GetDecision(remoteIP)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Debug(err.Error())
 			if err.Error() == simpleredis.RedisUnreachable {
 				healthy = false
 			}
@@ -259,7 +259,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String())
 	if err != nil {
-		logger.Info(err.Error())
+		logger.Error(err.Error())
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -275,7 +275,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	var decisions []Decision
 	err = json.Unmarshal(body, &decisions)
 	if err != nil {
-		logger.Info(fmt.Sprintf("failed to parse body: %s", err))
+		logger.Error(fmt.Sprintf("handleNoStreamCache:parseBody: %s", err))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -289,7 +289,7 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	rw.WriteHeader(http.StatusForbidden)
 	duration, err := time.ParseDuration(decisions[0].Duration)
 	if err != nil {
-		logger.Info(fmt.Sprintf("failed to parse duration: %s", err))
+		logger.Error(fmt.Sprintf("handleNoStreamCache:parseDuration %s", err))
 		return
 	}
 	if bouncer.crowdsecMode == liveMode {
@@ -302,9 +302,9 @@ func handleStreamCache(bouncer *Bouncer) {
 	// Instead of blocking the goroutine interval for all the secondary node,
 	// if the master service is shut down, other goroutine can take the lead
 	// because updated routine information is in the cache
-	logger.Debug("handleStreamCache")
 	_, err := cache.GetDecision(cacheTimeoutKey)
 	if err == nil {
+		logger.Debug("handleStreamCache:alreadyUpdated")
 		return
 	}
 	cache.SetDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
@@ -316,14 +316,14 @@ func handleStreamCache(bouncer *Bouncer) {
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String())
 	if err != nil {
-		logger.Info(err.Error())
+		logger.Error(err.Error())
 		crowdsecStreamHealthy = false
 		return
 	}
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
-		logger.Info(fmt.Sprintf("error while parsing body: %s", err))
+		logger.Error(fmt.Sprintf("handleStreamCache:parsingBody %s", err))
 		crowdsecStreamHealthy = false
 		return
 	}
@@ -345,21 +345,20 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	req.Header.Add(crowdsecLapiHeader, bouncer.crowdsecKey)
 	res, err := bouncer.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error while fetching %v: %w", stringURL, err)
+		return nil, fmt.Errorf("crowdsecQuery url:%s %s", stringURL, err.Error())
 	}
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error while fetching %v, status code: %d", stringURL, res.StatusCode)
+		return nil, fmt.Errorf("crowdsecQuery url:%s, statusCode:%d", stringURL, res.StatusCode)
 	}
-	defer func(body io.ReadCloser) {
-		err = body.Close()
-		if err != nil {
-			logger.Error(fmt.Sprintf("failed to close body reader: %s", err.Error()))
+	defer func() {
+		if err = res.Body.Close(); err != nil {
+			logger.Error(fmt.Sprintf("crowdsecQuery:closeBody %s", err.Error()))
 		}
-	}(res.Body)
+	}()
 	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
-		return nil, fmt.Errorf("error while reading body: %w", err)
+		return nil, fmt.Errorf("crowdsecQuery:readBody %s", err.Error())
 	}
 	return body, nil
 }
@@ -402,7 +401,7 @@ func validateParams(config *Config) error {
 	if len(config.ForwardedHeadersTrustedIPs) > 0 {
 		_, err = ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 		if err != nil {
-			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%w", err)
+			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%s", err.Error())
 		}
 	} else {
 		logger.Debug("No IP provided for ForwardedHeadersTrustedIPs")
@@ -410,7 +409,7 @@ func validateParams(config *Config) error {
 	if len(config.ClientTrustedIPs) > 0 {
 		_, err = ip.NewChecker(config.ClientTrustedIPs)
 		if err != nil {
-			return fmt.Errorf("TrustedIPs must be a list of IP/CIDR :%w", err)
+			return fmt.Errorf("TrustedIPs must be a list of IP/CIDR :%s", err.Error())
 		}
 	} else {
 		logger.Debug("No IP provided for TrustedIPs")
