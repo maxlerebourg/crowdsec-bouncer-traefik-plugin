@@ -3,7 +3,6 @@
 package ip
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -45,12 +44,12 @@ func NewChecker(trustedIPs []string) (*Checker, error) {
 // Contains checks if provided address is in the trusted IPs.
 func (ip *Checker) Contains(addr string) (bool, error) {
 	if len(addr) == 0 {
-		return false, errors.New("empty IP address")
+		return false, fmt.Errorf("Contains:noAddress")
 	}
 
 	ipAddr, err := parseIP(addr)
 	if err != nil {
-		return false, fmt.Errorf("unable to parse address: %s: %w", addr, err)
+		return false, fmt.Errorf("Contains:parseAddress addr:%s %w", addr, err)
 	}
 
 	return ip.ContainsIP(ipAddr), nil
@@ -76,7 +75,7 @@ func (ip *Checker) ContainsIP(addr net.IP) bool {
 func parseIP(addr string) (net.IP, error) {
 	userIP := net.ParseIP(addr)
 	if userIP == nil {
-		return nil, fmt.Errorf("can't parse IP from address %s", addr)
+		return nil, fmt.Errorf("parseIP:parseAddress %s", addr)
 	}
 
 	return userIP, nil
@@ -123,7 +122,7 @@ func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string)
 	}
 	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		return "", fmt.Errorf("failed to extract ip from remote address: %w", err)
+		return "", fmt.Errorf("GetRemoteIP:extractIP: %w", err)
 	}
 	return remoteIP, nil
 }
