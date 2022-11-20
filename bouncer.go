@@ -126,7 +126,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 				MaxIdleConns:    10,
 				IdleConnTimeout: 30 * time.Second,
 			},
-			Timeout: 5 * time.Second,
+			Timeout: 2 * time.Second,
 		},
 	}
 	if config.RedisCacheEnabled {
@@ -182,17 +182,30 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 		} else {
 			logger.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, isBanned))
-			response(isBanned, bouncer, rw, req)
+			if isBanned {
+				rw.WriteHeader(http.StatusForbidden)
+			} else {
+				bouncer.next.ServeHTTP(rw, req)
+			}
 			return
 		}
 	}
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == streamMode {
-		response(isCrowdsecStreamHealthy, bouncer, rw, req)
+		if isCrowdsecStreamHealthy {
+			rw.WriteHeader(http.StatusForbidden)
+		} else {
+			bouncer.next.ServeHTTP(rw, req)
+		}
 	} else {
 		err = handleNoStreamCache(bouncer, remoteIP)
-		response(err != nil, bouncer, rw, req)
+		if err != nil {
+			logger.Debug(err.Error())
+			rw.WriteHeader(http.StatusForbidden)
+		} else {
+			bouncer.next.ServeHTTP(rw, req)
+		}
 	}
 }
 
@@ -215,14 +228,6 @@ type Decision struct {
 type Stream struct {
 	Deleted []Decision `json:"deleted"`
 	New     []Decision `json:"new"`
-}
-
-func response(isValid bool, bouncer *Bouncer, rw http.ResponseWriter, req *http.Request) {
-	if isValid {
-		rw.WriteHeader(http.StatusForbidden)
-	} else {
-		bouncer.next.ServeHTTP(rw, req)
-	}
 }
 
 func contains(source []string, target string) bool {
