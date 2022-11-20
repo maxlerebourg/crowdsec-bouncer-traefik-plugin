@@ -31,8 +31,8 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	crowdsecStreamHealthy = false
-	ticker                chan bool
+	isCrowdsecStreamHealthy = false
+	ticker                  chan bool
 )
 
 // Config the plugin configuration.
@@ -154,51 +154,45 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Here we check for the trusted IPs in the customHeader
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
 	if err != nil {
-		logger.Error(fmt.Sprintf("ServeHTTP ip:%s %w", remoteIP, err))
+		logger.Error(fmt.Sprintf("ServeHTTP ip:%s %s", remoteIP, err.Error()))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
-	trusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
+	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
-		logger.Info(err.Error())
+		logger.Error(err.Error())
+		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
-	logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, trusted))
-	if trusted {
+	logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
+	if isTrusted {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
 
 	// TODO This should be simplified
-	healthy := crowdsecStreamHealthy
 	if bouncer.crowdsecMode != noneMode {
 		isBanned, err := cache.GetDecision(remoteIP)
 		if err != nil {
 			logger.Debug(err.Error())
 			if err.Error() == simpleredis.RedisUnreachable {
-				healthy = false
+				rw.WriteHeader(http.StatusForbidden)
+				return
 			}
 		} else {
 			logger.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, isBanned))
-			if isBanned {
-				rw.WriteHeader(http.StatusForbidden)
-			} else {
-				bouncer.next.ServeHTTP(rw, req)
-			}
+			response(isBanned, bouncer, rw, req)
 			return
 		}
 	}
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == streamMode {
-		if healthy {
-			bouncer.next.ServeHTTP(rw, req)
-		} else {
-			rw.WriteHeader(http.StatusForbidden)
-		}
+		response(isCrowdsecStreamHealthy, bouncer, rw, req)
 	} else {
-		handleNoStreamCache(bouncer, rw, req, remoteIP)
+		err = handleNoStreamCache(bouncer, remoteIP)
+		response(err != nil, bouncer, rw, req)
 	}
 }
 
@@ -221,6 +215,14 @@ type Decision struct {
 type Stream struct {
 	Deleted []Decision `json:"deleted"`
 	New     []Decision `json:"new"`
+}
+
+func response(isValid bool, bouncer *Bouncer, rw http.ResponseWriter, req *http.Request) {
+	if isValid {
+		rw.WriteHeader(http.StatusForbidden)
+	} else {
+		bouncer.next.ServeHTTP(rw, req)
+	}
 }
 
 func contains(source []string, target string) bool {
@@ -250,7 +252,8 @@ func startTicker(config *Config, work func()) chan bool {
 }
 
 // We are now in none or live mode.
-func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, remoteIP string) {
+func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
+	isLiveMode := bouncer.crowdsecMode == liveMode
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
@@ -259,42 +262,35 @@ func handleNoStreamCache(bouncer *Bouncer, rw http.ResponseWriter, req *http.Req
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String())
 	if err != nil {
-		logger.Error(err.Error())
-		rw.WriteHeader(http.StatusForbidden)
-		return
+		return err
 	}
 
 	if bytes.Equal(body, []byte("null")) {
-		if bouncer.crowdsecMode == liveMode {
+		if isLiveMode {
 			cache.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
 		}
-		bouncer.next.ServeHTTP(rw, req)
-		return
+		return nil
 	}
 
 	var decisions []Decision
 	err = json.Unmarshal(body, &decisions)
 	if err != nil {
-		logger.Error(fmt.Sprintf("handleNoStreamCache:parseBody: %w", err))
-		rw.WriteHeader(http.StatusForbidden)
-		return
+		return fmt.Errorf("handleNoStreamCache:parseBody: %w", err)
 	}
 	if len(decisions) == 0 {
-		if bouncer.crowdsecMode == liveMode {
+		if isLiveMode {
 			cache.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
 		}
-		bouncer.next.ServeHTTP(rw, req)
-		return
+		return nil
 	}
-	rw.WriteHeader(http.StatusForbidden)
 	duration, err := time.ParseDuration(decisions[0].Duration)
 	if err != nil {
-		logger.Error(fmt.Sprintf("handleNoStreamCache:parseDuration %w", err))
-		return
+		return fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
-	if bouncer.crowdsecMode == liveMode {
+	if isLiveMode {
 		cache.SetDecision(remoteIP, true, int64(duration.Seconds()))
 	}
+	return fmt.Errorf("handleNoStreamCache:banned")
 }
 
 func handleStreamCache(bouncer *Bouncer) {
@@ -312,19 +308,19 @@ func handleStreamCache(bouncer *Bouncer) {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     crowdsecLapiStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !crowdsecStreamHealthy),
+		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String())
 	if err != nil {
 		logger.Error(err.Error())
-		crowdsecStreamHealthy = false
+		isCrowdsecStreamHealthy = false
 		return
 	}
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
-		logger.Error(fmt.Sprintf("handleStreamCache:parsingBody %w", err))
-		crowdsecStreamHealthy = false
+		logger.Error(fmt.Sprintf("handleStreamCache:parsingBody %s", err.Error()))
+		isCrowdsecStreamHealthy = false
 		return
 	}
 	for _, decision := range stream.New {
@@ -336,7 +332,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	for _, decision := range stream.Deleted {
 		cache.DeleteDecision(decision.Value)
 	}
-	crowdsecStreamHealthy = true
+	isCrowdsecStreamHealthy = true
 }
 
 func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
@@ -352,7 +348,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
-			logger.Error(fmt.Sprintf("crowdsecQuery:closeBody %w", err))
+			logger.Error(fmt.Sprintf("crowdsecQuery:closeBody %s", err.Error()))
 		}
 	}()
 	body, err := io.ReadAll(res.Body)
