@@ -154,13 +154,13 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Here we check for the trusted IPs in the customHeader
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
 	if err != nil {
-		logger.Error(fmt.Sprintf("ServeHTTP ip:%s %s", remoteIP, err.Error()))
+		logger.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
 	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -175,7 +175,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if bouncer.crowdsecMode != noneMode {
 		isBanned, err := cache.GetDecision(remoteIP)
 		if err != nil {
-			logger.Debug(err.Error())
+			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s %s", remoteIP, err.Error()))
 			if err.Error() == simpleredis.RedisUnreachable {
 				rw.WriteHeader(http.StatusForbidden)
 				return
@@ -194,6 +194,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == streamMode {
 		if isCrowdsecStreamHealthy {
+			logger.Error(fmt.Sprintf("ServeHTTP:isCrowdsecStreamHealthy ip:%s", remoteIP))
 			rw.WriteHeader(http.StatusForbidden)
 		} else {
 			bouncer.next.ServeHTTP(rw, req)
@@ -280,7 +281,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 	var decisions []Decision
 	err = json.Unmarshal(body, &decisions)
 	if err != nil {
-		return fmt.Errorf("handleNoStreamCache:parseBody: %w", err)
+		return fmt.Errorf("handleNoStreamCache:parseBody %w", err)
 	}
 	if len(decisions) == 0 {
 		if isLiveMode {
