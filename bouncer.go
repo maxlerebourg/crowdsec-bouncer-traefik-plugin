@@ -173,10 +173,10 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != noneMode {
-		isBanned, err := cache.GetDecision(remoteIP)
-		if err != nil {
-			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s %s", remoteIP, err.Error()))
-			if err.Error() == simpleredis.RedisUnreachable {
+		isBanned, erro := cache.GetDecision(remoteIP)
+		if erro != nil {
+			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s %s", remoteIP, erro.Error()))
+			if erro.Error() == simpleredis.RedisUnreachable {
 				rw.WriteHeader(http.StatusForbidden)
 				return
 			}
