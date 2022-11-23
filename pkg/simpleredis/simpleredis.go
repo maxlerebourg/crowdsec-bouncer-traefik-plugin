@@ -118,7 +118,7 @@ func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 	return resp.Data, nil
 }
 
-// Set update the value for key name in redis with value data for duration.
+// Set updates the value for key name in redis with value data for duration.
 func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 	redisCmd := RedisCmd{
 		Command:  "SET",
@@ -130,7 +130,7 @@ func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 	return nil
 }
 
-// Del remove the key name in redis.
+// Del removes the key name in redis.
 func (sr *SimpleRedis) Del(name string) error {
 	redisCmd := RedisCmd{
 		Command: "DEL",
