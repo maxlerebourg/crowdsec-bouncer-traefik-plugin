@@ -57,5 +57,6 @@ api:
       key_file: /etc/crowdsec/certs/server-key.pem #Server side key
       ca_cert_path: /etc/crowdsec/certs/inter.pem #CA used to verify the client certs
       bouncers_allowed_ou: #OU allowed for bouncers
-      - bouncer-ou
-
+        - bouncer-ou
+      agents_allowed_ou: #OU allowed for agents
+        - agent-ou
