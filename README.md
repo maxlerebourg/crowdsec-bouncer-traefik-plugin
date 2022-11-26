@@ -296,6 +296,10 @@ To play the demo environnement run:
 make run_trustedips
 ```
 
+4. Using Crowdsec and Traefik installed as binary in a single VM
+
+Please see exemples/vagrant-vm
+
 ### About
 
 Me and [mathieuHa](https://github.com/mathieuHa) have been using traefik since 2020 at [Primadviz](https://primadviz.com).
