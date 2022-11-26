@@ -24,8 +24,24 @@ sudo usermod -aG libvirt $USER
 vagrant plugin install vagrant-libvirt
 ```
 
-### Start the VM
+#### Start the VM
 
-```
+```bash
 sudo vagrant up --provider=libvirt
 ```
+
+#### Destroy the VM
+
+```bash
+sudo vagrant destroy -f
+```
+
+### Context
+
+Traefik is installed as a systemd service.
+It is configured with the dashboard activated and listening on port 8081 and port 80 for the web
+
+Crowdsec is started and listening on port 8080.
+
+Whoami is installed as a systemd service.
+It is configured to listen on port 9000.

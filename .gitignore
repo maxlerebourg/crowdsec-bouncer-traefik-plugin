@@ -1,6 +1,6 @@
 .idea/
 .DS_Store
-config
+./config/
 db
 logs
 docker-compose.dev.yml

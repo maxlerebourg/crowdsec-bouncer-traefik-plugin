@@ -43,7 +43,7 @@ Vagrant.configure("2") do |config|
   # the path on the host to the actual folder. The second argument is
   # the path on the guest to mount the folder. And the optional third
   # argument is a set of non-required options.
-  config.vm.synced_folder ".", "/vagrant_data"
+  # config.vm.synced_folder ".", "/vagrant_data"
 
   # Provider-specific configuration so you can fine-tune various
   # backing providers for Vagrant. These expose provider-specific options.
@@ -51,57 +51,30 @@ Vagrant.configure("2") do |config|
   #
 
   config.vm.provider "libvirt" do |lv|
-    # Display the VirtualBox GUI when booting the machine
-  
+    graphics_type = "none"
+    lv.cpus = 1
+    # lv.vm.network :private_network, :ip => "10.20.30.40"
     # Customize the amount of memory on the VM:
     lv.memory = "2048"
   end
 
   config.vm.provider "virtualbox" do |vb|
-    # Display the VirtualBox GUI when booting the machine
     vb.gui = false
-  
+    vb.cpus = 1
+    # vb.vm.network :private_network, :ip => "10.20.30.40"
     # Customize the amount of memory on the VM:
     vb.memory = "2048"
   end
-  #
-  # View the documentation for the provider you are using for more
-  # information on available options.
+  config.vm.provision "file", source: "./files", destination: "/home/vagrant/vagrant_data"
 
-  # Enable provisioning with a shell script. Additional provisioners such as
-  # Ansible, Chef, Docker, Puppet and Salt are also available. Please see the
-  # documentation for more information about their specific syntax and use.
-  config.vm.provision "shell", inline: <<-SHELL
-    apt-get update && apt-get install wget -y && apt-get upgrade -y
-    wget -O traefik.tar.gz "https://github.com/traefik/traefik/releases/download/v2.9.5/traefik_v2.9.5_linux_amd64.tar.gz"
-    tar -zxvf traefik.tar.gz
-    # inspired from https://gist.github.com/ubergesundheit/7c9d875befc2d7bfd0bf43d8b3862d85
-    sudo mv ./traefik /usr/local/bin/
-    sudo chown root:root /usr/local/bin/traefik
-    sudo chmod 755 /usr/local/bin/traefik
-    sudo setcap 'cap_net_bind_service=+ep' /usr/local/bin/traefik
+  config.vm.provision "shell", path: "scripts/install_traefik.sh"
+  config.vm.provision "shell", path: "scripts/configure_traefik.sh"
 
-    sudo groupadd -g 321 traefik
-    sudo useradd \
-      -g traefik --no-user-group \
-      --home-dir /var/www --no-create-home \
-      --shell /usr/sbin/nologin \
-      --system --uid 321 traefik
+  config.vm.provision "shell", path: "scripts/install_whoami.sh"
 
-    sudo mkdir /etc/traefik
-    sudo mkdir /etc/traefik/acme
-    sudo chown -R root:root /etc/traefik
-    sudo chown -R traefik:traefik /etc/traefik/acme
+  config.vm.provision "shell", path: "scripts/install_crowdsec.sh"
+  
+  config.vm.provision "shell", path: "scripts/configure_crowdsec_certs.sh"
 
-    sudo cp /vagrant_data/traefik.service /etc/systemd/system/
-    sudo chown root:root /etc/systemd/system/traefik.service
-    sudo chmod 644 /etc/systemd/system/traefik.service
-    sudo systemctl daemon-reload
-    sudo systemctl start traefik.service
-    sudo systemctl enable traefik.service
 
-    curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash
-    sudo apt install crowdsec -y
-    sudo cp /vagrant_data/acquis.yaml /etc/crowdsec/acquis.yaml
-  SHELL
 end

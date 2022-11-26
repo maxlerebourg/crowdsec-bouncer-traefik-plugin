@@ -1,0 +1,103 @@
+################################################################
+# Global configuration
+################################################################
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+################################################################
+# EntryPoints configuration
+################################################################
+
+entryPoints:
+  web:
+    address: :80
+  traefik:
+    address: :8081
+
+################################################################
+# Provider file configuration
+################################################################
+
+providers:
+  file:
+    directory: "/etc/traefik/conf"
+
+################################################################
+# Plugin configuration
+################################################################
+
+experimental:
+  plugins:
+    bouncer:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.1.4
+
+################################################################
+# Certificate Resolver
+################################################################
+
+serversTransport:
+  insecureSkipVerify: true
+
+################################################################
+# Traefik logs configuration
+################################################################
+
+# Traefik logs
+# Enabled by default and log to stdout
+log:
+  filePath: /var/log/traefik/traefik.log
+  level: DEBUG
+  format: json
+
+################################################################
+# Access logs configuration
+################################################################
+
+# Enable access logs
+# By default it will write to stdout and produce logs in the textual
+# Common Log Format (CLF), extended with additional fields.
+accessLog:
+  # Sets the file path for the access log. If not specified, stdout will be used.
+  # Intermediate directories are created if necessary.
+  filePath: /var/log/traefik/access.log
+  fields:
+    defaultMode: keep
+    names:
+      ClientUsername: keep
+    headers:
+      defaultMode: keep
+
+  # Format is either "json" or "common".
+  #
+  # Optional
+  # Default: "common"
+  #
+#  format: json
+
+################################################################
+# API and dashboard configuration
+################################################################
+
+# Enable API and dashboard
+#
+# Optional
+#
+api:
+  # Enable the API in insecure mode
+  #
+  # Optional
+  # Default: false
+  #
+  insecure: true
+
+  # Enabled Dashboard
+  #
+  # Optional
+  # Default: true
+  #
+  dashboard: true
+
+
+

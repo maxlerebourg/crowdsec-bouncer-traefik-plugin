@@ -298,7 +298,7 @@ make run_trustedips
 
 4. Using Crowdsec and Traefik installed as binary in a single VM
 
-Please see exemples/vagrant-vm
+Please see exemples/binary-vm/README.md
 
 ### About
 
