@@ -193,7 +193,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == streamMode {
-		if isCrowdsecStreamHealthy {
+		if !isCrowdsecStreamHealthy {
 			logger.Error(fmt.Sprintf("ServeHTTP:isCrowdsecStreamHealthy ip:%s", remoteIP))
 			rw.WriteHeader(http.StatusForbidden)
 		} else {
