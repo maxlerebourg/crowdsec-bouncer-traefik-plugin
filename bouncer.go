@@ -202,7 +202,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	} else {
 		err = handleNoStreamCache(bouncer, remoteIP)
 		if err != nil {
-			logger.Debug(err.Error())
+			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s %s", remoteIP, err.Error()))
 			rw.WriteHeader(http.StatusForbidden)
 		} else {
 			bouncer.next.ServeHTTP(rw, req)
