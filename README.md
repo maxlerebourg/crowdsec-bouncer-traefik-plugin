@@ -337,12 +337,57 @@ make run_trustedips
 
 5. Using https communication and tls authentication with Crowdsec
 
+##### Summary
 This example demonstrate the use of https between the Traefik plugin and the Crowdsec LAPI.
 
 It is possible to communicate with the LAPI in https and still authenticate with API key.
 You can add the client TLS certificate generated to authenticate without any Token in the plugin.
 
 However note that it is not possible to authenticate with TLS client certificate without https.
+
+The example is detailed in the examples/tls-auth/README.md file.
+
+##### Details
+Simple HTTPS communication: It is possible to talk to Crowdsec LAPI which is configured with a self-signed certificate
+In that case the setting **crowdsecLapiTLSInsecureVerify** must be set to true.
+
+It is recommanded to validate the certificate presented by Crowdsec LAPI using the Certificate Authority which created it.
+
+You can provide the Certificate Authority using:
+* A file path readable by Traefik
+* The PEM encoded certificate as a text variable
+
+In the static file configuration of Traefik
+```yaml
+middlewares:
+    crowdsec:
+      plugin:
+        bouncer:
+          CrowdsecLapiTLSCertificateAuthority: |-
+              -----BEGIN CERTIFICATE-----
+              MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
+              MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
+              ...
+              C6qNieSwcvWL7C03ri0DefTQMY54r5wP33QU5hJ71JoaZI3YTeT0Nf+NRL4hM++w
+              Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
+              -----END CERTIFICATE-----
+```
+In a dynamic configuration of a provider (ex docker) as a Label
+```yaml
+services:
+  whoami-foo:
+    image: traefik/whoami
+    labels:
+      - |
+        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecLapiTLSCertificateAuthority=
+        -----BEGIN CERTIFICATE-----
+        MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
+        MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
+        ...
+        C6qNieSwcvWL7C03ri0DefTQMY54r5wP33QU5hJ71JoaZI3YTeT0Nf+NRL4hM++w
+        Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
+        -----END CERTIFICATE-----
+```
 
 ### About
 
