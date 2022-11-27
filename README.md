@@ -161,7 +161,7 @@ http:
           forwardedHeadersCustomName: X-Custom-Header
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
-          CrowdsecLapiTlsCertificateAuthority: |-
+          crowdsecLapiTlsCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
             MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
