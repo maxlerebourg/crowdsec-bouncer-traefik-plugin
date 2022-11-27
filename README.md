@@ -70,11 +70,11 @@ make run
   - bool
   - default: false
   - Disable verification of certificate presented by Crowdsec LAPI
-- CrowdsecLapiTLSCertificateAuthority
+- CrowdsecLapiTlsCertificateAuthority
   - string
   - default: ""
   - PEM-encoded Certificate Authority of the Crowdsec LAPI
-- CrowdsecLapiTLSCertificateAuthorityFile
+- CrowdsecLapiTlsCertificateAuthorityFile
   - string
   - default: ""
   - File path of the Certificate Authority of the Crowdsec LAPI
@@ -161,7 +161,7 @@ http:
           forwardedHeadersCustomName: X-Custom-Header
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
-          crowdsecLapiTLSCertificateAuthority: |-
+          CrowdsecLapiTlsCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
             MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
@@ -355,6 +355,13 @@ It is recommanded to validate the certificate presented by Crowdsec LAPI using t
 
 You can provide the Certificate Authority using:
 * A file path readable by Traefik
+```yaml
+middlewares:
+    crowdsec:
+      plugin:
+        bouncer:
+          CrowdsecLapiTlsCertificateAuthorityFile: /etc/traefik/certs/crowdsecCA.pem
+```
 * The PEM encoded certificate as a text variable
 
 In the static file configuration of Traefik
@@ -363,7 +370,7 @@ middlewares:
     crowdsec:
       plugin:
         bouncer:
-          CrowdsecLapiTLSCertificateAuthority: |-
+          CrowdsecLapiTlsCertificateAuthority: |-
               -----BEGIN CERTIFICATE-----
               MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
               MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
@@ -379,7 +386,7 @@ services:
     image: traefik/whoami
     labels:
       - |
-        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecLapiTLSCertificateAuthority=
+        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecLapiTlsCertificateAuthority=
         -----BEGIN CERTIFICATE-----
         MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
         MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
