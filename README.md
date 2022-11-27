@@ -64,11 +64,16 @@ make run
   - Crowdsec LAPI available on which host and port.
 - CrowdsecLapiKey
   - string
+  - default: ""
   - Crowdsec LAPI generated key for the bouncer : **must be unique by service**. 
+- CrowdsecLapiTLSInsecureVerify
+  - bool
+  - default: false
+  - Disable verification of certificate presented by Crowdsec LAPI
 - UpdateIntervalSeconds
   - int64
   - default: 60
-  - Used only in `stream` mode, interval between fetching blacklisted IPs from LAPI
+  - Used only in `stream` mode, interval between requests to fetch blacklisted IPs from LAPI
 - DefaultDecisionSeconds
   - int64
   - default: 60
@@ -139,6 +144,7 @@ http:
           crowdsecLapiKey: privateKey
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
+          crowdsecLapiTLSInsecureVerify: false
           forwardedHeadersTrustedIPs: 
             - 10.0.10.23/32
             - 10.0.20.0/24
@@ -159,7 +165,7 @@ docker-compose -f docker-compose-local.yml up -d crowdsec
 docker exec crowdsec cscli bouncers add crowdsecBouncer
 ```
 
-This LAPI key must be set where is noted FIXME-LAPI-KEY in the docker-compose-test.yml
+This LAPI key must be set where is noted FIXME-LAPI-KEY in the docker-compose.yml
 ```yaml
 ...
 whoami:
