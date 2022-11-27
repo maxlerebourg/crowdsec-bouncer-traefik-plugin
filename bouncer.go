@@ -434,18 +434,29 @@ func validateParams(config *Config) error {
 			return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthority or CrowdsecLapiTLSCertificateAuthorityFile must be specified when https is on and CrowdsecLapiTLSInsecureVerify is false")
 		} else if config.CrowdsecLapiTLSCertificateAuthorityFile != "" {
 			// Check file var
-			file, err := os.Stat(config.CrowdsecLapiTLSCertificateAuthority)
+			file, err := os.Stat(config.CrowdsecLapiTLSCertificateAuthorityFile)
 			if err != nil {
 				return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthorityFile invalid path: %w", err)
 			}
 			if file.IsDir() {
 				return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthorityFile path must be a file")
 			}
+			cert, err := os.ReadFile(config.CrowdsecLapiTLSCertificateAuthorityFile)
+			if err != nil {
+				return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthorityFile read cert failed: %w", err)
+			}
+			err = checkTLSConfig(cert)
+			if err != nil {
+				return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthorityFile certificate invalid: %w", err)
+			}
 		} else {
 			// Check Pem var
 			err := checkTLSConfig([]byte(config.CrowdsecLapiTLSCertificateAuthority))
 			if err != nil {
+				logger.Error(config.CrowdsecLapiTLSCertificateAuthority)
 				return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthority certificate invalid: %w", err)
+			} else {
+				logger.Debug("validateParams:CrowdsecLapiTLSCertificateAuthority is valid")
 			}
 		}
 	}
