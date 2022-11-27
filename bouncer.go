@@ -5,6 +5,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,37 +38,39 @@ var (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled                    bool     `json:"enabled,omitempty"`
-	LogLevel                   string   `json:"logLevel,omitempty"`
-	CrowdsecMode               string   `json:"crowdsecMode,omitempty"`
-	CrowdsecLapiScheme         string   `json:"crowdsecLapiScheme,omitempty"`
-	CrowdsecLapiHost           string   `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiKey            string   `json:"crowdsecLapiKey,omitempty"`
-	UpdateIntervalSeconds      int64    `json:"updateIntervalSeconds,omitempty"`
-	DefaultDecisionSeconds     int64    `json:"defaultDecisionSeconds,omitempty"`
-	ForwardedHeadersCustomName string   `json:"forwardedheaderscustomheader,omitempty"`
-	ForwardedHeadersTrustedIPs []string `json:"forwardedHeadersTrustedIps,omitempty"`
-	ClientTrustedIPs           []string `json:"clientTrustedIps,omitempty"`
-	RedisCacheEnabled          bool     `json:"redisCacheEnabled,omitempty"`
-	RedisCacheHost             string   `json:"redisCacheHost,omitempty"`
+	Enabled                       bool     `json:"enabled,omitempty"`
+	LogLevel                      string   `json:"logLevel,omitempty"`
+	CrowdsecMode                  string   `json:"crowdsecMode,omitempty"`
+	CrowdsecLapiScheme            string   `json:"crowdsecLapiScheme,omitempty"`
+	CrowdsecLapiHost              string   `json:"crowdsecLapiHost,omitempty"`
+	CrowdsecLapiKey               string   `json:"crowdsecLapiKey,omitempty"`
+	CrowdsecLapiTLSInsecureVerify bool     `json:"crowdsecLapiTLSInsecureVerify,omitempty"`
+	UpdateIntervalSeconds         int64    `json:"updateIntervalSeconds,omitempty"`
+	DefaultDecisionSeconds        int64    `json:"defaultDecisionSeconds,omitempty"`
+	ForwardedHeadersCustomName    string   `json:"forwardedheaderscustomheader,omitempty"`
+	ForwardedHeadersTrustedIPs    []string `json:"forwardedHeadersTrustedIps,omitempty"`
+	ClientTrustedIPs              []string `json:"clientTrustedIps,omitempty"`
+	RedisCacheEnabled             bool     `json:"redisCacheEnabled,omitempty"`
+	RedisCacheHost                string   `json:"redisCacheHost,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		Enabled:                    false,
-		LogLevel:                   "INFO",
-		CrowdsecMode:               liveMode,
-		CrowdsecLapiScheme:         "http",
-		CrowdsecLapiHost:           "crowdsec:8080",
-		CrowdsecLapiKey:            "",
-		UpdateIntervalSeconds:      60,
-		DefaultDecisionSeconds:     60,
-		ClientTrustedIPs:           []string{},
-		ForwardedHeadersTrustedIPs: []string{},
-		ForwardedHeadersCustomName: "X-Forwarded-For",
-		RedisCacheEnabled:          false,
-		RedisCacheHost:             "redis:6379",
+		Enabled:                       false,
+		LogLevel:                      "INFO",
+		CrowdsecMode:                  liveMode,
+		CrowdsecLapiScheme:            "http",
+		CrowdsecLapiHost:              "crowdsec:8080",
+		CrowdsecLapiKey:               "",
+		CrowdsecLapiTLSInsecureVerify: false,
+		UpdateIntervalSeconds:         60,
+		DefaultDecisionSeconds:        60,
+		ClientTrustedIPs:              []string{},
+		ForwardedHeadersTrustedIPs:    []string{},
+		ForwardedHeadersCustomName:    "X-Forwarded-For",
+		RedisCacheEnabled:             false,
+		RedisCacheHost:                "redis:6379",
 	}
 }
 
@@ -125,6 +128,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			Transport: &http.Transport{
 				MaxIdleConns:    10,
 				IdleConnTimeout: 30 * time.Second,
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: config.CrowdsecLapiTLSInsecureVerify},
 			},
 			Timeout: 2 * time.Second,
 		},
@@ -400,6 +404,8 @@ func validateParams(config *Config) error {
 	if err != nil {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
+	// TODO add test of the validity of the cert
+
 	if len(config.ForwardedHeadersTrustedIPs) > 0 {
 		_, err = ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 		if err != nil {
