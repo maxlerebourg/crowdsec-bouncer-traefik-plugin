@@ -25,7 +25,7 @@ cfssl sign -ca "/etc/crowdsec/certs/ca.pem" -ca-key "/etc/crowdsec/certs/ca-key.
 # Generate a server side certificate
 cfssl gencert -ca "/etc/crowdsec/certs/inter.pem" -ca-key "/etc/crowdsec/certs/inter-key.pem" -config ${basepath}/profiles.json -profile=server ${basepath}/server.json 2>/dev/null | cfssljson --bare "/etc/crowdsec/certs/server"
 # Generate a client certificate for the bouncer whoami
-cfssl gencert -ca "/etc/crowdsec/certs/inter.pem" -ca-key "/etc/crowdsec/certs/inter-key.pem" -config ${basepath}/profiles.json -profile=client ${basepath}/whoami.json 2>/dev/null | cfssljson --bare "/etc/crowdsec/certs/bouncer"
+cfssl gencert -ca "/etc/crowdsec/certs/inter.pem" -ca-key "/etc/crowdsec/certs/inter-key.pem" -config ${basepath}/profiles.json -profile=client ${basepath}/bouncer.json 2>/dev/null | cfssljson --bare "/etc/crowdsec/certs/bouncer"
 # Generate a client certificate for the agent
 cfssl gencert -ca "/etc/crowdsec/certs/inter.pem" -ca-key "/etc/crowdsec/certs/inter-key.pem" -config ${basepath}/profiles.json -profile=client ${basepath}/agent.json 2>/dev/null | cfssljson --bare "/etc/crowdsec/certs/agent"
 

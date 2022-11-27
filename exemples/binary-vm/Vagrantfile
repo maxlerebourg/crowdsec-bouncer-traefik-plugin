@@ -58,13 +58,13 @@ Vagrant.configure("2") do |config|
     lv.memory = "2048"
   end
 
-  config.vm.provider "virtualbox" do |vb|
-    vb.gui = false
-    vb.cpus = 1
-    # vb.vm.network :private_network, :ip => "10.20.30.40"
-    # Customize the amount of memory on the VM:
-    vb.memory = "2048"
-  end
+  # config.vm.provider "virtualbox" do |vb|
+  #   vb.gui = false
+  #   vb.cpus = 1
+  #   # vb.vm.network :private_network, :ip => "10.20.30.40"
+  #   # Customize the amount of memory on the VM:
+  #   vb.memory = "2048"
+  # end
   config.vm.provision "file", source: "./files", destination: "/home/vagrant/vagrant_data"
 
   config.vm.provision "shell", path: "scripts/install_traefik.sh"
