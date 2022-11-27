@@ -17,8 +17,9 @@ services:
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - logs-local:/var/log/traefik
-      - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - logs-tls-auth:/var/log/traefik
+      # - crowdsec-certs-tls-auth:/etc/traefik/crowdsec-certs/:ro
+      - ./:/plugins-tls-auth/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 80:80
       - 8080:8080
@@ -41,28 +42,28 @@ services:
       - |
         traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecLapiTLSCertificateAuthority=
         -----BEGIN CERTIFICATE-----
-        MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
-        MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
-        DBlBbWF6b24gV2ViIFNlcnZpY2VzLCBJbmMuMRMwEQYDVQQLDApBbWF6b24gUkRT
-        MSUwIwYDVQQDDBxBbWF6b24gUkRTIGFwLWVhc3QtMSBSb290IENBMB4XDTE5MDIx
-        NzAyNDcwMFoXDTIyMDYwMTEyMDAwMFowgY8xCzAJBgNVBAYTAlVTMRMwEQYDVQQI
-        DApXYXNoaW5ndG9uMRAwDgYDVQQHDAdTZWF0dGxlMSIwIAYDVQQKDBlBbWF6b24g
-        V2ViIFNlcnZpY2VzLCBJbmMuMRMwEQYDVQQLDApBbWF6b24gUkRTMSAwHgYDVQQD
-        DBdBbWF6b24gUkRTIGFwLWVhc3QtMSBDQTCCASIwDQYJKoZIhvcNAQEBBQADggEP
-        ADCCAQoCggEBAOcJAUofyJuBuPr5ISHi/Ha5ed8h3eGdzn4MBp6rytPOg9NVGRQs
-        O93fNGCIKsUT6gPuk+1f1ncMTV8Y0Fdf4aqGWme+Khm3ZOP3V1IiGnVq0U2xiOmn
-        SQ4Q7LoeQC4lC6zpoCHVJyDjZ4pAknQQfsXb77Togdt/tK5ahev0D+Q3gCwAoBoO
-        DHKJ6t820qPi63AeGbJrsfNjLKiXlFPDUj4BGir4dUzjEeH7/hx37na1XG/3EcxP
-        399cT5k7sY/CR9kctMlUyEEUNQOmhi/ly1Lgtihm3QfjL6K9aGLFNwX35Bkh9aL2
-        F058u+n8DP/dPeKUAcJKiQZUmzuen5n57x8CAwEAAaNmMGQwDgYDVR0PAQH/BAQD
-        AgEGMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFFlqgF4FQlb9yP6c+Q3E
-        O3tXv+zOMB8GA1UdIwQYMBaAFK9T6sY/PBZVbnHcNcQXf58P4OuPMA0GCSqGSIb3
-        DQEBCwUAA4IBAQDeXiS3v1z4jWAo1UvVyKDeHjtrtEH1Rida1eOXauFuEQa5tuOk
-        E53Os4haZCW4mOlKjigWs4LN+uLIAe1aFXGo92nGIqyJISHJ1L+bopx/JmIbHMCZ
-        0lTNJfR12yBma5VQy7vzeFku/SisKwX0Lov1oHD4MVhJoHbUJYkmAjxorcIHORvh
-        I3Vj5XrgDWtLDPL8/Id/roul/L+WX5ir+PGScKBfQIIN2lWdZoqdsx8YWqhm/ikL
-        C6qNieSwcvWL7C03ri0DefTQMY54r5wP33QU5hJ71JoaZI3YTeT0Nf+NRL4hM++w
-        Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
+        MIIEDjCCAvagAwIBAgIUAuEDEfnSYbbvhW9fUfNP+U/mwqEwDQYJKoZIhvcNAQEL
+        BQAwbzELMAkGA1UEBhMCRlIxDzANBgNVBAgTBkZyYW5jZTEOMAwGA1UEBxMFUGFy
+        aXMxETAPBgNVBAoTCENyb3dkc2VjMREwDwYDVQQLEwhDcm93ZHNlYzEZMBcGA1UE
+        AxMQQ3Jvd2RTZWMgVGVzdCBDQTAeFw0yMjExMjcyMjMyMDBaFw0yMzExMjcyMjMy
+        MDBaMIGJMQswCQYDVQQGEwJGUjEPMA0GA1UECBMGRnJhbmNlMQ4wDAYDVQQHEwVQ
+        YXJpczERMA8GA1UEChMIQ3Jvd2RzZWMxHjAcBgNVBAsTFUNyb3dkc2VjIEludGVy
+        bWVkaWF0ZTEmMCQGA1UEAxMdQ3Jvd2RTZWMgVGVzdCBDQSBJbnRlcm1lZGlhdGUw
+        ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7p7368HpoYWgBoecNS60+
+        jTrZWLKfZZ8wi4wASp2vFHlxoC4yI+/R8YWKriBZ3kGKVXuc7fPwCZ8Y+ULYV5oX
+        1DK9m4FETNKrcGm27zbPjYd6fOZCktQNfD0uyxiAxoSuJDXIY2yTI8DqrePhoVSP
+        dLHQGCYSZwM64idxv8+suU8pVM5COgMQ4JvvMzSa0O3IzpNil1c+76xbMQSRvUhx
+        7kfEJboPZ4exhKNEZygSMWYoxsZeNC7eo3VjVTb8wgKVXeHSUvnMjpgAm6hyOVK8
+        Q1xH9bPW9tiCkbNQGfGb1DVZplEP42MdnwzbfVXlq2OJ74SuuBJq/956R+RK4BIN
+        AgMBAAGjgYYwgYMwDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQGCCsGAQUFBwMB
+        BggrBgEFBQcDAjASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1UdDgQWBBR7IoS4tgE0
+        SAki3+2S6N70h9ukHDAfBgNVHSMEGDAWgBTJ6IGQRLBBFj7+AtmHfsapTY5S/DAN
+        BgkqhkiG9w0BAQsFAAOCAQEAf7x+JzMY6QrqvdAGdigRDfyAIinWHl6DgucuZV5Q
+        GdE7a5PTyoO8U0AHIiFWq84vhwG3s3/dB2sSkBNqQiRrLdiWDAzlTMKrXEOobnQY
+        s8X3TxAD3Fy7DsbrL9iCpm49N/OWuT6QlTIe4r02pon3ViwwPgTMlOvmX+fD6X1Q
+        ct2gN5JCwUkSR5MYfdoO3s4x4VEWuuUNSOrmW3feJNcnvEn0f2XTcraooFlrJzv6
+        QP9Yunf3aj4tiAz4w8wGcLVRGru2sBW9gjZ7/Vteg361QSTtwScW9dyfQeFD9jIn
+        1HWPxbNZbv+07Ryv5IhkXnuReo+45DWEPJkNKoAlKUxJog==
         -----END CERTIFICATE-----
 
   whoami2:
@@ -79,22 +80,37 @@ services:
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.4.1
+    image: crowdsecurity/crowdsec:v1.4.2
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
       COLLECTIONS: crowdsecurity/traefik
       CUSTOM_HOSTNAME: crowdsec
-      BOUNCER_KEY_TRAEFIK_1: 40796d93c2958f9e58345514e67740e5
-      BOUNCER_KEY_TRAEFIK_2: 44c36dac5c4140af9f06f397508e82c7
+      # BOUNCER_KEY_TRAEFIK_1: 40796d93c2958f9e58345514e67740e5
+      # BOUNCER_KEY_TRAEFIK_2: 44c36dac5c4140af9f06f397508e82c7
+      # LOCAL_API_URL: https://127.0.0.1:8080
+      # USE_TLS: "true"
+      # CERT_FILE: /etc/crowdsec/certs/bouncer.pem
+      # KEY_FILE: /etc/crowdsec/certs/bouncer-key.pem
     volumes:
-      - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - logs-local:/var/log/traefik:ro
-      - crowdsec-db-local:/var/lib/crowdsec/data/
-      - crowdsec-config-local:/etc/crowdsec/
+      - ./config/acquis.yaml:/etc/crowdsec/acquis.yaml
+      # - ./config/config.yaml:/etc/crowdsec/config.yaml:ro
+      # - ./config/local_api_credentials.yaml:/etc/crowdsec/local_api_credentials.yaml:ro
+      - crowdsec-certs-tls-auth:/etc/crowdsec/certs/:ro
+      - logs-tls-auth:/var/log/traefik:ro
+      # - crowdsec-db-tls-auth:/var/lib/crowdsec/data/
+      # - crowdsec-config-tls-auth:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
+
+  gencert:
+    build: .
+    volumes:
+      - crowdsec-certs-tls-auth:/out
+      - ./in:/in
+
 volumes:
-  logs-local:
-  crowdsec-db-local:
-  crowdsec-config-local:
+  logs-tls-auth:
+  crowdsec-db-tls-auth:
+  crowdsec-config-tls-auth:
+  crowdsec-certs-tls-auth:

@@ -1,0 +1,56 @@
+common:
+  daemonize: false
+  pid_dir: /var/run/
+  log_media: stdout
+  log_level: info
+  log_dir: /var/log/
+  working_dir: .
+config_paths:
+  config_dir: /etc/crowdsec/
+  data_dir: /var/lib/crowdsec/data/
+  simulation_path: /etc/crowdsec/simulation.yaml
+  hub_dir: /etc/crowdsec/hub/
+  index_path: /etc/crowdsec/hub/.index.json
+  notification_dir: /etc/crowdsec/notifications/
+  plugin_dir: /usr/local/lib/crowdsec/plugins/
+crowdsec_service:
+  acquisition_path: /etc/crowdsec/acquis.yaml
+  parser_routines: 1
+plugin_config:
+  user: nobody
+  group: nobody
+cscli:
+  output: human
+db_config:
+  log_level: info
+  type: sqlite
+  db_path: /var/lib/crowdsec/data/crowdsec.db
+  #user:
+  #password:
+  #db_name:
+  #host:
+  #port:
+  flush:
+    max_items: 5000
+    max_age: 7d
+api:
+  client:
+    insecure_skip_verify: false
+    credentials_path: /etc/crowdsec/local_api_credentials.yaml
+  server:
+    log_level: info
+    listen_uri: 0.0.0.0:8080
+    profiles_path: /etc/crowdsec/profiles.yaml
+    online_client: # Central API credentials (to push signals and receive bad IPs)
+      credentials_path: /etc/crowdsec/online_api_credentials.yaml
+    console_path: /etc/crowdsec/console.yaml
+    trusted_ips: # IP ranges, or IPs which can have admin API access
+      - 127.0.0.1
+    tls:
+      cert_file: /etc/crowdsec/certs/server.pem #Server side cert
+      key_file: /etc/crowdsec/certs/server-key.pem #Server side key
+      ca_cert_path: /etc/crowdsec/certs/inter.pem #CA used to verify the client certs
+      bouncers_allowed_ou: #OU allowed for bouncers
+        - bouncer-ou
+      agents_allowed_ou: #OU allowed for agents
+        - agent-ou
