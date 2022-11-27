@@ -23,3 +23,5 @@ http:
           updateintervalseconds: 60
           crowdsecmode: stream
           logLevel: "DEBUG"
+          crowdsecLapiScheme: https
+          crowdsecLapiHost: localhost:8080
