@@ -45,3 +45,7 @@ Crowdsec is started and listening on port 8080.
 
 Whoami is installed as a systemd service.
 It is configured to listen on port 9000.
+
+Whoami is accessible from traefik on port 80 at any domain and path
+
+For example: curl http://localhost:80/test

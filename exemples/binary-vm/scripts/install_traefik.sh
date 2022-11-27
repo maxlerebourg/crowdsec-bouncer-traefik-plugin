@@ -18,8 +18,10 @@ sudo useradd \
 
 sudo mkdir /etc/traefik
 sudo mkdir /etc/traefik/acme
+sudo mkdir /etc/traefik/plugins-storage
 sudo chown -R root:root /etc/traefik
 sudo chown -R traefik:traefik /etc/traefik/acme
+sudo chown -R traefik:traefik /etc/traefik/plugins-storage
 
 sudo cp /home/vagrant/vagrant_data/traefik/traefik.service /etc/systemd/system/
 sudo chown root:root /etc/systemd/system/traefik.service
