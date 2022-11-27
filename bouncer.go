@@ -416,52 +416,16 @@ func validateParams(config *Config) error {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
 
-	if len(config.ForwardedHeadersTrustedIPs) > 0 {
-		_, err = ip.NewChecker(config.ForwardedHeadersTrustedIPs)
-		if err != nil {
-			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%w", err)
-		}
-	} else {
-		logger.Debug("No IP provided for ForwardedHeadersTrustedIPs")
-	}
-	if len(config.ClientTrustedIPs) > 0 {
-		_, err = ip.NewChecker(config.ClientTrustedIPs)
-		if err != nil {
-			return fmt.Errorf("TrustedIPs must be a list of IP/CIDR :%w", err)
-		}
-	} else {
-		logger.Debug("No IP provided for TrustedIPs")
+	err = validateParamsIP(config)
+	if err != nil {
+		return err
 	}
 
 	// Case https to contact Crowdsec LAPI and certificate must be provided
 	if config.CrowdsecLapiScheme == "https" && !config.CrowdsecLapiTLSInsecureVerify {
-		if config.CrowdsecLapiTLSCertificateAuthority == "" && config.CrowdsecLapiTLSCertificateAuthorityFile == "" {
-			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority or CrowdsecLapiTlsCertificateAuthorityFile must be specified when https is on and CrowdsecLapiTLSInsecureVerify is false")
-		} else if config.CrowdsecLapiTLSCertificateAuthorityFile != "" {
-			// Check file var
-			file, err := os.Stat(config.CrowdsecLapiTLSCertificateAuthorityFile)
-			if err != nil {
-				return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile invalid path: %w", err)
-			}
-			if file.IsDir() {
-				return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile path must be a file")
-			}
-			cert, err := os.ReadFile(config.CrowdsecLapiTLSCertificateAuthorityFile)
-			if err != nil {
-				return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile read cert failed: %w", err)
-			}
-			err = checkTLSConfig(cert)
-			if err != nil {
-				return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile certificate invalid: %w", err)
-			}
-		} else {
-			// Check Pem var
-			err := checkTLSConfig([]byte(config.CrowdsecLapiTLSCertificateAuthority))
-			if err != nil {
-				logger.Error(config.CrowdsecLapiTLSCertificateAuthority)
-				return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority certificate invalid: %w", err)
-			}
-			logger.Debug("validateParams:CrowdsecLapiTlsCertificateAuthority is valid")
+		err = validateParamsTLS(config)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -511,4 +475,58 @@ func getTLSConfigCrowdsec(config Config) (*tls.Config, error) {
 		return tlsConfig, errors.New("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthorityFile read cert file failed")
 	}
 	return tlsConfig, nil
+}
+
+func validateParamsTLS(config *Config) error {
+	if config.CrowdsecLapiTLSCertificateAuthority == "" && config.CrowdsecLapiTLSCertificateAuthorityFile == "" {
+		return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority or CrowdsecLapiTlsCertificateAuthorityFile must be specified when https is on and CrowdsecLapiTLSInsecureVerify is false")
+	}
+	//nolint:nestif
+	if config.CrowdsecLapiTLSCertificateAuthorityFile != "" {
+		// Check file var
+		file, err := os.Stat(config.CrowdsecLapiTLSCertificateAuthorityFile)
+		if err != nil {
+			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile invalid path: %w", err)
+		}
+		if file.IsDir() {
+			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile path must be a file")
+		}
+		cert, err := os.ReadFile(config.CrowdsecLapiTLSCertificateAuthorityFile)
+		if err != nil {
+			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile read cert failed: %w", err)
+		}
+		err = checkTLSConfig(cert)
+		if err != nil {
+			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile certificate invalid: %w", err)
+		}
+	} else {
+		// Check Pem var
+		err := checkTLSConfig([]byte(config.CrowdsecLapiTLSCertificateAuthority))
+		if err != nil {
+			logger.Error(config.CrowdsecLapiTLSCertificateAuthority)
+			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority certificate invalid: %w", err)
+		}
+		logger.Debug("validateParams:CrowdsecLapiTlsCertificateAuthority is valid")
+	}
+	return nil
+}
+
+func validateParamsIP(config *Config) error {
+	if len(config.ForwardedHeadersTrustedIPs) > 0 {
+		_, err := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
+		if err != nil {
+			return fmt.Errorf("ForwardedHeadersTrustedIPs must be a list of IP/CIDR :%w", err)
+		}
+	} else {
+		logger.Debug("No IP provided for ForwardedHeadersTrustedIPs")
+	}
+	if len(config.ClientTrustedIPs) > 0 {
+		_, err := ip.NewChecker(config.ClientTrustedIPs)
+		if err != nil {
+			return fmt.Errorf("TrustedIPs must be a list of IP/CIDR :%w", err)
+		}
+	} else {
+		logger.Debug("No IP provided for TrustedIPs")
+	}
+	return nil
 }
