@@ -6,11 +6,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"text/template"
 	"time"
 
@@ -38,20 +41,22 @@ var (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled                       bool     `json:"enabled,omitempty"`
-	LogLevel                      string   `json:"logLevel,omitempty"`
-	CrowdsecMode                  string   `json:"crowdsecMode,omitempty"`
-	CrowdsecLapiScheme            string   `json:"crowdsecLapiScheme,omitempty"`
-	CrowdsecLapiHost              string   `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiKey               string   `json:"crowdsecLapiKey,omitempty"`
-	CrowdsecLapiTLSInsecureVerify bool     `json:"crowdsecLapiTLSInsecureVerify,omitempty"`
-	UpdateIntervalSeconds         int64    `json:"updateIntervalSeconds,omitempty"`
-	DefaultDecisionSeconds        int64    `json:"defaultDecisionSeconds,omitempty"`
-	ForwardedHeadersCustomName    string   `json:"forwardedheaderscustomheader,omitempty"`
-	ForwardedHeadersTrustedIPs    []string `json:"forwardedHeadersTrustedIps,omitempty"`
-	ClientTrustedIPs              []string `json:"clientTrustedIps,omitempty"`
-	RedisCacheEnabled             bool     `json:"redisCacheEnabled,omitempty"`
-	RedisCacheHost                string   `json:"redisCacheHost,omitempty"`
+	Enabled                                 bool     `json:"enabled,omitempty"`
+	LogLevel                                string   `json:"logLevel,omitempty"`
+	CrowdsecMode                            string   `json:"crowdsecMode,omitempty"`
+	CrowdsecLapiScheme                      string   `json:"crowdsecLapiScheme,omitempty"`
+	CrowdsecLapiHost                        string   `json:"crowdsecLapiHost,omitempty"`
+	CrowdsecLapiKey                         string   `json:"crowdsecLapiKey,omitempty"`
+	CrowdsecLapiTLSInsecureVerify           bool     `json:"crowdsecLapiTLSInsecureVerify,omitempty"`
+	CrowdsecLapiTLSCertificateAuthority     string   `json:"crowdsecLapiTLSCertificateAuthority,omitempty"`
+	CrowdsecLapiTLSCertificateAuthorityFile string   `json:"crowdsecLapiTLSCertificateAuthorityFile,omitempty"`
+	UpdateIntervalSeconds                   int64    `json:"updateIntervalSeconds,omitempty"`
+	DefaultDecisionSeconds                  int64    `json:"defaultDecisionSeconds,omitempty"`
+	ForwardedHeadersCustomName              string   `json:"forwardedheaderscustomheader,omitempty"`
+	ForwardedHeadersTrustedIPs              []string `json:"forwardedHeadersTrustedIps,omitempty"`
+	ClientTrustedIPs                        []string `json:"clientTrustedIps,omitempty"`
+	RedisCacheEnabled                       bool     `json:"redisCacheEnabled,omitempty"`
+	RedisCacheHost                          string   `json:"redisCacheHost,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -400,11 +405,11 @@ func validateParams(config *Config) error {
 		Scheme: config.CrowdsecLapiScheme,
 		Host:   config.CrowdsecLapiHost,
 	}
+	// This only check that the format of the URL scheme:// is correct and do not make requests
 	_, err := http.NewRequest(http.MethodGet, testURL.String(), nil)
 	if err != nil {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
-	// TODO add test of the validity of the cert
 
 	if len(config.ForwardedHeadersTrustedIPs) > 0 {
 		_, err = ip.NewChecker(config.ForwardedHeadersTrustedIPs)
@@ -421,6 +426,41 @@ func validateParams(config *Config) error {
 		}
 	} else {
 		logger.Debug("No IP provided for TrustedIPs")
+	}
+
+	// Case https to contact Crowdsec LAPI and certificate must be provided
+	if config.CrowdsecLapiScheme == "https" && !config.CrowdsecLapiTLSInsecureVerify {
+		if config.CrowdsecLapiTLSCertificateAuthority == "" && config.CrowdsecLapiTLSCertificateAuthorityFile == "" {
+			return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthority or CrowdsecLapiTLSCertificateAuthorityFile must be specified when https is on and CrowdsecLapiTLSInsecureVerify is false")
+		} else if config.CrowdsecLapiTLSCertificateAuthorityFile != "" {
+			// Check file var
+			file, err := os.Stat(config.CrowdsecLapiTLSCertificateAuthority)
+			if err != nil {
+				return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthorityFile invalid path: %w", err)
+			}
+			if file.IsDir() {
+				return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthorityFile path must be a file")
+			}
+		} else {
+			// Check Pem var
+			err := checkTLSConfig([]byte(config.CrowdsecLapiTLSCertificateAuthority))
+			if err != nil {
+				return fmt.Errorf("validateParams:CrowdsecLapiTLSCertificateAuthority certificate invalid: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func checkTLSConfig(cert []byte) error {
+	tlsConfig := new(tls.Config)
+	tlsConfig.RootCAs = x509.NewCertPool()
+
+	ok := tlsConfig.RootCAs.AppendCertsFromPEM([]byte(cert))
+
+	if !ok {
+		return errors.New("failed parsing pem file")
 	}
 
 	return nil

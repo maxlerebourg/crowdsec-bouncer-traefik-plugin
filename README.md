@@ -70,6 +70,14 @@ make run
   - bool
   - default: false
   - Disable verification of certificate presented by Crowdsec LAPI
+- CrowdsecLapiTLSCertificateAuthority
+  - string
+  - default: ""
+  - PEM-encoded Certificate Authority of the Crowdsec LAPI
+- CrowdsecLapiTLSCertificateAuthorityFile
+  - string
+  - default: ""
+  - File path of the Certificate Authority of the Crowdsec LAPI
 - UpdateIntervalSeconds
   - int64
   - default: 60
