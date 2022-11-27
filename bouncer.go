@@ -194,15 +194,15 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == streamMode {
 		if isCrowdsecStreamHealthy {
+			bouncer.next.ServeHTTP(rw, req)
+		} else {
 			logger.Error(fmt.Sprintf("ServeHTTP:isCrowdsecStreamHealthy ip:%s", remoteIP))
 			rw.WriteHeader(http.StatusForbidden)
-		} else {
-			bouncer.next.ServeHTTP(rw, req)
 		}
 	} else {
 		err = handleNoStreamCache(bouncer, remoteIP)
 		if err != nil {
-			logger.Debug(err.Error())
+			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s %s", remoteIP, err.Error()))
 			rw.WriteHeader(http.StatusForbidden)
 		} else {
 			bouncer.next.ServeHTTP(rw, req)
