@@ -110,6 +110,11 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	serverChecker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(config.ClientTrustedIPs)
 
+	tlsConfig, err := getTLSConfigCrowdsec(*config)
+	if err != nil {
+		logger.Error(fmt.Sprintf("New:tlsConfig err in getting tlsConfig:%s", err.Error()))
+	}
+
 	bouncer := &Bouncer{
 		next:     next,
 		name:     name,
@@ -133,7 +138,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			Transport: &http.Transport{
 				MaxIdleConns:    10,
 				IdleConnTimeout: 30 * time.Second,
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: config.CrowdsecLapiTLSInsecureVerify},
+				TLSClientConfig: tlsConfig,
 			},
 			Timeout: 2 * time.Second,
 		},
@@ -474,4 +479,36 @@ func checkTLSConfig(cert []byte) error {
 	}
 
 	return nil
+}
+
+func getTLSConfigCrowdsec(config Config) (*tls.Config, error) {
+	tlsConfig := new(tls.Config)
+	tlsConfig.RootCAs = x509.NewCertPool()
+	// checks todo
+	var cert []byte
+
+	if config.CrowdsecLapiScheme != "https" {
+		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
+		return tlsConfig, nil
+	} else if config.CrowdsecLapiTLSInsecureVerify {
+		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify is true")
+		tlsConfig.InsecureSkipVerify = true
+		return tlsConfig, nil
+	}
+
+	if config.CrowdsecLapiTLSCertificateAuthority != "" {
+		cert = []byte(config.CrowdsecLapiTLSCertificateAuthority)
+	} else if config.CrowdsecLapiTLSCertificateAuthorityFile != "" {
+		var err error
+		cert, err = os.ReadFile(config.CrowdsecLapiTLSCertificateAuthorityFile)
+		if err != nil {
+			return tlsConfig, fmt.Errorf("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthorityFile read cert failed: %w", err)
+		}
+	}
+
+	if ok := tlsConfig.RootCAs.AppendCertsFromPEM(cert); !ok {
+		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthorityFile read cert file failed")
+		return tlsConfig, errors.New("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthorityFile read cert file failed")
+	}
+	return tlsConfig, nil
 }
