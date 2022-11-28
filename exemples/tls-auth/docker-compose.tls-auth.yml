@@ -19,7 +19,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-tls-auth:/var/log/traefik
       - crowdsec-certs-tls-auth:/etc/traefik/crowdsec-certs
-      # - crowdsec-certs-tls-auth:/etc/traefik/crowdsec-certs/:ro
       - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 
     ports:
@@ -28,22 +27,22 @@ services:
     depends_on:
       - crowdsec
 
-  whoami-foo:
-    image: traefik/whoami
-    container_name: "simple-service-foo"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.router-foo.rule=Path(`/foo`)"
-      - "traefik.http.routers.router-foo.entrypoints=web"
-      - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
-      - "traefik.http.services.service-foo.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapischeme=https"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
-  whoami2:
+  # whoami-foo:
+  #   image: traefik/whoami
+  #   container_name: "simple-service-foo"
+  #   restart: unless-stopped
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.router-foo.rule=Path(`/foo`)"
+  #     - "traefik.http.routers.router-foo.entrypoints=web"
+  #     - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
+  #     - "traefik.http.services.service-foo.loadbalancer.server.port=80"
+  #     - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
+  #     - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
+  #     - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+  #     - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapischeme=https"
+  #     - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
+  whoami-bar:
     image: traefik/whoami
     container_name: "simple-service-bar"
     restart: unless-stopped
@@ -54,10 +53,11 @@ services:
       - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker"
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapischeme=https"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.CrowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.CrowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.CrowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.2
     container_name: "crowdsec"

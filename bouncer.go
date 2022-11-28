@@ -559,7 +559,6 @@ func validateParamsRequired(config *Config) error {
 	requiredStrings := map[string]string{
 		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
 		"CrowdsecLapiHost":   config.CrowdsecLapiHost,
-		"CrowdsecLapiKey":    config.CrowdsecLapiKey,
 		"CrowdsecMode":       config.CrowdsecMode,
 	}
 	requiredInt := map[string]int64{
@@ -576,8 +575,10 @@ func validateParamsRequired(config *Config) error {
 			return fmt.Errorf("%v: cannot be empty", key)
 		}
 	}
-	if config.CrowdsecLapiKey == "" && config.CrowdsecLapiKeyFile == "" {
-		return errors.New("CrowdsecLapiKey and CrowdsecLapiKeyFile: cannot be empty")
+	// This lacks of clarity
+	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
+	if !((config.CrowdsecLapiKey == "" && config.CrowdsecLapiKeyFile == "") || ((config.CrowdsecLapiTLSCertificateBouncer == "" && config.CrowdsecLapiTLSCertificateBouncerFile == "") && (config.CrowdsecLapiTLSCertificateBouncerKey == "" && config.CrowdsecLapiTLSCertificateBouncerKeyFile == ""))) {
+		return errors.New("CrowdsecLapiKey-File or CrowdsecLapiTLSCertificateBouncer-key-file: cannot be both empty")
 	}
 	if !contains([]string{noneMode, liveMode, streamMode}, config.CrowdsecMode) {
 		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
