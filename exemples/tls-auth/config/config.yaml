@@ -60,5 +60,3 @@ prometheus:
   level: full
   listen_addr: 0.0.0.0
   listen_port: 6060
-  
-

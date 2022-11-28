@@ -10,4 +10,4 @@ cfssl gencert -ca "/out/inter.pem" -ca-key "/out/inter-key.pem" -config /in/prof
 # Generate a client certificate for the bouncer whoami
 cfssl gencert -ca "/out/inter.pem" -ca-key "/out/inter-key.pem" -config /in/profiles.json -profile=client /in/bouncer.json 2>${stdout} | cfssljson --bare "/out/bouncer"  && \
 # Generate a client certificate for the agent
-cfssl gencert -ca "/out/inter.pem" -ca-key "/out/inter-key.pem" -config /in/profiles.json -profile=client /in/agent.json 2>${stdout} | cfssljson --bare "/out/agent" 
+cfssl gencert -ca "/out/inter.pem" -ca-key "/out/inter-key.pem" -config /in/profiles.json -profile=client /in/agent.json 2>${stdout} | cfssljson --bare "/out/agent"
