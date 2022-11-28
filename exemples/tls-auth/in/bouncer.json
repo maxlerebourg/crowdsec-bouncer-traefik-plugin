@@ -1,9 +1,9 @@
 {
-    "CN": "whoami",
-        "key": {
+    "CN": "crowdsec",
+    "key": {
         "algo": "rsa",
         "size": 2048
-        },
+    },
     "names": [
         {
         "C": "FR",
@@ -12,5 +12,10 @@
         "OU": "bouncer-ou",
         "ST": "France"
         }
-    ]
+    ],
+    "hosts": [
+        "127.0.0.1",
+        "localhost",
+        "crowdsec"
+      ]
 }

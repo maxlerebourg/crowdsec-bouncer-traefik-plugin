@@ -18,6 +18,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-tls-auth:/var/log/traefik
+      - crowdsec-certs-tls-auth:/etc/traefik/crowdsec-certs
       # - crowdsec-certs-tls-auth:/etc/traefik/crowdsec-certs/:ro
       - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 
@@ -41,33 +42,7 @@ services:
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapischeme=https"
-      - |
-        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecLapiTLSCertificateAuthority=
-        -----BEGIN CERTIFICATE-----
-        MIIEDjCCAvagAwIBAgIUAuEDEfnSYbbvhW9fUfNP+U/mwqEwDQYJKoZIhvcNAQEL
-        BQAwbzELMAkGA1UEBhMCRlIxDzANBgNVBAgTBkZyYW5jZTEOMAwGA1UEBxMFUGFy
-        aXMxETAPBgNVBAoTCENyb3dkc2VjMREwDwYDVQQLEwhDcm93ZHNlYzEZMBcGA1UE
-        AxMQQ3Jvd2RTZWMgVGVzdCBDQTAeFw0yMjExMjcyMjMyMDBaFw0yMzExMjcyMjMy
-        MDBaMIGJMQswCQYDVQQGEwJGUjEPMA0GA1UECBMGRnJhbmNlMQ4wDAYDVQQHEwVQ
-        YXJpczERMA8GA1UEChMIQ3Jvd2RzZWMxHjAcBgNVBAsTFUNyb3dkc2VjIEludGVy
-        bWVkaWF0ZTEmMCQGA1UEAxMdQ3Jvd2RTZWMgVGVzdCBDQSBJbnRlcm1lZGlhdGUw
-        ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7p7368HpoYWgBoecNS60+
-        jTrZWLKfZZ8wi4wASp2vFHlxoC4yI+/R8YWKriBZ3kGKVXuc7fPwCZ8Y+ULYV5oX
-        1DK9m4FETNKrcGm27zbPjYd6fOZCktQNfD0uyxiAxoSuJDXIY2yTI8DqrePhoVSP
-        dLHQGCYSZwM64idxv8+suU8pVM5COgMQ4JvvMzSa0O3IzpNil1c+76xbMQSRvUhx
-        7kfEJboPZ4exhKNEZygSMWYoxsZeNC7eo3VjVTb8wgKVXeHSUvnMjpgAm6hyOVK8
-        Q1xH9bPW9tiCkbNQGfGb1DVZplEP42MdnwzbfVXlq2OJ74SuuBJq/956R+RK4BIN
-        AgMBAAGjgYYwgYMwDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQGCCsGAQUFBwMB
-        BggrBgEFBQcDAjASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1UdDgQWBBR7IoS4tgE0
-        SAki3+2S6N70h9ukHDAfBgNVHSMEGDAWgBTJ6IGQRLBBFj7+AtmHfsapTY5S/DAN
-        BgkqhkiG9w0BAQsFAAOCAQEAf7x+JzMY6QrqvdAGdigRDfyAIinWHl6DgucuZV5Q
-        GdE7a5PTyoO8U0AHIiFWq84vhwG3s3/dB2sSkBNqQiRrLdiWDAzlTMKrXEOobnQY
-        s8X3TxAD3Fy7DsbrL9iCpm49N/OWuT6QlTIe4r02pon3ViwwPgTMlOvmX+fD6X1Q
-        ct2gN5JCwUkSR5MYfdoO3s4x4VEWuuUNSOrmW3feJNcnvEn0f2XTcraooFlrJzv6
-        QP9Yunf3aj4tiAz4w8wGcLVRGru2sBW9gjZ7/Vteg361QSTtwScW9dyfQeFD9jIn
-        1HWPxbNZbv+07Ryv5IhkXnuReo+45DWEPJkNKoAlKUxJog==
-        -----END CERTIFICATE-----
-
+      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
   whoami2:
     image: traefik/whoami
     container_name: "simple-service-bar"
@@ -92,9 +67,9 @@ services:
       # BOUNCER_KEY_TRAEFIK_2: 44c36dac5c4140af9f06f397508e82c7
       LOCAL_API_URL: https://127.0.0.1:8080
       USE_TLS: "true"
-      CERT_FILE: "/etc/crowdsec/certs/bouncer.pem"
-      KEY_FILE: "/etc/crowdsec/certs/bouncer-key.pem"
-      CACERT_FILE: "/etc/crowdsec/certs/ca.pem"
+      CERT_FILE: "/etc/crowdsec/certs/server.pem"
+      KEY_FILE: "/etc/crowdsec/certs/server-key.pem"
+      CACERT_FILE: "/etc/crowdsec/certs/inter.pem"
       AGENTS_ALLOWED_OU: "agent-ou"
       BOUNCERS_ALLOWED_OU: "bouncer-ou"
       LEVEL_DEBUG: "true"
