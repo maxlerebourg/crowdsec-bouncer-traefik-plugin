@@ -17,15 +17,15 @@ crowdsec_service:
   acquisition_path: /etc/crowdsec/acquis.yaml
   parser_routines: 1
 plugin_config:
-  user: nobody
-  group: nobody
+ user: nobody
+ group: nobody
 cscli:
   output: human
 db_config:
   log_level: info
   type: sqlite
   db_path: /var/lib/crowdsec/data/crowdsec.db
-  #user:
+  #user: 
   #password:
   #db_name:
   #host:
@@ -41,11 +41,11 @@ api:
     log_level: info
     listen_uri: 0.0.0.0:8080
     profiles_path: /etc/crowdsec/profiles.yaml
-    online_client: # Central API credentials (to push signals and receive bad IPs)
-      credentials_path: /etc/crowdsec/online_api_credentials.yaml
-    console_path: /etc/crowdsec/console.yaml
     trusted_ips: # IP ranges, or IPs which can have admin API access
       - 127.0.0.1
+      - ::1
+    online_client: # Central API credentials (to push signals and receive bad IPs)
+      #credentials_path: /etc/crowdsec/online_api_credentials.yaml
     tls:
       cert_file: /etc/crowdsec/certs/server.pem #Server side cert
       key_file: /etc/crowdsec/certs/server-key.pem #Server side key
@@ -54,3 +54,11 @@ api:
         - bouncer-ou
       agents_allowed_ou: #OU allowed for agents
         - agent-ou
+
+prometheus:
+  enabled: true
+  level: full
+  listen_addr: 0.0.0.0
+  listen_port: 6060
+  
+

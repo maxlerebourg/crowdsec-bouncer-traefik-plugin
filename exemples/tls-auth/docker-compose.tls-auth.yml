@@ -19,7 +19,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-tls-auth:/var/log/traefik
       # - crowdsec-certs-tls-auth:/etc/traefik/crowdsec-certs/:ro
-      - ./:/plugins-tls-auth/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+
     ports:
       - 80:80
       - 8080:8080
@@ -37,6 +38,7 @@ services:
       - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapischeme=https"
       - |
@@ -88,13 +90,18 @@ services:
       CUSTOM_HOSTNAME: crowdsec
       # BOUNCER_KEY_TRAEFIK_1: 40796d93c2958f9e58345514e67740e5
       # BOUNCER_KEY_TRAEFIK_2: 44c36dac5c4140af9f06f397508e82c7
-      # LOCAL_API_URL: https://127.0.0.1:8080
-      # USE_TLS: "true"
-      # CERT_FILE: /etc/crowdsec/certs/bouncer.pem
-      # KEY_FILE: /etc/crowdsec/certs/bouncer-key.pem
+      LOCAL_API_URL: https://127.0.0.1:8080
+      USE_TLS: "true"
+      CERT_FILE: "/etc/crowdsec/certs/bouncer.pem"
+      KEY_FILE: "/etc/crowdsec/certs/bouncer-key.pem"
+      CACERT_FILE: "/etc/crowdsec/certs/ca.pem"
+      AGENTS_ALLOWED_OU: "agent-ou"
+      BOUNCERS_ALLOWED_OU: "bouncer-ou"
+      LEVEL_DEBUG: "true"
+      DISABLE_AGENT: "true"
     volumes:
       - ./config/acquis.yaml:/etc/crowdsec/acquis.yaml
-      # - ./config/config.yaml:/etc/crowdsec/config.yaml:ro
+      # - ./config/config.yaml:/etc/crowdsec/config_local.yaml
       # - ./config/local_api_credentials.yaml:/etc/crowdsec/local_api_credentials.yaml:ro
       - crowdsec-certs-tls-auth:/etc/crowdsec/certs/:ro
       - logs-tls-auth:/var/log/traefik:ro
