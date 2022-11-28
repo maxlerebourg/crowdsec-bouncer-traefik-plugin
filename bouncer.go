@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"text/template"
 	"time"
 
@@ -118,7 +119,13 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 
 	tlsConfig, err := getTLSConfigCrowdsec(*config)
 	if err != nil {
+		// should this error exit ?
 		logger.Error(fmt.Sprintf("New:tlsConfig err in getting tlsConfig:%s", err.Error()))
+	}
+	apiKey, err := getValueOfVariableOrFile(config.CrowdsecLapiKey, config.CrowdsecLapiKeyFile)
+	if err != nil {
+		// should this error exit ?
+		logger.Error(fmt.Sprintf("New:crowdsecLapiKey err in getting apikey:%s", err.Error()))
 	}
 
 	bouncer := &Bouncer{
@@ -130,7 +137,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		crowdsecMode:           config.CrowdsecMode,
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
-		crowdsecKey:            config.CrowdsecLapiKey,
+		crowdsecKey:            apiKey,
 		updateInterval:         config.UpdateIntervalSeconds,
 		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
@@ -386,38 +393,16 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 }
 
 func validateParams(config *Config) error {
-	requiredStrings := map[string]string{
-		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
-		"CrowdsecLapiHost":   config.CrowdsecLapiHost,
-		"CrowdsecLapiKey":    config.CrowdsecLapiKey,
-		"CrowdsecMode":       config.CrowdsecMode,
-	}
-	requiredInt := map[string]int64{
-		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
-		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
-	}
-	for key, val := range requiredInt {
-		if val < 1 {
-			return fmt.Errorf("%v: cannot be less than 1", key)
-		}
-	}
-	for key, val := range requiredStrings {
-		if len(val) == 0 {
-			return fmt.Errorf("%v: cannot be empty", key)
-		}
-	}
-	if !contains([]string{noneMode, liveMode, streamMode}, config.CrowdsecMode) {
-		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
-	}
-	if !contains([]string{"http", "https"}, config.CrowdsecLapiScheme) {
-		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
+	err := validateParamsRequired(config)
+	if err != nil {
+		return err
 	}
 	testURL := url.URL{
 		Scheme: config.CrowdsecLapiScheme,
 		Host:   config.CrowdsecLapiHost,
 	}
 	// This only check that the format of the URL scheme:// is correct and do not make requests
-	_, err := http.NewRequest(http.MethodGet, testURL.String(), nil)
+	_, err = http.NewRequest(http.MethodGet, testURL.String(), nil)
 	if err != nil {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
@@ -516,6 +501,7 @@ func getValueOfVariableOrFile(str string, fp string) (string, error) {
 	value := ""
 	if str != "" {
 		value = str
+		return value, nil
 	} else if fp != "" {
 		file, err := os.Stat(fp)
 		if err != nil {
@@ -524,16 +510,14 @@ func getValueOfVariableOrFile(str string, fp string) (string, error) {
 		if file.IsDir() {
 			return value, fmt.Errorf("getValueOfVariableOrFile:value path %s must be a file", fp)
 		}
-		fileValue, err := os.ReadFile(fp)
+		fileValue, err := os.ReadFile(filepath.Clean(fp))
 		if err != nil {
 			return value, fmt.Errorf("getValueOfVariableOrFile:value read file path %s failed: %w", fp, err)
-		} else {
-			value = string(fileValue)
 		}
-	} else {
-		return value, errors.New("getValueOfVariableOrFile:value not defined in path or variable failed")
+		value = string(fileValue)
+		return value, nil
 	}
-	return value, nil
+	return value, errors.New("getValueOfVariableOrFile:value not defined in path or variable failed")
 }
 
 func validateParamsTLS(config *Config) error {
@@ -567,6 +551,39 @@ func validateParamsIP(config *Config) error {
 		}
 	} else {
 		logger.Debug("No IP provided for TrustedIPs")
+	}
+	return nil
+}
+
+func validateParamsRequired(config *Config) error {
+	requiredStrings := map[string]string{
+		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
+		"CrowdsecLapiHost":   config.CrowdsecLapiHost,
+		"CrowdsecLapiKey":    config.CrowdsecLapiKey,
+		"CrowdsecMode":       config.CrowdsecMode,
+	}
+	requiredInt := map[string]int64{
+		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
+		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
+	}
+	for key, val := range requiredInt {
+		if val < 1 {
+			return fmt.Errorf("%v: cannot be less than 1", key)
+		}
+	}
+	for key, val := range requiredStrings {
+		if len(val) == 0 {
+			return fmt.Errorf("%v: cannot be empty", key)
+		}
+	}
+	if config.CrowdsecLapiKey == "" && config.CrowdsecLapiKeyFile == "" {
+		return errors.New("CrowdsecLapiKey and CrowdsecLapiKeyFile: cannot be empty")
+	}
+	if !contains([]string{noneMode, liveMode, streamMode}, config.CrowdsecMode) {
+		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
+	}
+	if !contains([]string{"http", "https"}, config.CrowdsecLapiScheme) {
+		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
 	}
 	return nil
 }
