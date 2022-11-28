@@ -41,22 +41,27 @@ var (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled                                 bool     `json:"enabled,omitempty"`
-	LogLevel                                string   `json:"logLevel,omitempty"`
-	CrowdsecMode                            string   `json:"crowdsecMode,omitempty"`
-	CrowdsecLapiScheme                      string   `json:"crowdsecLapiScheme,omitempty"`
-	CrowdsecLapiHost                        string   `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiKey                         string   `json:"crowdsecLapiKey,omitempty"`
-	CrowdsecLapiTLSInsecureVerify           bool     `json:"crowdsecLapiTlsInsecureVerify,omitempty"`
-	CrowdsecLapiTLSCertificateAuthority     string   `json:"crowdsecLapiTlsCertificateAuthority,omitempty"`
-	CrowdsecLapiTLSCertificateAuthorityFile string   `json:"crowdsecLapiTlsCertificateAuthorityFile,omitempty"`
-	UpdateIntervalSeconds                   int64    `json:"updateIntervalSeconds,omitempty"`
-	DefaultDecisionSeconds                  int64    `json:"defaultDecisionSeconds,omitempty"`
-	ForwardedHeadersCustomName              string   `json:"forwardedheaderscustomheader,omitempty"`
-	ForwardedHeadersTrustedIPs              []string `json:"forwardedHeadersTrustedIps,omitempty"`
-	ClientTrustedIPs                        []string `json:"clientTrustedIps,omitempty"`
-	RedisCacheEnabled                       bool     `json:"redisCacheEnabled,omitempty"`
-	RedisCacheHost                          string   `json:"redisCacheHost,omitempty"`
+	Enabled                                  bool     `json:"enabled,omitempty"`
+	LogLevel                                 string   `json:"logLevel,omitempty"`
+	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
+	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
+	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
+	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
+	CrowdsecLapiKeyFile                      string   `json:"crowdsecLapiKeyFile,omitempty"`
+	CrowdsecLapiTLSInsecureVerify            bool     `json:"crowdsecLapiTlsInsecureVerify,omitempty"`
+	CrowdsecLapiTLSCertificateAuthority      string   `json:"crowdsecLapiTlsCertificateAuthority,omitempty"`
+	CrowdsecLapiTLSCertificateAuthorityFile  string   `json:"crowdsecLapiTlsCertificateAuthorityFile,omitempty"`
+	CrowdsecLapiTLSCertificateBouncer        string   `json:"crowdsecLapiTlsCertificateBouncer,omitempty"`
+	CrowdsecLapiTLSCertificateBouncerFile    string   `json:"crowdsecLapiTlsCertificateBouncerFile,omitempty"`
+	CrowdsecLapiTLSCertificateBouncerKey     string   `json:"crowdsecLapiTlsCertificateBouncerKey,omitempty"`
+	CrowdsecLapiTLSCertificateBouncerKeyFile string   `json:"crowdsecLapiTlsCertificateBouncerKeyFile,omitempty"`
+	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
+	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
+	ForwardedHeadersCustomName               string   `json:"forwardedheaderscustomheader,omitempty"`
+	ForwardedHeadersTrustedIPs               []string `json:"forwardedHeadersTrustedIps,omitempty"`
+	ClientTrustedIPs                         []string `json:"clientTrustedIps,omitempty"`
+	RedisCacheEnabled                        bool     `json:"redisCacheEnabled,omitempty"`
+	RedisCacheHost                           string   `json:"redisCacheHost,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -68,6 +73,7 @@ func CreateConfig() *Config {
 		CrowdsecLapiScheme:            "http",
 		CrowdsecLapiHost:              "crowdsec:8080",
 		CrowdsecLapiKey:               "",
+		CrowdsecLapiKeyFile:           "",
 		CrowdsecLapiTLSInsecureVerify: false,
 		UpdateIntervalSeconds:         60,
 		DefaultDecisionSeconds:        60,
@@ -449,8 +455,6 @@ func getTLSConfigCrowdsec(config Config) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	// checks todo
-	var cert []byte
-
 	if config.CrowdsecLapiScheme != "https" {
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
 		return tlsConfig, nil
@@ -459,54 +463,90 @@ func getTLSConfigCrowdsec(config Config) (*tls.Config, error) {
 		tlsConfig.InsecureSkipVerify = true
 		return tlsConfig, nil
 	}
-
-	if config.CrowdsecLapiTLSCertificateAuthority != "" {
-		cert = []byte(config.CrowdsecLapiTLSCertificateAuthority)
-	} else if config.CrowdsecLapiTLSCertificateAuthorityFile != "" {
-		var err error
-		cert, err = os.ReadFile(config.CrowdsecLapiTLSCertificateAuthorityFile)
-		if err != nil {
-			return tlsConfig, fmt.Errorf("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthorityFile read cert failed: %w", err)
-		}
+	err := getTLSServerConfigCrowdsec(config, tlsConfig)
+	if err != nil {
+		logger.Debug(fmt.Sprintf("getTLSConfigCrowdsec:getTLSServerConfigCrowdsec %s", err.Error()))
+		return tlsConfig, err
+	}
+	err = getTLSClientConfigCrowdsec(config, tlsConfig)
+	if err != nil {
+		logger.Debug(fmt.Sprintf("getTLSConfigCrowdsec:getTLSClientConfigCrowdsec %s", err.Error()))
+		return tlsConfig, err
 	}
 
-	if ok := tlsConfig.RootCAs.AppendCertsFromPEM(cert); !ok {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthorityFile read cert file failed")
-		return tlsConfig, errors.New("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthorityFile read cert file failed")
-	}
 	return tlsConfig, nil
+}
+
+func getTLSServerConfigCrowdsec(config Config, tlsConfig *tls.Config) error {
+	var cert []byte
+
+	value, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateAuthority, config.CrowdsecLapiTLSCertificateAuthorityFile)
+	if err != nil {
+		return fmt.Errorf("getTLSServerConfigCrowdsec:CrowdsecLapiTLSCertificateBouncer-File %w", err)
+	}
+	cert = []byte(value)
+	if ok := tlsConfig.RootCAs.AppendCertsFromPEM(cert); !ok {
+		logger.Debug("getTLSServerConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority-File read cert failed")
+		return errors.New("getTLSServerConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority-File read cert failed")
+	}
+	return nil
+}
+
+func getTLSClientConfigCrowdsec(config Config, tlsConfig *tls.Config) error {
+	bouncerCertStr, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateBouncer, config.CrowdsecLapiTLSCertificateBouncerFile)
+	if err != nil {
+		return fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncer-File %w", err)
+	}
+	bouncerKeyStr, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateBouncerKey, config.CrowdsecLapiTLSCertificateBouncerKeyFile)
+	if err != nil {
+		return fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncerKey-File %w", err)
+	}
+	bouncerCert := []byte(bouncerCertStr)
+	bouncerKey := []byte(bouncerKeyStr)
+
+	cert, err := tls.X509KeyPair(bouncerCert, bouncerKey)
+	if err != nil {
+		return fmt.Errorf("getTLSClientConfigCrowdsec:ClientCert %w", err)
+	}
+	tlsConfig.Certificates = []tls.Certificate{cert}
+	return nil
+}
+
+func getValueOfVariableOrFile(str string, fp string) (string, error) {
+	value := ""
+	if str != "" {
+		value = str
+	} else if fp != "" {
+		file, err := os.Stat(fp)
+		if err != nil {
+			return value, fmt.Errorf("getValueOfVariableOrFile:value invalid path %s: %w", fp, err)
+		}
+		if file.IsDir() {
+			return value, fmt.Errorf("getValueOfVariableOrFile:value path %s must be a file", fp)
+		}
+		fileValue, err := os.ReadFile(fp)
+		if err != nil {
+			return value, fmt.Errorf("getValueOfVariableOrFile:value read file path %s failed: %w", fp, err)
+		} else {
+			value = string(fileValue)
+		}
+	} else {
+		return value, errors.New("getValueOfVariableOrFile:value not defined in path or variable failed")
+	}
+	return value, nil
 }
 
 func validateParamsTLS(config *Config) error {
 	if config.CrowdsecLapiTLSCertificateAuthority == "" && config.CrowdsecLapiTLSCertificateAuthorityFile == "" {
 		return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority or CrowdsecLapiTlsCertificateAuthorityFile must be specified when https is on and CrowdsecLapiTLSInsecureVerify is false")
 	}
-	//nolint:nestif
-	if config.CrowdsecLapiTLSCertificateAuthorityFile != "" {
-		// Check file var
-		file, err := os.Stat(config.CrowdsecLapiTLSCertificateAuthorityFile)
-		if err != nil {
-			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile invalid path: %w", err)
-		}
-		if file.IsDir() {
-			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile path must be a file")
-		}
-		cert, err := os.ReadFile(config.CrowdsecLapiTLSCertificateAuthorityFile)
-		if err != nil {
-			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile read cert failed: %w", err)
-		}
-		err = checkTLSConfig(cert)
-		if err != nil {
-			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthorityFile certificate invalid: %w", err)
-		}
-	} else {
-		// Check Pem var
-		err := checkTLSConfig([]byte(config.CrowdsecLapiTLSCertificateAuthority))
-		if err != nil {
-			logger.Error(config.CrowdsecLapiTLSCertificateAuthority)
-			return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority certificate invalid: %w", err)
-		}
-		logger.Debug("validateParams:CrowdsecLapiTlsCertificateAuthority is valid")
+	value, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateAuthority, config.CrowdsecLapiTLSCertificateAuthorityFile)
+	if err != nil {
+		return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority-File %w", err)
+	}
+	err = checkTLSConfig([]byte(value))
+	if err != nil {
+		return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority-File certificate invalid: %w", err)
 	}
 	return nil
 }

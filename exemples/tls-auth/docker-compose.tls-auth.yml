@@ -54,8 +54,10 @@ services:
       - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker"
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
-
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapischeme=https"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.CrowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.CrowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.CrowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.2
     container_name: "crowdsec"
@@ -63,8 +65,8 @@ services:
     environment:
       COLLECTIONS: crowdsecurity/traefik
       CUSTOM_HOSTNAME: crowdsec
-      # BOUNCER_KEY_TRAEFIK_1: 40796d93c2958f9e58345514e67740e5
-      # BOUNCER_KEY_TRAEFIK_2: 44c36dac5c4140af9f06f397508e82c7
+      # whoami-foo is authenticating with api key over https
+      BOUNCER_KEY_TRAEFIK_FOO: 40796d93c2958f9e58345514e67740e5
       LOCAL_API_URL: https://127.0.0.1:8080
       USE_TLS: "true"
       CERT_FILE: "/etc/crowdsec/certs/server.pem"
@@ -74,6 +76,8 @@ services:
       BOUNCERS_ALLOWED_OU: "bouncer-ou"
       LEVEL_DEBUG: "true"
       DISABLE_AGENT: "true"
+      # Disabled for the examples
+      DISABLE_ONLINE_API: "true"
     volumes:
       - ./config/acquis.yaml:/etc/crowdsec/acquis.yaml
       # - ./config/config.yaml:/etc/crowdsec/config_local.yaml
