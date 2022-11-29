@@ -65,7 +65,11 @@ make run
 - CrowdsecLapiKey
   - string
   - default: ""
-  - Crowdsec LAPI generated key for the bouncer : **must be unique by service**. 
+  - Crowdsec LAPI key for the bouncer : **must be unique by service**. 
+- CrowdsecLapiKeyFile
+  - string
+  - default: ""
+  - Crowdsec File path of the LAPI key for the bouncer : **must be unique by service**. 
 - CrowdsecLapiTLSInsecureVerify
   - bool
   - default: false
@@ -78,6 +82,22 @@ make run
   - string
   - default: ""
   - File path of the Certificate Authority of the Crowdsec LAPI
+- CrowdsecLapiTlsCertificateBouncer
+  - string
+  - default: ""
+  - PEM-encoded client Certificate of the Bouncer
+- CrowdsecLapiTlsCertificateBouncerFile
+  - string
+  - default: ""
+  - File path of the client Certificate of the Bouncer
+- CrowdsecLapiTlsCertificateBouncerKey
+  - string
+  - default: ""
+  - PEM-encoded client private key of the Bouncer
+- CrowdsecLapiTlsCertificateBouncerKeyFile
+  - string
+  - default: ""
+  - File path of the client private key of the Bouncer
 - UpdateIntervalSeconds
   - int64
   - default: 60
@@ -146,10 +166,12 @@ http:
       plugin:
         bouncer:
           enabled: false
+          logLevel: DEBUG
           updateIntervalSeconds: 60
           defaultDecisionSeconds: 60
           crowdsecMode: live
-          crowdsecLapiKey: privateKey
+          crowdsecLapiKey: privateKey-foo
+          crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
           crowdsecLapiTLSInsecureVerify: false
@@ -161,36 +183,39 @@ http:
           forwardedHeadersCustomName: X-Custom-Header
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
-          crowdsecLapiTlsCertificateAuthority: |-
+          crowdsecLapiTLSCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
-            MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
-            DBlBbWF6b24gV2ViIFNlcnZpY2VzLCBJbmMuMRMwEQYDVQQLDApBbWF6b24gUkRT
-            MSUwIwYDVQQDDBxBbWF6b24gUkRTIGFwLWVhc3QtMSBSb290IENBMB4XDTE5MDIx
-            NzAyNDcwMFoXDTIyMDYwMTEyMDAwMFowgY8xCzAJBgNVBAYTAlVTMRMwEQYDVQQI
-            DApXYXNoaW5ndG9uMRAwDgYDVQQHDAdTZWF0dGxlMSIwIAYDVQQKDBlBbWF6b24g
-            V2ViIFNlcnZpY2VzLCBJbmMuMRMwEQYDVQQLDApBbWF6b24gUkRTMSAwHgYDVQQD
-            DBdBbWF6b24gUkRTIGFwLWVhc3QtMSBDQTCCASIwDQYJKoZIhvcNAQEBBQADggEP
-            ADCCAQoCggEBAOcJAUofyJuBuPr5ISHi/Ha5ed8h3eGdzn4MBp6rytPOg9NVGRQs
-            O93fNGCIKsUT6gPuk+1f1ncMTV8Y0Fdf4aqGWme+Khm3ZOP3V1IiGnVq0U2xiOmn
-            SQ4Q7LoeQC4lC6zpoCHVJyDjZ4pAknQQfsXb77Togdt/tK5ahev0D+Q3gCwAoBoO
-            DHKJ6t820qPi63AeGbJrsfNjLKiXlFPDUj4BGir4dUzjEeH7/hx37na1XG/3EcxP
-            399cT5k7sY/CR9kctMlUyEEUNQOmhi/ly1Lgtihm3QfjL6K9aGLFNwX35Bkh9aL2
-            F058u+n8DP/dPeKUAcJKiQZUmzuen5n57x8CAwEAAaNmMGQwDgYDVR0PAQH/BAQD
-            AgEGMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFFlqgF4FQlb9yP6c+Q3E
-            O3tXv+zOMB8GA1UdIwQYMBaAFK9T6sY/PBZVbnHcNcQXf58P4OuPMA0GCSqGSIb3
-            DQEBCwUAA4IBAQDeXiS3v1z4jWAo1UvVyKDeHjtrtEH1Rida1eOXauFuEQa5tuOk
-            E53Os4haZCW4mOlKjigWs4LN+uLIAe1aFXGo92nGIqyJISHJ1L+bopx/JmIbHMCZ
-            0lTNJfR12yBma5VQy7vzeFku/SisKwX0Lov1oHD4MVhJoHbUJYkmAjxorcIHORvh
-            I3Vj5XrgDWtLDPL8/Id/roul/L+WX5ir+PGScKBfQIIN2lWdZoqdsx8YWqhm/ikL
-            C6qNieSwcvWL7C03ri0DefTQMY54r5wP33QU5hJ71JoaZI3YTeT0Nf+NRL4hM++w
+            ...
             Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
             -----END CERTIFICATE-----
+          crowdsecLapiTLSCertificateAuthorityFile: /etc/traefik/crowdsec-certs/ca.pem
+          crowdsecLapiTLSCertificateBouncer: |-
+            -----BEGIN CERTIFICATE-----
+            MIIEHjCCAwagAwIBAgIUOBTs1eqkaAUcPplztUr2xRapvNAwDQYJKoZIhvcNAQEL
+            ...
+            RaXAnYYUVRblS1jmePemh388hFxbmrpG2pITx8B5FMULqHoj11o2Rl0gSV6tHIHz
+            N2U=
+            -----END CERTIFICATE-----
+          crowdsecLapiTLSCertificateBouncerFile: /etc/traefik/crowdsec-certs/bouncer.pem
+          crowdsecLapiTLSCertificateBouncerKey: |-
+            -----BEGIN RSA PRIVATE KEY-----
+            MIIEogIBAAKCAQEAtYQnbJqifH+ZymePylDxGGLIuxzcAUU4/ajNj+qRAdI/Ux3d
+            ...
+            ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
+            -----END RSA PRIVATE KEY-----
+          crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
+
 ```
-These are the default values of the plugin except for LapiKey.
+These are the default values for the plugin except for LapiKey.
+
+#### Authenticate with LAPI
+
+You can either authenticate with LAPIKEY to the LAPI or using client certificates.
+Please see below for more detail on each option.
 
 #### Generate LAPI KEY
-You need to generate a crowdsec API key for the LAPI.
+You can generate a crowdsec API key for the LAPI.
 You can follow the documentation here: https://docs.crowdsec.net/docs/user_guides/lapi_mgmt/
 
 ```bash
@@ -213,10 +238,36 @@ crowdsec:
 ...
 ```
 
+Note:
+> Crowdsec does not require a specific format for la LAPI-key, you may use something like FIXME-LAPI-KEY but that is not recommanded for obvious reasons
+
 You can then run all the containers:
 ```bash
 docker-compose up -d
 ```
+
+#### Use certificates to authenticate with Crowdsec
+
+You can follow the example in exemples/tls-auth to view how to authenticate with client certificates with the LAPI.
+In that case communications with the LAPI must go through HTTPS.
+
+A script is available to generate certificates in exemples/tls-auth/gencerts.sh and must be colocated with the in directory which contains the inputs for the PKI creation.
+
+#### Use HTTPS to communicate with the LAPI
+
+To communicate with the LAPI in HTTPS you need to either accept any certificates setting the crowdsecLapiTLSInsecureVerify to true or add the CA used to by the server certificate of Crowdsec using crowdsecLapiTLSCertificateAuthority or crowdsecLapiTLSCertificateAuthorityFile.
+Set the crowdsecLapiScheme to https.
+
+Crowdsec must be listening in HTTPS for this to work.
+Please see the tls-auth exemple or the official documentation: [https://docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
+
+#### Fill variable with value of file
+
+Every sensitive variable or file based can be provided with the content as raw or through a file path that Traefik can read.
+The file variable will be used as preference if both content and file are provided for the same variable.
+Format is:  
+- Content: VARIABLE_NAME: XXX
+- FILE   : VARIABLE_NAME_FILE: /path
 
 #### Add manually an IP to the blocklist (testing purpose)
 
@@ -356,21 +407,23 @@ It is recommanded to validate the certificate presented by Crowdsec LAPI using t
 You can provide the Certificate Authority using:
 * A file path readable by Traefik
 ```yaml
-middlewares:
+http:
+  middlewares:
     crowdsec:
       plugin:
         bouncer:
-          CrowdsecLapiTlsCertificateAuthorityFile: /etc/traefik/certs/crowdsecCA.pem
+          crowdsecLapiTlsCertificateAuthorityFile: /etc/traefik/certs/crowdsecCA.pem
 ```
 * The PEM encoded certificate as a text variable
 
 In the static file configuration of Traefik
 ```yaml
-middlewares:
+http:
+  middlewares:
     crowdsec:
       plugin:
         bouncer:
-          CrowdsecLapiTlsCertificateAuthority: |-
+          crowdsecLapiTlsCertificateAuthority: |-
               -----BEGIN CERTIFICATE-----
               MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
               MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
@@ -386,7 +439,7 @@ services:
     image: traefik/whoami
     labels:
       - |
-        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecLapiTlsCertificateAuthority=
+        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdsecLapiTlsCertificateAuthority=
         -----BEGIN CERTIFICATE-----
         MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
         MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
@@ -395,6 +448,19 @@ services:
         Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
         -----END CERTIFICATE-----
 ```
+
+The example tls-auth presents 2 services, foo and bar which comes with the bouncer.
+At startup, certificate are created in a shared docker volume by a sidecar container which exits after.
+
+Traefik will use client and CA certificates.
+The Bouncer will use server and CA certificates.
+
+The service whoami-foo will authenticate with API key over HTTPS after verifying the server certificate with CA.
+The service whoami-bar will authenticate with a client certificate signed by the CA.
+
+
+Note:
+> This example is still in Beta and used an unreleased (v1.4.3) at time of writing version of Crowdsec
 
 ### About
 

@@ -110,22 +110,22 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	logger.Init(config.LogLevel)
 	err := validateParams(config)
 	if err != nil {
-		logger.Info(err.Error())
+		logger.Info(fmt.Sprintf("New:validateParams %s", err.Error()))
 		return nil, err
 	}
 
 	serverChecker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(config.ClientTrustedIPs)
 
-	tlsConfig, err := getTLSConfigCrowdsec(*config)
+	tlsConfig, err := getTLSConfigCrowdsec(config)
 	if err != nil {
-		// should this error exit ?
 		logger.Error(fmt.Sprintf("New:tlsConfig err in getting tlsConfig:%s", err.Error()))
+		return nil, err
 	}
 	apiKey, err := getValueOfVariableOrFile(config.CrowdsecLapiKey, config.CrowdsecLapiKeyFile)
-	if err != nil {
-		// should this error exit ?
-		logger.Error(fmt.Sprintf("New:crowdsecLapiKey err in getting apikey:%s", err.Error()))
+	if err != nil && len(tlsConfig.Certificates) == 0 {
+		logger.Error(fmt.Sprintf("New:crowdsecLapiKey err in getting apikey:%s and no client certificate setup", err.Error()))
+		return nil, err
 	}
 
 	bouncer := &Bouncer{
@@ -436,7 +436,7 @@ func checkTLSConfig(cert []byte) error {
 	return nil
 }
 
-func getTLSConfigCrowdsec(config Config) (*tls.Config, error) {
+func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	// checks todo
@@ -462,7 +462,7 @@ func getTLSConfigCrowdsec(config Config) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func getTLSServerConfigCrowdsec(config Config, tlsConfig *tls.Config) error {
+func getTLSServerConfigCrowdsec(config *Config, tlsConfig *tls.Config) error {
 	var cert []byte
 
 	value, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateAuthority, config.CrowdsecLapiTLSCertificateAuthorityFile)
@@ -477,23 +477,27 @@ func getTLSServerConfigCrowdsec(config Config, tlsConfig *tls.Config) error {
 	return nil
 }
 
-func getTLSClientConfigCrowdsec(config Config, tlsConfig *tls.Config) error {
-	bouncerCertStr, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateBouncer, config.CrowdsecLapiTLSCertificateBouncerFile)
-	if err != nil {
-		return fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncer-File %w", err)
-	}
-	bouncerKeyStr, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateBouncerKey, config.CrowdsecLapiTLSCertificateBouncerKeyFile)
-	if err != nil {
-		return fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncerKey-File %w", err)
-	}
-	bouncerCert := []byte(bouncerCertStr)
-	bouncerKey := []byte(bouncerKeyStr)
+func getTLSClientConfigCrowdsec(config *Config, tlsConfig *tls.Config) error {
+	if (config.CrowdsecLapiTLSCertificateBouncer != "" || config.CrowdsecLapiTLSCertificateBouncerFile != "") && (config.CrowdsecLapiTLSCertificateBouncerKey != "" || config.CrowdsecLapiTLSCertificateBouncerKeyFile != "") {
+		bouncerCertStr, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateBouncer, config.CrowdsecLapiTLSCertificateBouncerFile)
+		if err != nil {
+			return fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncer-File %w", err)
+		}
+		bouncerKeyStr, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateBouncerKey, config.CrowdsecLapiTLSCertificateBouncerKeyFile)
+		if err != nil {
+			return fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncerKey-File %w", err)
+		}
+		bouncerCert := []byte(bouncerCertStr)
+		bouncerKey := []byte(bouncerKeyStr)
 
-	cert, err := tls.X509KeyPair(bouncerCert, bouncerKey)
-	if err != nil {
-		return fmt.Errorf("getTLSClientConfigCrowdsec:ClientCert %w", err)
+		cert, err := tls.X509KeyPair(bouncerCert, bouncerKey)
+		if err != nil {
+			return fmt.Errorf("getTLSClientConfigCrowdsec:ClientCert %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	} else {
+		logger.Debug("getTLSClientConfigCrowdsec:NoClientCert provided")
 	}
-	tlsConfig.Certificates = []tls.Certificate{cert}
 	return nil
 }
 
@@ -505,19 +509,19 @@ func getValueOfVariableOrFile(str string, fp string) (string, error) {
 	} else if fp != "" {
 		file, err := os.Stat(fp)
 		if err != nil {
-			return value, fmt.Errorf("getValueOfVariableOrFile:value invalid path %s: %w", fp, err)
+			return value, fmt.Errorf("getValueOfVariableOrFile:%s invalid path %w", fp, err)
 		}
 		if file.IsDir() {
-			return value, fmt.Errorf("getValueOfVariableOrFile:value path %s must be a file", fp)
+			return value, fmt.Errorf("getValueOfVariableOrFile:%s path must be a file", fp)
 		}
 		fileValue, err := os.ReadFile(filepath.Clean(fp))
 		if err != nil {
-			return value, fmt.Errorf("getValueOfVariableOrFile:value read file path %s failed: %w", fp, err)
+			return value, fmt.Errorf("getValueOfVariableOrFile:%s read file path failed: %w", fp, err)
 		}
 		value = string(fileValue)
 		return value, nil
 	}
-	return value, errors.New("getValueOfVariableOrFile:value not defined in path or variable failed")
+	return value, fmt.Errorf("getValueOfVariableOrFile:%s|%s not defined in path or variable failed", str, fp)
 }
 
 func validateParamsTLS(config *Config) error {
