@@ -14,9 +14,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"text/template"
 	"time"
-	"reflect"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
@@ -456,34 +456,17 @@ func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	if ok := tlsConfig.RootCAs.AppendCertsFromPEM(cert); !ok {
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority read cert failed")
 	}
-	if err != nil {
-		logger.Debug(fmt.Sprintf("getTLSConfigCrowdsec:getTLSServerConfigCrowdsec %s", err.Error()))
-		return tlsConfig, err
-	}
 	clientCert, err := getTLSClientCertCrowdsec(config)
 	if err != nil {
 		logger.Debug(fmt.Sprintf("getTLSConfigCrowdsec:getTLSClientConfigCrowdsec %s", err.Error()))
 		return tlsConfig, err
 	}
-	tlsConfig.Certificates = clientCert
+	tlsConfig.Certificates = append(tlsConfig.Certificates, *clientCert)
 
 	return tlsConfig, nil
 }
 
-func getTLSServerConfigCrowdsec(config *Config, tlsConfig *tls.Config) error {
-	value, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
-	if err != nil {
-		return fmt.Errorf("getTLSServerConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority %w", err)
-	}
-	cert := []byte(value)
-	if ok := tlsConfig.RootCAs.AppendCertsFromPEM(cert); !ok {
-		logger.Debug("getTLSServerConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority-File read cert failed")
-		return fmt.Errorf("getTLSServerConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority-File read cert failed")
-	}
-	return nil
-}
-
-func getTLSClientCertCrowdsec(config *Config) (*[]tls.Certificate, error) {
+func getTLSClientCertCrowdsec(config *Config) (*tls.Certificate, error) {
 	bouncerCertStr, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncer")
 	if err != nil {
 		return nil, fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncer %w", err)
@@ -499,7 +482,7 @@ func getTLSClientCertCrowdsec(config *Config) (*[]tls.Certificate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getTLSClientConfigCrowdsec:ClientCert %w", err)
 	}
-	return []tls.Certificate{cert}
+	return &cert, err
 }
 
 func getVariable(config *Config, key string) (string, error) {
