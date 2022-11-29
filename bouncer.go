@@ -8,7 +8,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"path/filepath"
 	"text/template"
 	"time"
+	"reflect"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
@@ -122,7 +122,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		logger.Error(fmt.Sprintf("New:tlsConfig err in getting tlsConfig:%s", err.Error()))
 		return nil, err
 	}
-	apiKey, err := getValueOfVariableOrFile(config.CrowdsecLapiKey, config.CrowdsecLapiKeyFile)
+	apiKey, err := getVariable(config, "CrowdsecLapiKey")
 	if err != nil && len(tlsConfig.Certificates) == 0 {
 		logger.Error(fmt.Sprintf("New:crowdsecLapiKey err in getting apikey:%s and no client certificate setup", err.Error()))
 		return nil, err
@@ -430,7 +430,7 @@ func checkTLSConfig(cert []byte) error {
 	ok := tlsConfig.RootCAs.AppendCertsFromPEM(cert)
 
 	if !ok {
-		return errors.New("failed parsing pem file")
+		return fmt.Errorf("failed parsing pem file")
 	}
 
 	return nil
@@ -448,87 +448,97 @@ func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 		tlsConfig.InsecureSkipVerify = true
 		return tlsConfig, nil
 	}
-	err := getTLSServerConfigCrowdsec(config, tlsConfig)
+	value, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
+	if err != nil {
+		return tlsConfig, fmt.Errorf("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority %w", err)
+	}
+	cert := []byte(value)
+	if ok := tlsConfig.RootCAs.AppendCertsFromPEM(cert); !ok {
+		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority read cert failed")
+	}
 	if err != nil {
 		logger.Debug(fmt.Sprintf("getTLSConfigCrowdsec:getTLSServerConfigCrowdsec %s", err.Error()))
 		return tlsConfig, err
 	}
-	err = getTLSClientConfigCrowdsec(config, tlsConfig)
+	clientCert, err := getTLSClientCertCrowdsec(config)
 	if err != nil {
 		logger.Debug(fmt.Sprintf("getTLSConfigCrowdsec:getTLSClientConfigCrowdsec %s", err.Error()))
 		return tlsConfig, err
 	}
+	tlsConfig.Certificates = clientCert
 
 	return tlsConfig, nil
 }
 
 func getTLSServerConfigCrowdsec(config *Config, tlsConfig *tls.Config) error {
-	var cert []byte
-
-	value, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateAuthority, config.CrowdsecLapiTLSCertificateAuthorityFile)
+	value, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
 	if err != nil {
-		return fmt.Errorf("getTLSServerConfigCrowdsec:CrowdsecLapiTLSCertificateBouncer-File %w", err)
+		return fmt.Errorf("getTLSServerConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority %w", err)
 	}
-	cert = []byte(value)
+	cert := []byte(value)
 	if ok := tlsConfig.RootCAs.AppendCertsFromPEM(cert); !ok {
 		logger.Debug("getTLSServerConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority-File read cert failed")
-		return errors.New("getTLSServerConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority-File read cert failed")
+		return fmt.Errorf("getTLSServerConfigCrowdsec:CrowdsecLapiTlsCertificateAuthority-File read cert failed")
 	}
 	return nil
 }
 
-func getTLSClientConfigCrowdsec(config *Config, tlsConfig *tls.Config) error {
-	if (config.CrowdsecLapiTLSCertificateBouncer != "" || config.CrowdsecLapiTLSCertificateBouncerFile != "") && (config.CrowdsecLapiTLSCertificateBouncerKey != "" || config.CrowdsecLapiTLSCertificateBouncerKeyFile != "") {
-		bouncerCertStr, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateBouncer, config.CrowdsecLapiTLSCertificateBouncerFile)
-		if err != nil {
-			return fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncer-File %w", err)
-		}
-		bouncerKeyStr, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateBouncerKey, config.CrowdsecLapiTLSCertificateBouncerKeyFile)
-		if err != nil {
-			return fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncerKey-File %w", err)
-		}
-		bouncerCert := []byte(bouncerCertStr)
-		bouncerKey := []byte(bouncerKeyStr)
-
-		cert, err := tls.X509KeyPair(bouncerCert, bouncerKey)
-		if err != nil {
-			return fmt.Errorf("getTLSClientConfigCrowdsec:ClientCert %w", err)
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	} else {
-		logger.Debug("getTLSClientConfigCrowdsec:NoClientCert provided")
+func getTLSClientCertCrowdsec(config *Config) (*[]tls.Certificate, error) {
+	bouncerCertStr, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncer")
+	if err != nil {
+		return nil, fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncer %w", err)
 	}
-	return nil
+	bouncerKeyStr, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncerKey")
+	if err != nil {
+		return nil, fmt.Errorf("getTLSClientConfigCrowdsec:CrowdsecLapiTLSCertificateBouncerKey %w", err)
+	}
+	if bouncerCertStr == "" || bouncerKeyStr == "" {
+		return nil, fmt.Errorf("getTLSClientConfigCrowdsec:NoClientCert provided")
+	}
+	cert, err := tls.X509KeyPair([]byte(bouncerCertStr), []byte(bouncerKeyStr))
+	if err != nil {
+		return nil, fmt.Errorf("getTLSClientConfigCrowdsec:ClientCert %w", err)
+	}
+	return []tls.Certificate{cert}
 }
 
-func getValueOfVariableOrFile(str string, fp string) (string, error) {
+func getVariable(config *Config, key string) (string, error) {
 	value := ""
-	if str != "" {
-		value = str
-		return value, nil
-	} else if fp != "" {
-		file, err := os.Stat(fp)
-		if err != nil {
-			return value, fmt.Errorf("getValueOfVariableOrFile:%s invalid path %w", fp, err)
+	object := reflect.Indirect(reflect.ValueOf(config))
+	field := object.FieldByName(fmt.Sprintf("%sFile", key))
+	if field.IsValid() {
+		fp := field.String()
+		if fp != "" {
+			file, err := os.Stat(fp)
+			if err != nil {
+				return value, fmt.Errorf("getVariable:%s invalid path %w", fp, err)
+			}
+			if file.IsDir() {
+				return value, fmt.Errorf("getValueOfVariableOrFile:%s path must be a file", fp)
+			}
+			fileValue, err := os.ReadFile(filepath.Clean(fp))
+			if err != nil {
+				return value, fmt.Errorf("getVariable:%s read file path failed: %w", fp, err)
+			}
+			value = string(fileValue)
+			return value, nil
 		}
-		if file.IsDir() {
-			return value, fmt.Errorf("getValueOfVariableOrFile:%s path must be a file", fp)
-		}
-		fileValue, err := os.ReadFile(filepath.Clean(fp))
-		if err != nil {
-			return value, fmt.Errorf("getValueOfVariableOrFile:%s read file path failed: %w", fp, err)
-		}
-		value = string(fileValue)
-		return value, nil
 	}
-	return value, fmt.Errorf("getValueOfVariableOrFile:%s|%s not defined in path or variable failed", str, fp)
+	field = object.FieldByName(key)
+	if field.IsValid() {
+		value = field.String()
+		if value != "" {
+			return value, nil
+		}
+	}
+	return value, nil
 }
 
 func validateParamsTLS(config *Config) error {
 	if config.CrowdsecLapiTLSCertificateAuthority == "" && config.CrowdsecLapiTLSCertificateAuthorityFile == "" {
 		return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority or CrowdsecLapiTlsCertificateAuthorityFile must be specified when https is on and CrowdsecLapiTLSInsecureVerify is false")
 	}
-	value, err := getValueOfVariableOrFile(config.CrowdsecLapiTLSCertificateAuthority, config.CrowdsecLapiTLSCertificateAuthorityFile)
+	value, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
 	if err != nil {
 		return fmt.Errorf("validateParams:CrowdsecLapiTlsCertificateAuthority-File %w", err)
 	}
@@ -582,7 +592,7 @@ func validateParamsRequired(config *Config) error {
 	// This lacks of clarity
 	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
 	if !((config.CrowdsecLapiKey == "" && config.CrowdsecLapiKeyFile == "") || ((config.CrowdsecLapiTLSCertificateBouncer == "" && config.CrowdsecLapiTLSCertificateBouncerFile == "") && (config.CrowdsecLapiTLSCertificateBouncerKey == "" && config.CrowdsecLapiTLSCertificateBouncerKeyFile == ""))) {
-		return errors.New("CrowdsecLapiKey-File or CrowdsecLapiTLSCertificateBouncer-key-file: cannot be both empty")
+		return fmt.Errorf("CrowdsecLapiKey-File or CrowdsecLapiTLSCertificateBouncer-key-file: cannot be both empty")
 	}
 	if !contains([]string{noneMode, liveMode, streamMode}, config.CrowdsecMode) {
 		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")

@@ -1,0 +1,17 @@
+type: http          # Don't change
+name: http_default  # Must match the registered plugin in the profile
+
+
+log_level: info # One of "trace", "debug", "info", "warn", "error", "off"
+
+# group_wait:         # Time to wait collecting alerts before relaying a message to this plugin, eg "30s"
+# group_threshold:    # Amount of alerts that triggers a message before <group_wait> has expired, eg "10"
+# max_retry:          # Number of attempts to relay messages to plugins in case of error
+# timeout:            # Time to wait for response from the plugin before considering the attempt a failure, eg "10s"
+
+format: |
+  {{.|toJson}}
+
+url: https://workflow.primadviz.com/webhook/crowdsec
+
+method: POST
