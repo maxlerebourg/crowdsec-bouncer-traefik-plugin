@@ -59,7 +59,7 @@ services:
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.4.2
+    image: crowdsecurity/crowdsec:v1.4.3
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
@@ -75,7 +75,7 @@ services:
       AGENTS_ALLOWED_OU: "agent-ou"
       BOUNCERS_ALLOWED_OU: "bouncer-ou"
       LEVEL_DEBUG: "true"
-      DISABLE_AGENT: "true"
+      DISABLE_AGENT: "false"
       # Disabled for the examples
       DISABLE_ONLINE_API: "true"
     volumes:
