@@ -74,7 +74,6 @@ func CreateConfig() *Config {
 		CrowdsecLapiScheme:            "http",
 		CrowdsecLapiHost:              "crowdsec:8080",
 		CrowdsecLapiKey:               "",
-		CrowdsecLapiKeyFile:           "",
 		CrowdsecLapiTLSInsecureVerify: false,
 		UpdateIntervalSeconds:         60,
 		DefaultDecisionSeconds:        60,
@@ -400,11 +399,15 @@ func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
 		return tlsConfig, nil
 	} else if config.CrowdsecLapiTLSInsecureVerify {
+		// here conditions are not good
+		// TODO
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify is true")
 		tlsConfig.InsecureSkipVerify = true
 		return tlsConfig, nil
 	}
 	certAuthority, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
+	// here conditions are not good
+	// TODO
 	if err != nil {
 		return nil, err
 	}
@@ -428,10 +431,6 @@ func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getTLSClientConfigCrowdsec impossible to generate ClientCert %w", err)
 	}
-	if err != nil {
-		logger.Debug(fmt.Sprintf("getTLSConfigCrowdsec:getTLSClientConfigCrowdsec %s", err.Error()))
-		return nil, err
-	}
 	tlsConfig.Certificates = append(tlsConfig.Certificates, clientCert)
 
 	return tlsConfig, nil
@@ -441,6 +440,7 @@ func getVariable(config *Config, key string) (string, error) {
 	value := ""
 	object := reflect.Indirect(reflect.ValueOf(config))
 	field := object.FieldByName(fmt.Sprintf("%sFile", key))
+	// Here linter say you should simplify this code
 	if field.IsValid() {
 		fp := field.String()
 		if fp != "" {
@@ -534,9 +534,9 @@ func validateParamsTLS(config *Config) error {
 	return nil
 }
 
-func validateParamsIPs(IPs []string, key string) error {
-	if len(IPs) > 0 {
-		if _, err := ip.NewChecker(IPs); err != nil {
+func validateParamsIPs(listIP []string, key string) error {
+	if len(listIP) > 0 {
+		if _, err := ip.NewChecker(listIP); err != nil {
 			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
 		}
 	} else {

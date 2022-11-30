@@ -45,22 +45,22 @@ services:
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapischeme=https"
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
 
-  # whoami-bar:
-  #   image: traefik/whoami
-  #   container_name: "simple-service-bar"
-  #   restart: unless-stopped
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.router-bar.rule=Path(`/bar`)"
-  #     - "traefik.http.routers.router-bar.entrypoints=web"
-  #     - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker"
-  #     - "traefik.http.services.service-bar.loadbalancer.server.port=80"
-  #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
-  #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.loglevel=DEBUG"
-  #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapischeme=https"
-  #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
-  #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
-  #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
+  whoami-bar:
+    image: traefik/whoami
+    container_name: "simple-service-bar"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.router-bar.rule=Path(`/bar`)"
+      - "traefik.http.routers.router-bar.entrypoints=web"
+      - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker"
+      - "traefik.http.services.service-bar.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapischeme=https"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.3
