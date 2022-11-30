@@ -395,13 +395,14 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
+	//nolint:gocritic
 	if config.CrowdsecLapiScheme != "https" {
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
 		return tlsConfig, nil
 	} else if config.CrowdsecLapiTLSInsecureVerify {
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify is true")
 		tlsConfig.InsecureSkipVerify = true
-		// If we return here and and still want to use client auth this won't work
+		// If we return here and still want to use client auth this won't work
 		// return tlsConfig, nil
 	} else {
 		certAuthority, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
