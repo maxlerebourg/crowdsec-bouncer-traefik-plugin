@@ -442,32 +442,25 @@ func getVariable(config *Config, key string) (string, error) {
 	value := ""
 	object := reflect.Indirect(reflect.ValueOf(config))
 	field := object.FieldByName(fmt.Sprintf("%sFile", key))
-	// Here linter say you should simplify this code
-	if field.IsValid() {
-		fp := field.String()
-		if fp != "" {
-			file, err := os.Stat(fp)
-			if err != nil {
-				return value, fmt.Errorf("%s:%s invalid path %w", key, fp, err)
-			}
-			if file.IsDir() {
-				return value, fmt.Errorf("%s:%s path must be a file", key, fp)
-			}
-			fileValue, err := os.ReadFile(filepath.Clean(fp))
-			if err != nil {
-				return value, fmt.Errorf("%s:%s read file path failed %w", key, fp, err)
-			}
-			value = string(fileValue)
-			return value, nil
+	// Here linter say you should simplify this code, but lets not, performance is important not clarity and complexity
+	fp := field.String()
+	if fp != "" {
+		file, err := os.Stat(fp)
+		if err != nil {
+			return value, fmt.Errorf("%s:%s invalid path %w", key, fp, err)
 		}
+		if file.IsDir() {
+			return value, fmt.Errorf("%s:%s path must be a file", key, fp)
+		}
+		fileValue, err := os.ReadFile(filepath.Clean(fp))
+		if err != nil {
+			return value, fmt.Errorf("%s:%s read file path failed %w", key, fp, err)
+		}
+		value = string(fileValue)
+		return value, nil
 	}
 	field = object.FieldByName(key)
-	if field.IsValid() {
-		value = field.String()
-		if value != "" {
-			return value, nil
-		}
-	}
+	value = field.String()
 	return value, nil
 }
 
