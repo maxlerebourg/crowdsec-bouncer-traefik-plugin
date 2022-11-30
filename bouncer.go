@@ -404,14 +404,15 @@ func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 		tlsConfig.InsecureSkipVerify = true
 		return tlsConfig, nil
 	}
-	value, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
+	certAuthority, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
 	if err != nil {
 		return nil, err
 	}
-	cert := []byte(value)
+	cert := []byte(certAuthority)
 	if !tlsConfig.RootCAs.AppendCertsFromPEM(cert) {
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority read cert failed")
 	}
+
 	certBouncer, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncer")
 	if err != nil {
 		return nil, err
@@ -420,13 +421,12 @@ func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	logger.Info(fmt.Sprintf("%s, %s", certBouncer, certBouncerKey))
 	if certBouncer == "" || certBouncerKey == "" {
-		return nil, fmt.Errorf("no client cert provided")
+		return tlsConfig, nil
 	}
 	clientCert, err := tls.X509KeyPair([]byte(certBouncer), []byte(certBouncerKey))
 	if err != nil {
-		return nil, fmt.Errorf("getTLSClientConfigCrowdsec Impossible to generate ClientCert %w", err)
+		return nil, fmt.Errorf("getTLSClientConfigCrowdsec impossible to generate ClientCert %w", err)
 	}
 	if err != nil {
 		logger.Debug(fmt.Sprintf("getTLSConfigCrowdsec:getTLSClientConfigCrowdsec %s", err.Error()))
@@ -478,7 +478,7 @@ func validateParams(config *Config) error {
 		Host:   config.CrowdsecLapiHost,
 	}
 	// This only check that the format of the URL scheme:// is correct and do not make requests
-	
+
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}

@@ -61,6 +61,7 @@ services:
   #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
   #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
   #     - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
+
   crowdsec:
     image: crowdsecurity/crowdsec:v1.4.3
     container_name: "crowdsec"
