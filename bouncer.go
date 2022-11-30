@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -394,26 +395,26 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
-	// checks todo
 	if config.CrowdsecLapiScheme != "https" {
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
 		return tlsConfig, nil
 	} else if config.CrowdsecLapiTLSInsecureVerify {
-		// here conditions are not good
-		// TODO
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify is true")
 		tlsConfig.InsecureSkipVerify = true
-		return tlsConfig, nil
-	}
-	certAuthority, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
-	// here conditions are not good
-	// TODO
-	if err != nil {
-		return nil, err
-	}
-	cert := []byte(certAuthority)
-	if !tlsConfig.RootCAs.AppendCertsFromPEM(cert) {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority read cert failed")
+		// If we return here and and still want to use client auth this won't work
+		// return tlsConfig, nil
+	} else {
+		certAuthority, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
+		if err != nil {
+			return nil, err
+		}
+		cert := []byte(certAuthority)
+		if !tlsConfig.RootCAs.AppendCertsFromPEM(cert) {
+			logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority read cert failed")
+			// here we return because if CrowdsecLapiTLSInsecureVerify is false
+			// and CA not load, we can't communicate with https
+			return nil, errors.New("getTLSConfigCrowdsec:cannot load CA and verify cert is enabled")
+		}
 	}
 
 	certBouncer, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncer")
