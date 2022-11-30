@@ -64,11 +64,44 @@ make run
   - Crowdsec LAPI available on which host and port.
 - CrowdsecLapiKey
   - string
-  - Crowdsec LAPI generated key for the bouncer : **must be unique by service**. 
+  - default: ""
+  - Crowdsec LAPI key for the bouncer : **must be unique by service**. 
+- CrowdsecLapiKeyFile
+  - string
+  - default: ""
+  - Crowdsec File path of the LAPI key for the bouncer : **must be unique by service**. 
+- CrowdsecLapiTLSInsecureVerify
+  - bool
+  - default: false
+  - Disable verification of certificate presented by Crowdsec LAPI
+- CrowdsecLapiTlsCertificateAuthority
+  - string
+  - default: ""
+  - PEM-encoded Certificate Authority of the Crowdsec LAPI
+- CrowdsecLapiTlsCertificateAuthorityFile
+  - string
+  - default: ""
+  - File path of the Certificate Authority of the Crowdsec LAPI
+- CrowdsecLapiTlsCertificateBouncer
+  - string
+  - default: ""
+  - PEM-encoded client Certificate of the Bouncer
+- CrowdsecLapiTlsCertificateBouncerFile
+  - string
+  - default: ""
+  - File path of the client Certificate of the Bouncer
+- CrowdsecLapiTlsCertificateBouncerKey
+  - string
+  - default: ""
+  - PEM-encoded client private key of the Bouncer
+- CrowdsecLapiTlsCertificateBouncerKeyFile
+  - string
+  - default: ""
+  - File path of the client private key of the Bouncer
 - UpdateIntervalSeconds
   - int64
   - default: 60
-  - Used only in `stream` mode, interval between fetching blacklisted IPs from LAPI
+  - Used only in `stream` mode, interval between requests to fetch blacklisted IPs from LAPI
 - DefaultDecisionSeconds
   - int64
   - default: 60
@@ -133,12 +166,15 @@ http:
       plugin:
         bouncer:
           enabled: false
+          logLevel: DEBUG
           updateIntervalSeconds: 60
           defaultDecisionSeconds: 60
           crowdsecMode: live
-          crowdsecLapiKey: privateKey
+          crowdsecLapiKey: privateKey-foo
+          crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
+          crowdsecLapiTLSInsecureVerify: false
           forwardedHeadersTrustedIPs: 
             - 10.0.10.23/32
             - 10.0.20.0/24
@@ -147,11 +183,39 @@ http:
           forwardedHeadersCustomName: X-Custom-Header
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
+          crowdsecLapiTLSCertificateAuthority: |-
+            -----BEGIN CERTIFICATE-----
+            MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
+            ...
+            Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
+            -----END CERTIFICATE-----
+          crowdsecLapiTLSCertificateAuthorityFile: /etc/traefik/crowdsec-certs/ca.pem
+          crowdsecLapiTLSCertificateBouncer: |-
+            -----BEGIN CERTIFICATE-----
+            MIIEHjCCAwagAwIBAgIUOBTs1eqkaAUcPplztUr2xRapvNAwDQYJKoZIhvcNAQEL
+            ...
+            RaXAnYYUVRblS1jmePemh388hFxbmrpG2pITx8B5FMULqHoj11o2Rl0gSV6tHIHz
+            N2U=
+            -----END CERTIFICATE-----
+          crowdsecLapiTLSCertificateBouncerFile: /etc/traefik/crowdsec-certs/bouncer.pem
+          crowdsecLapiTLSCertificateBouncerKey: |-
+            -----BEGIN RSA PRIVATE KEY-----
+            MIIEogIBAAKCAQEAtYQnbJqifH+ZymePylDxGGLIuxzcAUU4/ajNj+qRAdI/Ux3d
+            ...
+            ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
+            -----END RSA PRIVATE KEY-----
+          crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
+
 ```
-These are the default values of the plugin except for LapiKey.
+These are the default values for the plugin except for LapiKey.
+
+#### Authenticate with LAPI
+
+You can either authenticate with LAPIKEY to the LAPI or using client certificates.
+Please see below for more detail on each option.
 
 #### Generate LAPI KEY
-You need to generate a crowdsec API key for the LAPI.
+You can generate a crowdsec API key for the LAPI.
 You can follow the documentation here: https://docs.crowdsec.net/docs/user_guides/lapi_mgmt/
 
 ```bash
@@ -159,7 +223,7 @@ docker-compose -f docker-compose-local.yml up -d crowdsec
 docker exec crowdsec cscli bouncers add crowdsecBouncer
 ```
 
-This LAPI key must be set where is noted FIXME-LAPI-KEY in the docker-compose-test.yml
+This LAPI key must be set where is noted FIXME-LAPI-KEY in the docker-compose.yml
 ```yaml
 ...
 whoami:
@@ -174,10 +238,36 @@ crowdsec:
 ...
 ```
 
+Note:
+> Crowdsec does not require a specific format for la LAPI-key, you may use something like FIXME-LAPI-KEY but that is not recommanded for obvious reasons
+
 You can then run all the containers:
 ```bash
 docker-compose up -d
 ```
+
+#### Use certificates to authenticate with Crowdsec
+
+You can follow the example in exemples/tls-auth to view how to authenticate with client certificates with the LAPI.
+In that case communications with the LAPI must go through HTTPS.
+
+A script is available to generate certificates in exemples/tls-auth/gencerts.sh and must be colocated with the in directory which contains the inputs for the PKI creation.
+
+#### Use HTTPS to communicate with the LAPI
+
+To communicate with the LAPI in HTTPS you need to either accept any certificates setting the crowdsecLapiTLSInsecureVerify to true or add the CA used to by the server certificate of Crowdsec using crowdsecLapiTLSCertificateAuthority or crowdsecLapiTLSCertificateAuthorityFile.
+Set the crowdsecLapiScheme to https.
+
+Crowdsec must be listening in HTTPS for this to work.
+Please see the tls-auth exemple or the official documentation: [https://docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
+
+#### Fill variable with value of file
+
+Every sensitive variable or file based can be provided with the content as raw or through a file path that Traefik can read.
+The file variable will be used as preference if both content and file are provided for the same variable.
+Format is:  
+- Content: VARIABLE_NAME: XXX
+- FILE   : VARIABLE_NAME_FILE: /path
 
 #### Add manually an IP to the blocklist (testing purpose)
 
@@ -295,6 +385,102 @@ To play the demo environnement run:
 ```bash
 make run_trustedips
 ```
+
+5. Using https communication and tls authentication with Crowdsec
+
+##### Summary
+This example demonstrate the use of https between the Traefik plugin and the Crowdsec LAPI.
+
+It is possible to communicate with the LAPI in https and still authenticate with API key.
+You can add the client TLS certificate generated to authenticate without any Token in the plugin.
+
+However note that it is not possible to authenticate with TLS client certificate without https setup for the LAPI.
+
+The example is detailed below and will be place in the `examples/tls-auth/README.md` file.
+
+##### Details
+
+Simple HTTPS communication: It is possible to talk to Crowdsec LAPI which is configured with a self-signed certificate
+In that case the setting **crowdsecLapiTLSInsecureVerify** must be set to true.
+
+It is recommanded to validate the certificate presented by Crowdsec LAPI using the Certificate Authority which created it.
+
+You can provide the Certificate Authority using:
+* A file path readable by Traefik
+```yaml
+http:
+  middlewares:
+    crowdsec:
+      plugin:
+        bouncer:
+          crowdsecLapiTlsCertificateAuthorityFile: /etc/traefik/certs/crowdsecCA.pem
+```
+* The PEM encoded certificate as a text variable
+
+In the static file configuration of Traefik
+```yaml
+http:
+  middlewares:
+    crowdsec:
+      plugin:
+        bouncer:
+          crowdsecLapiTlsCertificateAuthority: |-
+              -----BEGIN CERTIFICATE-----
+              MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
+              MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
+              ...
+              C6qNieSwcvWL7C03ri0DefTQMY54r5wP33QU5hJ71JoaZI3YTeT0Nf+NRL4hM++w
+              Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
+              -----END CERTIFICATE-----
+```
+In a dynamic configuration of a provider (ex docker) as a Label
+```yaml
+services:
+  whoami-foo:
+    image: traefik/whoami
+    labels:
+      - |
+        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdsecLapiTlsCertificateAuthority=
+        -----BEGIN CERTIFICATE-----
+        MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
+        MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
+        ...
+        C6qNieSwcvWL7C03ri0DefTQMY54r5wP33QU5hJ71JoaZI3YTeT0Nf+NRL4hM++w
+        Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
+        -----END CERTIFICATE-----
+```
+
+The example tls-auth presents 2 services, foo and bar which comes with the bouncer.
+At startup, certificates are created in a shared docker volume by a sidecar container which exits after.
+
+Traefik will use client and CA certificates.
+The Bouncer will use server and CA certificates.
+
+The service `whoami-foo` will authenticate with an **API key** over HTTPS after verifying the server certificate with CA.
+The service `whoami-bar` will authenticate with a **client certificate** signed by the CA.
+
+Access to a route that communicate via https and authenticate with API-key:
+```
+curl http://localhost:80/foo
+```
+Access to a route that communicate via https and authenticate with a client certificate:
+```
+curl http://localhost:80/bar
+```
+Access to the traefik dashboard
+```
+curl http://localhost:8080/dashboard/#/
+```
+
+To play the demo environnement run:
+```bash
+make run_tlsauth
+```
+
+Note:
+> This example is still in Beta and use a new version of Crowdsec (v1.4.3) at time of writing
+A functionnality has been disabled in Crowdsec in order to make the example work DISABLE_AGENT: "true"
+
 
 ### About
 

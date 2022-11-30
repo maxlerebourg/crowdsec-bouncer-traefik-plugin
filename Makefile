@@ -34,6 +34,9 @@ run_cacheredis:
 run_trustedips:
 	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml up -d --remove-orphans
 
+run_tlsauth:
+	docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml down && docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml up -d && docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml restart && docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml logs -f
+
 run:
 	docker-compose -f docker-compose.yml up -d --remove-orphans
 
@@ -55,6 +58,9 @@ restart_cacheredis:
 restart_trustedips:
 	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml restart
 
+restart_tlsauth:
+	docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml
+
 show_logs:
 	docker-compose -f docker-compose.yml restart
 
@@ -68,6 +74,7 @@ clean_all_docker:
 	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml down --remove-orphans
 	docker-compose -f exemples/redis-cache/docker-compose.redis.yml down --remove-orphans
 	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml down --remove-orphans
+	docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml down --remove-orphans
 	docker-compose -f docker-compose.local.yml down --remove-orphans
 	docker-compose -f docker-compose.yml down --remove-orphans
 
