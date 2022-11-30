@@ -31,14 +31,14 @@ experimental:
   plugins:
     bouncer:
       moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      version: v1.1.4
+      version: v1.1.5
 
 ################################################################
 # Certificate Resolver
 ################################################################
 
 serversTransport:
-  insecureSkipVerify: true
+  insecureSkipVerify: false
 
 ################################################################
 # Traefik logs configuration

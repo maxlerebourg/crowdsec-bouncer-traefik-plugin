@@ -21,7 +21,9 @@ http:
           enabled: true
           crowdseclapikey: whoami-demo
           updateintervalseconds: 60
-          crowdsecmode: stream
-          logLevel: "DEBUG"
+          crowdsecmode: live
+          loglevel: "DEBUG"
           crowdsecLapiScheme: https
           crowdsecLapiHost: localhost:8080
+          crowdsecLapiTLSInsecureVerify: true
+          
