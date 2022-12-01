@@ -247,7 +247,6 @@ You can then run all the containers:
 docker-compose up -d
 ```
 
-<<<<<<< HEAD
 #### Use certificates to authenticate with CrowdSec
 
 You can follow the example in exemples/tls-auth to view how to authenticate with client certificates with the LAPI.
