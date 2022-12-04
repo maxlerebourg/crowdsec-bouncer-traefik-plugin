@@ -31,4 +31,8 @@ helm install --namespace=traefik-v2 \
 ```bash
 helm repo add crowdsec https://crowdsecurity.github.io/helm-charts
 helm repo update
+kubectl create ns crowdsec
+helm install --namespace=crowdsec \
+    --values=./crowdsec/values.yml \
+    crowdsec crowdsec/crowdsec
 ```
