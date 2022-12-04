@@ -1,3 +1,4 @@
+// Package configuration implements plugin Config, default Config values and validation param functions.
 package configuration
 
 import (
@@ -14,6 +15,7 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
+// Enums for crowdsec mode
 const (
 	StreamMode              = "stream"
 	LiveMode                = "live"
@@ -54,7 +56,7 @@ func contains(source []string, target string) bool {
 	return false
 }
 
-// CreateConfig creates the default plugin configuration.
+// New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
 		Enabled:                       false,
@@ -74,6 +76,7 @@ func New() *Config {
 	}
 }
 
+// GetVariable get variable from file and after in the variables gave by user.
 func GetVariable(config *Config, key string) (string, error) {
 	value := ""
 	object := reflect.Indirect(reflect.ValueOf(config))
@@ -100,6 +103,7 @@ func GetVariable(config *Config, key string) (string, error) {
 	return value, nil
 }
 
+// ValidateParams validate all the param gave by user.
 func ValidateParams(config *Config) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err
