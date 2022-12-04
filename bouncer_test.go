@@ -12,68 +12,11 @@ import (
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
-func TestCreation(t *testing.T) {
+func getMinimalConfig() *Config {
 	cfg := CreateConfig()
 	cfg.CrowdsecLapiKey = "test"
-
-	ctx := context.Background()
-	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
-
-	handler, err := New(ctx, next, cfg, "demo-plugin")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	recorder := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	handler.ServeHTTP(recorder, req)
+	return cfg
 }
-
-// func TestValidateParamsCrowdsecLapiKey(t *testing.T) {
-// 	cfg := CreateConfig()
-// 	err := validateParams(cfg)
-// 	fmt.Println(err.Error())
-// 	if err == nil {
-// 		t.Errorf("Need error here %s", err.Error())
-// 	}
-// }
-
-// func TestValidateParamsCrowdsecLapiScheme(t *testing.T) {
-// 	cfg := CreateConfig()
-// 	cfg.CrowdsecLapiKey = "test"
-// 	cfg.CrowdsecLapiScheme = "bad"
-// 	err := validateParams(cfg)
-// 	fmt.Println(err.Error())
-// 	if err == nil {
-// 		t.Errorf("Need error here %s", err.Error())
-// 	}
-// }
-
-// func TestValidateParamsCrowdsecMode(t *testing.T) {
-// 	cfg := CreateConfig()
-// 	cfg.CrowdsecLapiKey = "test"
-// 	cfg.CrowdsecMode = "bad"
-// 	err := validateParams(cfg)
-// 	fmt.Println(err.Error())
-// 	if err == nil {
-// 		t.Errorf("Need error here %s", err.Error())
-// 	}
-// }
-
-// func TestValidateParamsUpdateIntervalSeconds(t *testing.T) {
-// 	cfg := CreateConfig()
-// 	cfg.CrowdsecLapiKey = "test"
-// 	cfg.UpdateIntervalSeconds = 0
-// 	err := validateParams(cfg)
-// 	fmt.Println(err.Error())
-// 	if err == nil {
-// 		t.Errorf("Need error here %s", err.Error())
-// 	}
-// }
 
 func TestServeHTTP(t *testing.T) {
 	cfg := CreateConfig()
@@ -94,22 +37,6 @@ func TestServeHTTP(t *testing.T) {
 	}
 
 	handler.ServeHTTP(recorder, req)
-}
-
-func TestCreateConfig(t *testing.T) {
-	tests := []struct {
-		name string
-		want *Config
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := CreateConfig(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("CreateConfig() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }
 
 func TestNew(t *testing.T) {
@@ -213,27 +140,6 @@ func Test_contains(t *testing.T) {
 	}
 }
 
-func Test_startTicker(t *testing.T) {
-	type args struct {
-		config *Config
-		work   func()
-	}
-	tests := []struct {
-		name string
-		args args
-		want chan bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := startTicker(tt.args.config, tt.args.work); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("startTicker() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_handleNoStreamCache(t *testing.T) {
 	type args struct {
 		bouncer  *Bouncer
@@ -326,6 +232,12 @@ func Test_getTLSConfigCrowdsec(t *testing.T) {
 }
 
 func Test_getVariable(t *testing.T) {
+	cfg1 := CreateConfig()
+	cfg1.CrowdsecLapiKey = "test"
+	cfg2 := CreateConfig()
+	cfg2.CrowdsecLapiKeyFile = "./tests/.keytest"
+	cfg3 := CreateConfig()
+	cfg3.CrowdsecLapiKeyFile = "./tests/.bad"
 	type args struct {
 		config *Config
 		key    string
@@ -336,7 +248,24 @@ func Test_getVariable(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "valid string",
+			args: args{ config: cfg1, key: "CrowdsecLapiKey" },
+			want: "test",
+			wantErr: false,
+		},
+		{
+			name: "valid file",
+			args: args{ config: cfg2, key: "CrowdsecLapiKey" },
+			want: "test",
+			wantErr: false,
+		},
+		{
+			name: "invalid file",
+			args: args{ config: cfg3, key: "CrowdsecLapiKey" },
+			want: "",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -353,6 +282,19 @@ func Test_getVariable(t *testing.T) {
 }
 
 func Test_validateParams(t *testing.T) {
+	cfg2 := getMinimalConfig()
+	cfg2.CrowdsecLapiScheme = "bad"
+	cfg3 := getMinimalConfig()
+	cfg3.CrowdsecMode = "bad"
+	cfg4 := getMinimalConfig()
+	cfg4.UpdateIntervalSeconds = 0
+	cfg5 := getMinimalConfig()
+	cfg5.ClientTrustedIPs = []string{ 0: "bad" }
+	cfg6 := getMinimalConfig()
+	cfg6.CrowdsecLapiScheme = "https"
+	cfg6.CrowdsecLapiTLSInsecureVerify = true
+	cfg8 := getMinimalConfig()
+	cfg8.CrowdsecLapiScheme = "https"
 	type args struct {
 		config *Config
 	}
@@ -361,7 +303,15 @@ func Test_validateParams(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{ name: "good minimal config", args: args{ config: getMinimalConfig() }, wantErr: false },
+		{ name: "bad crowdsec lapi key", args: args{ config: CreateConfig() }, wantErr: true },
+		{ name: "bad crowdsec scheme", args: args{ config: cfg2 }, wantErr: true },
+		{ name: "bad crowdsec mode", args: args{ config: cfg3 }, wantErr: true },
+		{ name: "bad update interval", args: args{ config: cfg4 }, wantErr: true },
+		{ name: "bad clients ips", args: args{ config: cfg5 }, wantErr: true },
+		// HTTPS enabled
+		{ name: "good https config with insecure verify", args: args{ config: cfg6 }, wantErr: false },
+		{ name: "no cert authority", args: args{ config: cfg8 }, wantErr: true },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -402,7 +352,12 @@ func Test_validateParamsIPs(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{ name: "not an ip", args: args{ listIP: []string{ 0: "bad" } }, wantErr: true },
+		{ name: "weird ip", args: args{ listIP: []string{ 0: "0.0.0.0/89" } }, wantErr: true },
+		{ name: "localhost ?", args: args{ listIP: []string{ 0: "localhost" } }, wantErr: true },
+		{ name: "weird ip 2", args: args{ listIP: []string{ 0: "0.0.0.256/12" } }, wantErr: true },
+		{ name: "valid ip", args: args{ listIP: []string{ 0: "0.0.0.0/12" } }, wantErr: false },
+		{ name: "valid ip list", args: args{ listIP: []string{ 0: "0.0.0.0/0", 1: "1.1.1.1/1" } }, wantErr: false },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -414,6 +369,14 @@ func Test_validateParamsIPs(t *testing.T) {
 }
 
 func Test_validateParamsRequired(t *testing.T) {
+	cfg2 := getMinimalConfig()
+	cfg2.CrowdsecLapiScheme = "bad"
+	cfg3 := getMinimalConfig()
+	cfg3.CrowdsecMode = "bad"
+	cfg4 := getMinimalConfig()
+	cfg4.UpdateIntervalSeconds = 0
+	cfg5 := getMinimalConfig()
+	cfg5.DefaultDecisionSeconds = 0
 	type args struct {
 		config *Config
 	}
@@ -422,7 +385,11 @@ func Test_validateParamsRequired(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{ name: "good", args: args{ config: getMinimalConfig() }, wantErr: false },
+		{ name: "bad crowdsec scheme", args: args{ config: cfg2 }, wantErr: true },
+		{ name: "bad crowdsec mode", args: args{ config: cfg3 }, wantErr: true },
+		{ name: "bad update interval seconds", args: args{ config: cfg4 }, wantErr: true },
+		{ name: "bad default decision seconds", args: args{ config: cfg5 }, wantErr: true },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

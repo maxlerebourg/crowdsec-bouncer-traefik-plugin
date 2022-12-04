@@ -468,12 +468,12 @@ func validateParams(config *Config) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err
 	}
+
+	// This only check that the format of the URL scheme:// is correct and do not make requests
 	testURL := url.URL{
 		Scheme: config.CrowdsecLapiScheme,
 		Host:   config.CrowdsecLapiHost,
 	}
-	// This only check that the format of the URL scheme:// is correct and do not make requests
-
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
 	}
@@ -546,6 +546,11 @@ func validateParamsRequired(config *Config) error {
 		"CrowdsecLapiHost":   config.CrowdsecLapiHost,
 		"CrowdsecMode":       config.CrowdsecMode,
 	}
+	for key, val := range requiredStrings {
+		if len(val) == 0 {
+			return fmt.Errorf("%v: cannot be empty", key)
+		}
+	}
 	requiredInt := map[string]int64{
 		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
 		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
@@ -553,11 +558,6 @@ func validateParamsRequired(config *Config) error {
 	for key, val := range requiredInt {
 		if val < 1 {
 			return fmt.Errorf("%v: cannot be less than 1", key)
-		}
-	}
-	for key, val := range requiredStrings {
-		if len(val) == 0 {
-			return fmt.Errorf("%v: cannot be empty", key)
 		}
 	}
 	if !contains([]string{noneMode, liveMode, streamMode}, config.CrowdsecMode) {
