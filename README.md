@@ -387,6 +387,15 @@ To play the demo environment run:
 make run_trustedips
 ```
 
+4. Using Crowdsec and Traefik installed as binary in a single VM
+
+Please see details in `exemples/binary-vm/README.md`
+
+To play the demo environment run:
+```bash
+make run_binaryvm
+```
+
 5. Using https communication and tls authentication with Crowdsec
 
 ##### Summary
