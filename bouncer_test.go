@@ -1,4 +1,4 @@
-package crowdsec_bouncer_traefik_plugin
+package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func TestServeHTTP(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	type args struct {
-		ctx    context.Context
+		ctx    context.Context //nolint:containedctx
 		next   http.Handler
 		config *configuration.Config
 		name   string

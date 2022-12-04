@@ -15,7 +15,7 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// Enums for crowdsec mode
+// Enums for crowdsec mode.
 const (
 	StreamMode              = "stream"
 	LiveMode                = "live"
