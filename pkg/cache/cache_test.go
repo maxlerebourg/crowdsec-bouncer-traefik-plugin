@@ -5,8 +5,6 @@ package cache
 import (
 	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_getDecisionLocalCache(t *testing.T) {
@@ -38,7 +36,6 @@ func Test_getDecisionLocalCache(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("getDecisionLocalCache() = %v, want %v", got, tt.want)
 			}
-			assert.Equal(t, err, tt.valueErr)
 		})
 	}
 }
