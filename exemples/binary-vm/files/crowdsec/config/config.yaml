@@ -2,7 +2,7 @@ common:
   daemonize: true
   pid_dir: /var/run/
   log_media: file
-  log_level: info
+  log_level: debug
   log_dir: /var/log/
   log_max_size: 20
   compress_logs: true
@@ -44,7 +44,7 @@ api:
     insecure_skip_verify: false
     credentials_path: /etc/crowdsec/local_api_credentials.yaml
   server:
-    log_level: info
+    log_level: debug
     listen_uri: 127.0.0.1:8080
     profiles_path: /etc/crowdsec/profiles.yaml
     console_path: /etc/crowdsec/console.yaml

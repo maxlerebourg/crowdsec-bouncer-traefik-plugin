@@ -49,7 +49,7 @@ serversTransport:
 log:
   filePath: /var/log/traefik/traefik.log
   level: DEBUG
-  format: json
+  # format: json
 
 ################################################################
 # Access logs configuration

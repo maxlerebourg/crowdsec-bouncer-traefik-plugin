@@ -29,9 +29,18 @@ cfssl gencert -ca "/etc/crowdsec/certs/inter.pem" -ca-key "/etc/crowdsec/certs/i
 # Generate a client certificate for the agent
 cfssl gencert -ca "/etc/crowdsec/certs/inter.pem" -ca-key "/etc/crowdsec/certs/inter-key.pem" -config ${basepath}/profiles.json -profile=client ${basepath}/agent.json 2>/dev/null | cfssljson --bare "/etc/crowdsec/certs/agent"
 
-cp /home/vagrant/vagrant_data/crowdsec/config/config.yaml  /etc/crowdsec/config.yaml
+
+cp /home/vagrant/vagrant_data/crowdsec/config/config.yaml  /etc/crowdsec/config.yaml.local
 cp /home/vagrant/vagrant_data/crowdsec/config/local_api_credentials.yaml /etc/crowdsec/
 chmod +r /etc/crowdsec/config.yaml
 chmod +r /etc/crowdsec/local_api_credentials.yaml
 
 systemctl restart crowdsec
+
+mkdir /etc/traefik/crowdsec-certs
+cp /etc/crowdsec/certs/inter.pem /etc/traefik/crowdsec-certs/inter.pem
+cp /etc/crowdsec/certs/bouncer.pem /etc/traefik/crowdsec-certs/bouncer.pem
+cp /etc/crowdsec/certs/bouncer-key.pem /etc/traefik/crowdsec-certs/bouncer-key.pem
+chown -R traefik:traefik /etc/traefik/crowdsec-certs/
+
+systemctl restart traefik
