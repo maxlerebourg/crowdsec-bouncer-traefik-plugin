@@ -249,21 +249,21 @@ func Test_getVariable(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "valid string",
-			args: args{ config: cfg1, key: "CrowdsecLapiKey" },
-			want: "test",
+			name:    "valid string",
+			args:    args{config: cfg1, key: "CrowdsecLapiKey"},
+			want:    "test",
 			wantErr: false,
 		},
 		{
-			name: "valid file",
-			args: args{ config: cfg2, key: "CrowdsecLapiKey" },
-			want: "test",
+			name:    "valid file",
+			args:    args{config: cfg2, key: "CrowdsecLapiKey"},
+			want:    "test",
 			wantErr: false,
 		},
 		{
-			name: "invalid file",
-			args: args{ config: cfg3, key: "CrowdsecLapiKey" },
-			want: "",
+			name:    "invalid file",
+			args:    args{config: cfg3, key: "CrowdsecLapiKey"},
+			want:    "",
 			wantErr: true,
 		},
 	}
@@ -289,7 +289,7 @@ func Test_validateParams(t *testing.T) {
 	cfg4 := getMinimalConfig()
 	cfg4.UpdateIntervalSeconds = 0
 	cfg5 := getMinimalConfig()
-	cfg5.ClientTrustedIPs = []string{ 0: "bad" }
+	cfg5.ClientTrustedIPs = []string{0: "bad"}
 	cfg6 := getMinimalConfig()
 	cfg6.CrowdsecLapiScheme = "https"
 	cfg6.CrowdsecLapiTLSInsecureVerify = true
@@ -303,15 +303,15 @@ func Test_validateParams(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{ name: "good minimal config", args: args{ config: getMinimalConfig() }, wantErr: false },
-		{ name: "bad crowdsec lapi key", args: args{ config: CreateConfig() }, wantErr: true },
-		{ name: "bad crowdsec scheme", args: args{ config: cfg2 }, wantErr: true },
-		{ name: "bad crowdsec mode", args: args{ config: cfg3 }, wantErr: true },
-		{ name: "bad update interval", args: args{ config: cfg4 }, wantErr: true },
-		{ name: "bad clients ips", args: args{ config: cfg5 }, wantErr: true },
+		{name: "good minimal config", args: args{config: getMinimalConfig()}, wantErr: false},
+		{name: "bad crowdsec lapi key", args: args{config: CreateConfig()}, wantErr: true},
+		{name: "bad crowdsec scheme", args: args{config: cfg2}, wantErr: true},
+		{name: "bad crowdsec mode", args: args{config: cfg3}, wantErr: true},
+		{name: "bad update interval", args: args{config: cfg4}, wantErr: true},
+		{name: "bad clients ips", args: args{config: cfg5}, wantErr: true},
 		// HTTPS enabled
-		{ name: "good https config with insecure verify", args: args{ config: cfg6 }, wantErr: false },
-		{ name: "no cert authority", args: args{ config: cfg8 }, wantErr: true },
+		{name: "good https config with insecure verify", args: args{config: cfg6}, wantErr: false},
+		{name: "no cert authority", args: args{config: cfg8}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -352,12 +352,12 @@ func Test_validateParamsIPs(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{ name: "not an ip", args: args{ listIP: []string{ 0: "bad" } }, wantErr: true },
-		{ name: "weird ip", args: args{ listIP: []string{ 0: "0.0.0.0/89" } }, wantErr: true },
-		{ name: "localhost ?", args: args{ listIP: []string{ 0: "localhost" } }, wantErr: true },
-		{ name: "weird ip 2", args: args{ listIP: []string{ 0: "0.0.0.256/12" } }, wantErr: true },
-		{ name: "valid ip", args: args{ listIP: []string{ 0: "0.0.0.0/12" } }, wantErr: false },
-		{ name: "valid ip list", args: args{ listIP: []string{ 0: "0.0.0.0/0", 1: "1.1.1.1/1" } }, wantErr: false },
+		{name: "not an ip", args: args{listIP: []string{0: "bad"}}, wantErr: true},
+		{name: "weird ip", args: args{listIP: []string{0: "0.0.0.0/89"}}, wantErr: true},
+		{name: "localhost ?", args: args{listIP: []string{0: "localhost"}}, wantErr: true},
+		{name: "weird ip 2", args: args{listIP: []string{0: "0.0.0.256/12"}}, wantErr: true},
+		{name: "valid ip", args: args{listIP: []string{0: "0.0.0.0/12"}}, wantErr: false},
+		{name: "valid ip list", args: args{listIP: []string{0: "0.0.0.0/0", 1: "1.1.1.1/1"}}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -385,11 +385,11 @@ func Test_validateParamsRequired(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{ name: "good", args: args{ config: getMinimalConfig() }, wantErr: false },
-		{ name: "bad crowdsec scheme", args: args{ config: cfg2 }, wantErr: true },
-		{ name: "bad crowdsec mode", args: args{ config: cfg3 }, wantErr: true },
-		{ name: "bad update interval seconds", args: args{ config: cfg4 }, wantErr: true },
-		{ name: "bad default decision seconds", args: args{ config: cfg5 }, wantErr: true },
+		{name: "good", args: args{config: getMinimalConfig()}, wantErr: false},
+		{name: "bad crowdsec scheme", args: args{config: cfg2}, wantErr: true},
+		{name: "bad crowdsec mode", args: args{config: cfg3}, wantErr: true},
+		{name: "bad update interval seconds", args: args{config: cfg4}, wantErr: true},
+		{name: "bad default decision seconds", args: args{config: cfg5}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
