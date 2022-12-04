@@ -3,7 +3,6 @@
 package cache
 
 import (
-	"errors"
 	"testing"
 )
 
@@ -19,12 +18,12 @@ func Test_getDecisionLocalCache(t *testing.T) {
 		args     args
 		want     bool
 		wantErr  bool
-		valueErr error
+		valueErr string
 	}{
-		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: true, wantErr: false, valueErr: nil},
-		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: false, wantErr: true, valueErr: errors.New("cache:miss")},
-		{name: "Fetch invalid value", args: args{clientIP: "zaeaea"}, want: false, wantErr: true, valueErr: errors.New("cache:miss")},
-		{name: "Fetch empty value", args: args{clientIP: ""}, want: false, wantErr: true, valueErr: errors.New("cache:miss")},
+		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: true, wantErr: false, valueErr: ""},
+		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: false, wantErr: true, valueErr: "cache:miss"},
+		{name: "Fetch invalid value", args: args{clientIP: "zaeaea"}, want: false, wantErr: true, valueErr: "cache:miss"},
+		{name: "Fetch empty value", args: args{clientIP: ""}, want: false, wantErr: true, valueErr: "cache:miss"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -35,6 +34,10 @@ func Test_getDecisionLocalCache(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("getDecisionLocalCache() = %v, want %v", got, tt.want)
+				return
+			}
+			if tt.valueErr != "" && tt.valueErr != err.Error() {
+				t.Errorf("getDecisionLocalCache() err = %v, want %v", err.Error(), tt.valueErr)
 			}
 		})
 	}
