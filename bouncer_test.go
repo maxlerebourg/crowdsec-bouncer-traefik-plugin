@@ -9,6 +9,7 @@ import (
 	"testing"
 	"text/template"
 
+	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
@@ -37,7 +38,7 @@ func TestNew(t *testing.T) {
 	type args struct {
 		ctx    context.Context
 		next   http.Handler
-		config *Config
+		config *configuration.Config
 		name   string
 	}
 	tests := []struct {
@@ -180,7 +181,7 @@ func Test_crowdsecQuery(t *testing.T) {
 
 func Test_getTLSConfigCrowdsec(t *testing.T) {
 	type args struct {
-		config *Config
+		config *configuration.Config
 	}
 	tests := []struct {
 		name    string
