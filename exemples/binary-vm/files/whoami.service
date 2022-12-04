@@ -28,4 +28,4 @@ ProtectSystem=full
 NoNewPrivileges=true
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.

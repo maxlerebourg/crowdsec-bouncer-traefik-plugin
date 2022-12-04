@@ -29,4 +29,3 @@ http:
           crowdsecLapiTLSCertificateAuthorityFile: /etc/traefik/crowdsec-certs/inter.pem
           crowdsecLapiTLSCertificateBouncerFile: /etc/traefik/crowdsec-certs/bouncer.pem
           crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
-          
