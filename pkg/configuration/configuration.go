@@ -211,7 +211,7 @@ func validateParamsRequired(config *Config) error {
 	return nil
 }
 
-// GetTLSConfigCrowdsec get TLS config from Config
+// GetTLSConfigCrowdsec get TLS config from Config.
 func GetTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
