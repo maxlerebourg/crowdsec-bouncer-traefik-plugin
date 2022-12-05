@@ -5,8 +5,6 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -71,7 +69,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	serverChecker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(config.ClientTrustedIPs)
 
-	tlsConfig, err := getTLSConfigCrowdsec(config)
+	tlsConfig, err := configuration.GetTLSConfigCrowdsec(config)
 	if err != nil {
 		logger.Error(fmt.Sprintf("New:getTLSConfigCrowdsec fail to get tlsConfig %s", err.Error()))
 		return nil, err
@@ -335,50 +333,4 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 		return nil, fmt.Errorf("crowdsecQuery:readBody %w", err)
 	}
 	return body, nil
-}
-
-func getTLSConfigCrowdsec(config *configuration.Config) (*tls.Config, error) {
-	tlsConfig := new(tls.Config)
-	tlsConfig.RootCAs = x509.NewCertPool()
-	//nolint:gocritic
-	if config.CrowdsecLapiScheme != "https" {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
-		return tlsConfig, nil
-	} else if config.CrowdsecLapiTLSInsecureVerify {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify is true")
-		tlsConfig.InsecureSkipVerify = true
-		// If we return here and still want to use client auth this won't work
-		// return tlsConfig, nil
-	} else {
-		certAuthority, err := configuration.GetVariable(config, "CrowdsecLapiTLSCertificateAuthority")
-		if err != nil {
-			return nil, err
-		}
-		cert := []byte(certAuthority)
-		if !tlsConfig.RootCAs.AppendCertsFromPEM(cert) {
-			logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority read cert failed")
-			// here we return because if CrowdsecLapiTLSInsecureVerify is false
-			// and CA not load, we can't communicate with https
-			return nil, fmt.Errorf("getTLSConfigCrowdsec:cannot load CA and verify cert is enabled")
-		}
-	}
-
-	certBouncer, err := configuration.GetVariable(config, "CrowdsecLapiTLSCertificateBouncer")
-	if err != nil {
-		return nil, err
-	}
-	certBouncerKey, err := configuration.GetVariable(config, "CrowdsecLapiTLSCertificateBouncerKey")
-	if err != nil {
-		return nil, err
-	}
-	if certBouncer == "" || certBouncerKey == "" {
-		return tlsConfig, nil
-	}
-	clientCert, err := tls.X509KeyPair([]byte(certBouncer), []byte(certBouncerKey))
-	if err != nil {
-		return nil, fmt.Errorf("getTLSClientConfigCrowdsec impossible to generate ClientCert %w", err)
-	}
-	tlsConfig.Certificates = append(tlsConfig.Certificates, clientCert)
-
-	return tlsConfig, nil
 }

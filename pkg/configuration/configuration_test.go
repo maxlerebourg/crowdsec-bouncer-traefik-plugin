@@ -1,7 +1,9 @@
 package configuration
 
 import (
+	"crypto/tls"
 	"testing"
+	"reflect"
 )
 
 func getMinimalConfig() *Config {
@@ -178,6 +180,32 @@ func Test_validateParamsRequired(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := validateParamsRequired(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsRequired() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_GetTLSConfigCrowdsec(t *testing.T) {
+	type args struct {
+		config *Config
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *tls.Config
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetTLSConfigCrowdsec(tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getTLSConfigCrowdsec() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getTLSConfigCrowdsec() = %v, want %v", got, tt.want)
 			}
 		})
 	}

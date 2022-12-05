@@ -2,7 +2,6 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -174,32 +173,6 @@ func Test_crowdsecQuery(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("crowdsecQuery() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_getTLSConfigCrowdsec(t *testing.T) {
-	type args struct {
-		config *configuration.Config
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *tls.Config
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := getTLSConfigCrowdsec(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getTLSConfigCrowdsec() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getTLSConfigCrowdsec() = %v, want %v", got, tt.want)
 			}
 		})
 	}
