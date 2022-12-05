@@ -17,9 +17,11 @@ import (
 
 // Enums for crowdsec mode.
 const (
-	StreamMode              = "stream"
-	LiveMode                = "live"
-	NoneMode                = "none"
+	StreamMode = "stream"
+	LiveMode   = "live"
+	NoneMode   = "none"
+	Https      = "https"
+	Http       = "http"
 )
 
 // Config the plugin configuration.
@@ -62,7 +64,7 @@ func New() *Config {
 		Enabled:                       false,
 		LogLevel:                      "INFO",
 		CrowdsecMode:                  LiveMode,
-		CrowdsecLapiScheme:            "http",
+		CrowdsecLapiScheme:            Http,
 		CrowdsecLapiHost:              "crowdsec:8080",
 		CrowdsecLapiKey:               "",
 		CrowdsecLapiTLSInsecureVerify: false,
@@ -143,7 +145,7 @@ func ValidateParams(config *Config) error {
 	}
 
 	// Case https to contact Crowdsec LAPI and certificate must be provided
-	if config.CrowdsecLapiScheme == "https" && !config.CrowdsecLapiTLSInsecureVerify {
+	if config.CrowdsecLapiScheme == Https && !config.CrowdsecLapiTLSInsecureVerify {
 		err = validateParamsTLS(config)
 		if err != nil {
 			return err
@@ -203,17 +205,18 @@ func validateParamsRequired(config *Config) error {
 	if !contains([]string{NoneMode, LiveMode, StreamMode}, config.CrowdsecMode) {
 		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
 	}
-	if !contains([]string{"http", "https"}, config.CrowdsecLapiScheme) {
+	if !contains([]string{Http, Https}, config.CrowdsecLapiScheme) {
 		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
 	}
 	return nil
 }
 
+// GetTLSConfigCrowdsec get TLS config from Config
 func GetTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	//nolint:gocritic
-	if config.CrowdsecLapiScheme != "https" {
+	if config.CrowdsecLapiScheme != Https {
 		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
 		return tlsConfig, nil
 	} else if config.CrowdsecLapiTLSInsecureVerify {

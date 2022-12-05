@@ -2,8 +2,8 @@ package configuration
 
 import (
 	"crypto/tls"
-	"testing"
 	"reflect"
+	"testing"
 )
 
 func getMinimalConfig() *Config {
@@ -45,7 +45,7 @@ func Test_GetVariable(t *testing.T) {
 		config *Config
 		key    string
 	}
-	tests := []struct{
+	tests := []struct {
 		name    string
 		args    args
 		want    string
@@ -77,10 +77,10 @@ func Test_ValidateParams(t *testing.T) {
 	cfg5 := getMinimalConfig()
 	cfg5.ClientTrustedIPs = []string{0: "bad"}
 	cfg6 := getMinimalConfig()
-	cfg6.CrowdsecLapiScheme = "https"
+	cfg6.CrowdsecLapiScheme = Https
 	cfg6.CrowdsecLapiTLSInsecureVerify = true
 	cfg8 := getMinimalConfig()
-	cfg8.CrowdsecLapiScheme = "https"
+	cfg8.CrowdsecLapiScheme = Https
 	type args struct {
 		config *Config
 	}
