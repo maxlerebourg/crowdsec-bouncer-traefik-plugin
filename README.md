@@ -67,11 +67,7 @@ make run
   - string
   - default: ""
   - Crowdsec LAPI key for the bouncer : **must be unique by service**. 
-- CrowdsecLapiKeyFile
-  - string
-  - default: ""
-  - Crowdsec File path of the LAPI key for the bouncer : **must be unique by service**. 
-- CrowdsecLapiTLSInsecureVerify
+- CrowdsecLapiTlsInsecureVerify
   - bool
   - default: false
   - Disable verification of certificate presented by Crowdsec LAPI
@@ -79,26 +75,14 @@ make run
   - string
   - default: ""
   - PEM-encoded Certificate Authority of the Crowdsec LAPI
-- CrowdsecLapiTlsCertificateAuthorityFile
-  - string
-  - default: ""
-  - File path of the Certificate Authority of the Crowdsec LAPI
 - CrowdsecLapiTlsCertificateBouncer
   - string
   - default: ""
   - PEM-encoded client Certificate of the Bouncer
-- CrowdsecLapiTlsCertificateBouncerFile
-  - string
-  - default: ""
-  - File path of the client Certificate of the Bouncer
 - CrowdsecLapiTlsCertificateBouncerKey
   - string
   - default: ""
   - PEM-encoded client private key of the Bouncer
-- CrowdsecLapiTlsCertificateBouncerKeyFile
-  - string
-  - default: ""
-  - File path of the client private key of the Bouncer
 - UpdateIntervalSeconds
   - int64
   - default: 60
@@ -107,6 +91,10 @@ make run
   - int64
   - default: 60
   - Used only in `live` mode, decision duration of accepted IPs
+- ClientTrustedIPs
+  - string 
+  - default: []
+  - List of client IPs to trust, they will bypass any check from the bouncer or cache (useful for LAN or VPN IP)
 - ForwardedHeadersTrustedIPs
   - []string
   - default: []
@@ -123,10 +111,6 @@ make run
   - string 
   - default: "redis:6379"
   - hostname and port for the redis service
-- ClientTrustedIPs
-  - string 
-  - default: []
-  - List of client IPs to trust, they will bypass any check from the bouncer or cache (useful for LAN or VPN IP)
 
 ### Configuration
 
@@ -208,7 +192,15 @@ http:
           crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
 
 ```
-These are the default values for the plugin except for LapiKey.
+
+#### Fill variable with value of file
+
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority` and `CrowdsecLapiKey` could be provided with the content as raw or through a file path that Traefik can read.
+The file variable will be used as preference if both content and file are provided for the same variable.
+
+Format is:  
+- Content: VARIABLE_NAME: XXX
+- FILE   : VARIABLE_NAME_FILE: /path
 
 #### Authenticate with LAPI
 
@@ -261,14 +253,6 @@ Set the crowdsecLapiScheme to https.
 
 Crowdsec must be listening in HTTPS for this to work.
 Please see the tls-auth exemple or the official documentation: [https://docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
-
-#### Fill variable with value of file
-
-Every sensitive variable or file based can be provided with the content as raw or through a file path that Traefik can read.
-The file variable will be used as preference if both content and file are provided for the same variable.
-Format is:  
-- Content: VARIABLE_NAME: XXX
-- FILE   : VARIABLE_NAME_FILE: /path
 
 #### Manually add an IP to the blocklist (for testing purposes)
 
