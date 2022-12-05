@@ -48,8 +48,8 @@ make run
 ### Variables
 - Enabled
   - bool
-  - enable the plugin
   - default: false
+  - enable the plugin
 - LogLevel
   - string
   - default: `INFO`, expected values are: `INFO`, `DEBUG`
@@ -195,12 +195,12 @@ http:
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority` and `CrowdsecLapiKey` could be provided with the content as raw or through a file path that Traefik can read.
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority` and `CrowdsecLapiKey` can be provided with the content as raw or through a file path that Traefik can read.
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:  
-- Content: VARIABLE_NAME: XXX
-- FILE   : VARIABLE_NAME_FILE: /path
+- Content: VariableName: XXX
+- File   : VariableName_FILE: /path
 
 #### Authenticate with LAPI
 
