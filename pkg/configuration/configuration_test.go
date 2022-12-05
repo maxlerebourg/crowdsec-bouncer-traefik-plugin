@@ -77,10 +77,10 @@ func Test_ValidateParams(t *testing.T) {
 	cfg5 := getMinimalConfig()
 	cfg5.ClientTrustedIPs = []string{0: "bad"}
 	cfg6 := getMinimalConfig()
-	cfg6.CrowdsecLapiScheme = Https
+	cfg6.CrowdsecLapiScheme = HTTPS
 	cfg6.CrowdsecLapiTLSInsecureVerify = true
 	cfg8 := getMinimalConfig()
-	cfg8.CrowdsecLapiScheme = Https
+	cfg8.CrowdsecLapiScheme = HTTPS
 	type args struct {
 		config *Config
 	}
