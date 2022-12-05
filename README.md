@@ -200,7 +200,7 @@ The file variable will be used as preference if both content and file are provid
 
 Format is:  
 - Content: VariableName: XXX
-- File   : VariableName_FILE: /path
+- File   : VariableNameFILE: /path
 
 #### Authenticate with LAPI
 
