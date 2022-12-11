@@ -105,7 +105,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 				IdleConnTimeout: 30 * time.Second,
 				TLSClientConfig: tlsConfig,
 			},
-			Timeout: 2 * time.Second,
+			Timeout: 10 * time.Second,
 		},
 	}
 	if config.RedisCacheEnabled {
