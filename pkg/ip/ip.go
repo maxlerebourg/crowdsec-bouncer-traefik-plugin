@@ -24,6 +24,8 @@ func NewChecker(trustedIPs []string) (*Checker, error) {
 	checker := &Checker{}
 
 	for _, ipMask := range trustedIPs {
+		// remove leading and trailing spaces
+		ipMask = strings.TrimSpace(ipMask)
 		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
 			checker.authorizedIPs = append(checker.authorizedIPs, &ipAddr)
 			logger.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
