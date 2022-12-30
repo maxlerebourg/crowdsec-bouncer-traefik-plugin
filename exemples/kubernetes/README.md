@@ -83,3 +83,9 @@ kubectl logs $(kubectl get pods --namespace=traefik --selector "app.kubernetes.i
 kubectl -n crowdsec exec -it $(kubectl get pods -n crowdsec --selector "k8s-app=crowdsec,type=lapi" --output=name) bash
 ```
 
+
+#### Shell in Traefik container
+
+```bash
+kubectl -n traefik exec -it $(kubectl get pods -n traefik --selector "app.kubernetes.io/name=traefik" --output=name) sh
+```

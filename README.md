@@ -475,6 +475,9 @@ Note:
 > This example is still in Beta and use a new version of Crowdsec (v1.4.3) at time of writing
 A functionnality has been disabled in Crowdsec in order to make the example work DISABLE_AGENT: "true"
 
+6. Using Crowdsec and Traefik in Kubernetes
+
+A complete exemple is available in [exemples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/kubernetes/README.md)
 
 ### About
 
