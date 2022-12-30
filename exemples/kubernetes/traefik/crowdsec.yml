@@ -1,10 +1,10 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
-    name: my-crowdsec-bouncer-traefik-plugin
+    name: bouncer
     namespace: traefik-v2
 spec:
     plugin:
-        crowdsec-bouncer-traefik-plugin:
+        bouncer:
             CrowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
-            Enabled: "true"
+            Enabled: "false"

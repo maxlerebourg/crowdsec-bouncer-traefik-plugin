@@ -11,5 +11,5 @@ logs:
         defaultmode: keep
 
 additionalArguments:
-  - "--experimental.plugins.crowdsec-bouncer-traefik-plugin.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-  - "--experimental.plugins.crowdsec-bouncer-traefik-plugin.version=v1.1.7-beta1"
+  - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+  - "--experimental.plugins.bouncer.version=v1.1.7-beta1"
