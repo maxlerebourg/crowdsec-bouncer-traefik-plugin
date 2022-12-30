@@ -3,6 +3,8 @@ kind: Ingress
 metadata:
   name: whoami-ingress
   namespace: traefik-v2
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: crowdsec-bouncer-traefik-plugin@kubernetescrd
 spec:
   rules:
   - http:
@@ -14,3 +16,4 @@ spec:
             name: whoami
             port:
               name: web
+  

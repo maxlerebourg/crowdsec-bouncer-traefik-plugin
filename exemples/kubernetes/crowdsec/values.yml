@@ -1,0 +1,11 @@
+image:
+  tag: v1.4.4-rc1
+
+agent:
+  acquisition:
+    - namespace: traefik-v2
+      podName: traefik-*
+      program: traefik
+  env:
+    - name: COLLECTIONS
+      value: "crowdsecurity/traefik"

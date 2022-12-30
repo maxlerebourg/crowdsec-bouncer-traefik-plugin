@@ -65,7 +65,7 @@ Access the whoami with: [localhost:8000/](http://localhost:8000/)
 helm repo add crowdsec https://crowdsecurity.github.io/helm-charts
 helm repo update
 kubectl create ns crowdsec
-helm install --namespace=crowdsec \
+helm upgrade --install --namespace=crowdsec \
     --values=./crowdsec/values.yml \
     crowdsec crowdsec/crowdsec
 ```
