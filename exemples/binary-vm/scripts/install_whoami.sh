@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt-get update && apt-get install wget -y
+DEBIAN_FRONTEND=noninteractive sudo apt-get update && apt-get install wget -y
 wget -O whoami.tar.gz "https://github.com/traefik/whoami/releases/download/v1.8.7/whoami_v1.8.7_linux_amd64.tar.gz"
 tar -zxvf whoami.tar.gz
 # inspired from https://gist.github.com/ubergesundheit/7c9d875befc2d7bfd0bf43d8b3862d85

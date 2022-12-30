@@ -19,7 +19,7 @@ http:
       plugin:
         bouncer:
           enabled: true
-          crowdseclapikey: whoami-demo
+          crowdseclapikey: "whoami-demo"
           updateintervalseconds: 60
           crowdsecmode: live
           loglevel: "DEBUG"

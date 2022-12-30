@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"text/template"
 	"time"
 
@@ -79,6 +80,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		logger.Error(fmt.Sprintf("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup %s", err.Error()))
 		return nil, err
 	}
+	apiKey = strings.TrimSuffix(apiKey, "\n")
 
 	bouncer := &Bouncer{
 		next:     next,
