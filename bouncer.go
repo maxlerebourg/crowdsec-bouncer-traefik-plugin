@@ -5,30 +5,23 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
-	"reflect"
+	"strings"
 	"text/template"
 	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
 const (
-	streamMode              = "stream"
-	liveMode                = "live"
-	noneMode                = "none"
 	crowdsecLapiHeader      = "X-Api-Key"
 	crowdsecLapiRoute       = "v1/decisions"
 	crowdsecLapiStreamRoute = "v1/decisions/stream"
@@ -41,49 +34,9 @@ var (
 	ticker                  chan bool
 )
 
-// Config the plugin configuration.
-type Config struct {
-	Enabled                                  bool     `json:"enabled,omitempty"`
-	LogLevel                                 string   `json:"logLevel,omitempty"`
-	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
-	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
-	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
-	CrowdsecLapiKeyFile                      string   `json:"crowdsecLapiKeyFile,omitempty"`
-	CrowdsecLapiTLSInsecureVerify            bool     `json:"crowdsecLapiTlsInsecureVerify,omitempty"`
-	CrowdsecLapiTLSCertificateAuthority      string   `json:"crowdsecLapiTlsCertificateAuthority,omitempty"`
-	CrowdsecLapiTLSCertificateAuthorityFile  string   `json:"crowdsecLapiTlsCertificateAuthorityFile,omitempty"`
-	CrowdsecLapiTLSCertificateBouncer        string   `json:"crowdsecLapiTlsCertificateBouncer,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerFile    string   `json:"crowdsecLapiTlsCertificateBouncerFile,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerKey     string   `json:"crowdsecLapiTlsCertificateBouncerKey,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerKeyFile string   `json:"crowdsecLapiTlsCertificateBouncerKeyFile,omitempty"`
-	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
-	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
-	ForwardedHeadersCustomName               string   `json:"forwardedheaderscustomheader,omitempty"`
-	ForwardedHeadersTrustedIPs               []string `json:"forwardedHeadersTrustedIps,omitempty"`
-	ClientTrustedIPs                         []string `json:"clientTrustedIps,omitempty"`
-	RedisCacheEnabled                        bool     `json:"redisCacheEnabled,omitempty"`
-	RedisCacheHost                           string   `json:"redisCacheHost,omitempty"`
-}
-
 // CreateConfig creates the default plugin configuration.
-func CreateConfig() *Config {
-	return &Config{
-		Enabled:                       false,
-		LogLevel:                      "INFO",
-		CrowdsecMode:                  liveMode,
-		CrowdsecLapiScheme:            "http",
-		CrowdsecLapiHost:              "crowdsec:8080",
-		CrowdsecLapiKey:               "",
-		CrowdsecLapiTLSInsecureVerify: false,
-		UpdateIntervalSeconds:         60,
-		DefaultDecisionSeconds:        60,
-		ForwardedHeadersCustomName:    "X-Forwarded-For",
-		ForwardedHeadersTrustedIPs:    []string{},
-		ClientTrustedIPs:              []string{},
-		RedisCacheEnabled:             false,
-		RedisCacheHost:                "redis:6379",
-	}
+func CreateConfig() *configuration.Config {
+	return configuration.New()
 }
 
 // Bouncer a Bouncer struct.
@@ -106,9 +59,9 @@ type Bouncer struct {
 }
 
 // New creates the crowdsec bouncer plugin.
-func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	logger.Init(config.LogLevel)
-	err := validateParams(config)
+	err := configuration.ValidateParams(config)
 	if err != nil {
 		logger.Info(fmt.Sprintf("New:validateParams %s", err.Error()))
 		return nil, err
@@ -117,16 +70,17 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	serverChecker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(config.ClientTrustedIPs)
 
-	tlsConfig, err := getTLSConfigCrowdsec(config)
+	tlsConfig, err := configuration.GetTLSConfigCrowdsec(config)
 	if err != nil {
 		logger.Error(fmt.Sprintf("New:getTLSConfigCrowdsec fail to get tlsConfig %s", err.Error()))
 		return nil, err
 	}
-	apiKey, err := getVariable(config, "CrowdsecLapiKey")
+	apiKey, err := configuration.GetVariable(config, "CrowdsecLapiKey")
 	if err != nil && len(tlsConfig.Certificates) == 0 {
 		logger.Error(fmt.Sprintf("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup %s", err.Error()))
 		return nil, err
 	}
+	apiKey = strings.TrimSuffix(apiKey, "\n")
 
 	bouncer := &Bouncer{
 		next:     next,
@@ -153,13 +107,13 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 				IdleConnTimeout: 30 * time.Second,
 				TLSClientConfig: tlsConfig,
 			},
-			Timeout: 2 * time.Second,
+			Timeout: 10 * time.Second,
 		},
 	}
 	if config.RedisCacheEnabled {
 		cache.InitRedisClient(config.RedisCacheHost)
 	}
-	if config.CrowdsecMode == streamMode && ticker == nil {
+	if config.CrowdsecMode == configuration.StreamMode && ticker == nil {
 		ticker = startTicker(config, func() {
 			handleStreamCache(bouncer)
 		})
@@ -199,7 +153,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// TODO This should be simplified
-	if bouncer.crowdsecMode != noneMode {
+	if bouncer.crowdsecMode != configuration.NoneMode {
 		isBanned, erro := cache.GetDecision(remoteIP)
 		if erro != nil {
 			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s %s", remoteIP, erro.Error()))
@@ -219,7 +173,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Right here if we cannot join the stream we forbid the request to go on.
-	if bouncer.crowdsecMode == streamMode {
+	if bouncer.crowdsecMode == configuration.StreamMode {
 		if isCrowdsecStreamHealthy {
 			bouncer.next.ServeHTTP(rw, req)
 		} else {
@@ -258,16 +212,7 @@ type Stream struct {
 	New     []Decision `json:"new"`
 }
 
-func contains(source []string, target string) bool {
-	for _, item := range source {
-		if item == target {
-			return true
-		}
-	}
-	return false
-}
-
-func startTicker(config *Config, work func()) chan bool {
+func startTicker(config *configuration.Config, work func()) chan bool {
 	ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
@@ -286,7 +231,7 @@ func startTicker(config *Config, work func()) chan bool {
 
 // We are now in none or live mode.
 func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
-	isLiveMode := bouncer.crowdsecMode == liveMode
+	isLiveMode := bouncer.crowdsecMode == configuration.LiveMode
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
@@ -390,181 +335,4 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
 		return nil, fmt.Errorf("crowdsecQuery:readBody %w", err)
 	}
 	return body, nil
-}
-
-func getTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
-	tlsConfig := new(tls.Config)
-	tlsConfig.RootCAs = x509.NewCertPool()
-	//nolint:gocritic
-	if config.CrowdsecLapiScheme != "https" {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
-		return tlsConfig, nil
-	} else if config.CrowdsecLapiTLSInsecureVerify {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify is true")
-		tlsConfig.InsecureSkipVerify = true
-		// If we return here and still want to use client auth this won't work
-		// return tlsConfig, nil
-	} else {
-		certAuthority, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
-		if err != nil {
-			return nil, err
-		}
-		cert := []byte(certAuthority)
-		if !tlsConfig.RootCAs.AppendCertsFromPEM(cert) {
-			logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority read cert failed")
-			// here we return because if CrowdsecLapiTLSInsecureVerify is false
-			// and CA not load, we can't communicate with https
-			return nil, errors.New("getTLSConfigCrowdsec:cannot load CA and verify cert is enabled")
-		}
-	}
-
-	certBouncer, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncer")
-	if err != nil {
-		return nil, err
-	}
-	certBouncerKey, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncerKey")
-	if err != nil {
-		return nil, err
-	}
-	if certBouncer == "" || certBouncerKey == "" {
-		return tlsConfig, nil
-	}
-	clientCert, err := tls.X509KeyPair([]byte(certBouncer), []byte(certBouncerKey))
-	if err != nil {
-		return nil, fmt.Errorf("getTLSClientConfigCrowdsec impossible to generate ClientCert %w", err)
-	}
-	tlsConfig.Certificates = append(tlsConfig.Certificates, clientCert)
-
-	return tlsConfig, nil
-}
-
-func getVariable(config *Config, key string) (string, error) {
-	value := ""
-	object := reflect.Indirect(reflect.ValueOf(config))
-	field := object.FieldByName(fmt.Sprintf("%sFile", key))
-	// Here linter say you should simplify this code, but lets not, performance is important not clarity and complexity
-	fp := field.String()
-	if fp != "" {
-		file, err := os.Stat(fp)
-		if err != nil {
-			return value, fmt.Errorf("%s:%s invalid path %w", key, fp, err)
-		}
-		if file.IsDir() {
-			return value, fmt.Errorf("%s:%s path must be a file", key, fp)
-		}
-		fileValue, err := os.ReadFile(filepath.Clean(fp))
-		if err != nil {
-			return value, fmt.Errorf("%s:%s read file path failed %w", key, fp, err)
-		}
-		value = string(fileValue)
-		return value, nil
-	}
-	field = object.FieldByName(key)
-	value = field.String()
-	return value, nil
-}
-
-func validateParams(config *Config) error {
-	if err := validateParamsRequired(config); err != nil {
-		return err
-	}
-	testURL := url.URL{
-		Scheme: config.CrowdsecLapiScheme,
-		Host:   config.CrowdsecLapiHost,
-	}
-	// This only check that the format of the URL scheme:// is correct and do not make requests
-
-	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
-		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
-	}
-
-	if err := validateParamsIPs(config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
-		return err
-	}
-	if err := validateParamsIPs(config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
-		return err
-	}
-
-	lapiKey, err := getVariable(config, "CrowdsecLapiKey")
-	if err != nil {
-		return err
-	}
-	certBouncer, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncer")
-	if err != nil {
-		return err
-	}
-	certBouncerKey, err := getVariable(config, "CrowdsecLapiTLSCertificateBouncerKey")
-	if err != nil {
-		return err
-	}
-	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
-	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
-		return fmt.Errorf("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be both empty")
-	}
-
-	// Case https to contact Crowdsec LAPI and certificate must be provided
-	if config.CrowdsecLapiScheme == "https" && !config.CrowdsecLapiTLSInsecureVerify {
-		err = validateParamsTLS(config)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func validateParamsTLS(config *Config) error {
-	certAuth, err := getVariable(config, "CrowdsecLapiTLSCertificateAuthority")
-	if err != nil {
-		return err
-	}
-	if certAuth == "" {
-		return fmt.Errorf("CrowdsecLapiTLSCertificateAuthority must be specified when CrowdsecLapiScheme='https' and CrowdsecLapiTLSInsecureVerify=false")
-	}
-	tlsConfig := new(tls.Config)
-	tlsConfig.RootCAs = x509.NewCertPool()
-	if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuth)) {
-		return fmt.Errorf("failed parsing pem file")
-	}
-	return nil
-}
-
-func validateParamsIPs(listIP []string, key string) error {
-	if len(listIP) > 0 {
-		if _, err := ip.NewChecker(listIP); err != nil {
-			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
-		}
-	} else {
-		logger.Debug(fmt.Sprintf("No IP provided for %s", key))
-	}
-	return nil
-}
-
-func validateParamsRequired(config *Config) error {
-	requiredStrings := map[string]string{
-		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
-		"CrowdsecLapiHost":   config.CrowdsecLapiHost,
-		"CrowdsecMode":       config.CrowdsecMode,
-	}
-	requiredInt := map[string]int64{
-		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
-		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
-	}
-	for key, val := range requiredInt {
-		if val < 1 {
-			return fmt.Errorf("%v: cannot be less than 1", key)
-		}
-	}
-	for key, val := range requiredStrings {
-		if len(val) == 0 {
-			return fmt.Errorf("%v: cannot be empty", key)
-		}
-	}
-	if !contains([]string{noneMode, liveMode, streamMode}, config.CrowdsecMode) {
-		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
-	}
-	if !contains([]string{"http", "https"}, config.CrowdsecLapiScheme) {
-		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
-	}
-	return nil
 }
