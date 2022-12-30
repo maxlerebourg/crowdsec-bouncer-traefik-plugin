@@ -8,7 +8,7 @@ Install Docker Desktop
 
 [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
 
-In settings, click on `Kubernetes` menu, and click `Enable Kubernetes`, then `Apply and Restart`.
+In settings, click on `Kubernetes` menu, and click `Enable Kubernetes`, then `Apply and Restart`.  
 In case of any issue, you can reset the cluster from this menu and the button `Reset Kubernetes Cluster`.
 
 ##### Install Traefik
@@ -74,5 +74,5 @@ helm upgrade --install --namespace=crowdsec \
 
 ```bash
 kubectl get pod --namespace traefik-v2
-kubectl logs traefik-698b7997f9-kfnqq --namespace traefik-v2 -f
+kubectl logs $(kubectl get pods --namespace=traefik-v2 --selector "app.kubernetes.io/name=traefik" --output=name) --namespace traefik-v2 -f
 ```
