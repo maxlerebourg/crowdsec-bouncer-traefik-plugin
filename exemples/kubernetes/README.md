@@ -37,7 +37,7 @@ Access the dashboard with: [localhost:9000/dashboard/#/](http://localhost:9000/d
 #### Install the plugin
 
 ```bash
-kubectl apply -f traefik/crowdsec.yml
+kubectl apply -f traefik/plugin.yml
 ```
 
 #### Install Whoami
@@ -76,3 +76,10 @@ helm upgrade --install --namespace=crowdsec \
 kubectl get pod --namespace traefik
 kubectl logs $(kubectl get pods --namespace=traefik --selector "app.kubernetes.io/name=traefik" --output=name) --namespace traefik -f
 ```
+
+#### Use CSCLI in Crowdsec container
+
+```bash
+kubectl -n crowdsec exec -it $(kubectl get pods -n crowdsec --selector "k8s-app=crowdsec,type=lapi" --output=name) bash
+```
+
