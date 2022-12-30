@@ -57,7 +57,7 @@ kubectl --namespace=traefik-v2 port-forward $(kubectl get pods --namespace=traef
 
 Access the whoami with: [localhost:8000/](http://localhost:8000/)
 
-##### Install Crowdsec
+#### Install Crowdsec
 
 [helm/crowdsec/crowdsec](https://artifacthub.io/packages/helm/crowdsec/crowdsec)
 
@@ -68,4 +68,11 @@ kubectl create ns crowdsec
 helm upgrade --install --namespace=crowdsec \
     --values=./crowdsec/values.yml \
     crowdsec crowdsec/crowdsec
+```
+
+#### Read Traefik Logs
+
+```bash
+kubectl get pod --namespace traefik-v2
+kubectl logs traefik-698b7997f9-kfnqq --namespace traefik-v2 -f
 ```
