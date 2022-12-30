@@ -31,7 +31,7 @@ experimental:
   plugins:
     bouncer:
       moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      version: v1.1.5
+      version: v1.1.6
 
 ################################################################
 # Certificate Resolver
