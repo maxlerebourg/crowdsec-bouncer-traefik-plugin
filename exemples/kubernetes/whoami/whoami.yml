@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: whoami
-  namespace: traefik-v2
+  namespace: traefik
   labels:
     app: whoami
 

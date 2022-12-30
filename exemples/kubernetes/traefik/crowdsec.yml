@@ -2,7 +2,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
     name: bouncer
-    namespace: traefik-v2
+    namespace: traefik
 spec:
     plugin:
         bouncer:

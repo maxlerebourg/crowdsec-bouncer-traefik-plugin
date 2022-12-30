@@ -18,8 +18,8 @@ In case of any issue, you can reset the cluster from this menu and the button `R
 ```bash
 helm repo add traefik https://traefik.github.io/charts
 helm repo update
-kubectl create ns traefik-v2
-helm upgrade --install --namespace=traefik-v2 \
+kubectl create ns traefik
+helm upgrade --install --namespace=traefik \
     --values=./traefik/values.yml \
     traefik traefik/traefik
 ```
@@ -29,7 +29,7 @@ helm upgrade --install --namespace=traefik-v2 \
 > Port forward the dashboard:
 
 ```bash
-kubectl --namespace=traefik-v2 port-forward $(kubectl get pods --namespace=traefik-v2 --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
+kubectl --namespace=traefik port-forward $(kubectl get pods --namespace=traefik --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
 ```
 
 Access the dashboard with: [localhost:9000/dashboard/#/](http://localhost:9000/dashboard/#/)
@@ -52,7 +52,7 @@ kubectl apply -f whoami/whoami-ingress.yml
 > Port forward web port of Traefik
 
 ```bash
-kubectl --namespace=traefik-v2 port-forward $(kubectl get pods --namespace=traefik-v2 --selector "app.kubernetes.io/name=traefik" --output=name) 8000:8000
+kubectl --namespace=traefik port-forward $(kubectl get pods --namespace=traefik --selector "app.kubernetes.io/name=traefik" --output=name) 8000:8000
 ```
 
 Access the whoami with: [localhost:8000/](http://localhost:8000/)
@@ -73,6 +73,6 @@ helm upgrade --install --namespace=crowdsec \
 #### Read Traefik Logs
 
 ```bash
-kubectl get pod --namespace traefik-v2
-kubectl logs $(kubectl get pods --namespace=traefik-v2 --selector "app.kubernetes.io/name=traefik" --output=name) --namespace traefik-v2 -f
+kubectl get pod --namespace traefik
+kubectl logs $(kubectl get pods --namespace=traefik --selector "app.kubernetes.io/name=traefik" --output=name) --namespace traefik -f
 ```
