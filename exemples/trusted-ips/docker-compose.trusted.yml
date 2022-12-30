@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   traefik:
-    image: "traefik:v2.9.4"
+    image: "traefik:v2.9.6"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -15,7 +15,7 @@ services:
       - "--entrypoints.web.address=:80"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.1.3"
+      - "--experimental.plugins.bouncer.version=v1.1.7"
       # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -69,7 +69,7 @@ services:
 
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.4.1
+    image: crowdsecurity/crowdsec:v1.4.3
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
