@@ -1,2 +1,13 @@
-additionalArguments:
-  - "--log.level=DEBUG"
+# additionalArguments:
+#   - "--log.level=DEBUG"
+image:
+  tag: v2.9.6
+
+logs:
+  general:
+    level: DEBUG
+  access:
+    enabled: true
+    fields:
+      headers: 
+        defaultmode: keep
