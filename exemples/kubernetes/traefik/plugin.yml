@@ -1,0 +1,14 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+    name: bouncer
+    namespace: traefik
+spec:
+    plugin:
+        bouncer:
+            CrowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
+            Enabled: "true"
+            logLevel: DEBUG
+            crowdsecMode: live
+            crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+            crowdsecLapiScheme: http
