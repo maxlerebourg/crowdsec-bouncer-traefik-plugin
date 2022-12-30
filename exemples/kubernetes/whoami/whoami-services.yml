@@ -11,4 +11,4 @@ spec:
       targetPort: web
 
   selector:
-    app: whoami   
+    app: whoami

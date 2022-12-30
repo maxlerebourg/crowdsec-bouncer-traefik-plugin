@@ -15,11 +15,11 @@ lapi:
     enabled: false
   env:
     - name: ENROLL_KEY
-      value: "40796d93c2958f9e58345514e67740e5"
+      value: 40796d93c2958f9e58345514e67740e5
     - name: ENROLL_INSTANCE_NAME
-      value: "k8s_cluster"
+      value: k8s_cluster
     - name: ENROLL_TAGS
       value: "k8s linux test"
     # If it's a test, we don't want to share signals with CrowdSec so disable the Online API.
     - name: DISABLE_ONLINE_API
-      value: "true"
+      value: true

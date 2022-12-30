@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: whoami
-  namespace: "traefik"
+  namespace: traefik
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: traefik-bouncer@kubernetescrd
     traefik.ingress.kubernetes.io/router.entrypoints: web
@@ -18,4 +18,3 @@ spec:
             name: whoami
             port:
               name: web
-  
