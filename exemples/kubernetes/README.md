@@ -24,6 +24,39 @@ helm upgrade --install --namespace=traefik-v2 \
     traefik traefik/traefik
 ```
 
+#### View the Traefik dashboard
+
+> Port forward the dashboard:
+
+```bash
+kubectl --namespace=traefik-v2 port-forward $(kubectl get pods --namespace=traefik-v2 --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
+```
+
+Access the dashboard with: [localhost:9000/dashboard/#/](http://localhost:9000/dashboard/#/)
+
+#### Install the plugin
+
+```bash
+kubectl apply -f traefik/crowdsec.yml
+```
+
+#### Install Whoami
+```bash
+kubectl apply -f whoami/whoami.yml
+kubectl apply -f whoami/whoami-services.yml
+kubectl apply -f whoami/whoami-ingress.yml
+```
+
+#### Access Whoami
+
+> Port forward web port of Traefik
+
+```bash
+kubectl --namespace=traefik-v2 port-forward $(kubectl get pods --namespace=traefik-v2 --selector "app.kubernetes.io/name=traefik" --output=name) 8000:8000
+```
+
+Access the whoami with: [localhost:8000/](http://localhost:8000/)
+
 ##### Install Crowdsec
 
 [helm/crowdsec/crowdsec](https://artifacthub.io/packages/helm/crowdsec/crowdsec)
