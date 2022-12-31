@@ -201,11 +201,12 @@ func Test_validateParamsAPIKey(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{name: "Validate minimal config", args: args{lapiKey: "test!#$%&'*+-.^_`|~"}, wantErr: false},
-		{name: "Not validate a bad crowdsec scheme", args: args{lapiKey: "test@"}, wantErr: true},
-		{name: "Not validate a bad crowdsec mode", args: args{lapiKey: "test("}, wantErr: true},
-		{name: "Not validate a bad update interval seconds", args: args{lapiKey: "test["}, wantErr: true},
-		{name: "Not validate a bad default decision seconds", args: args{lapiKey: "test?"}, wantErr: true},
+		{name: "Validate all the valid characters", args: args{lapiKey: "test!#$%&'*+-.^_`|~"}, wantErr: false},
+		{name: "Not validate a @", args: args{lapiKey: "test@"}, wantErr: true},
+		{name: "Not validate a (", args: args{lapiKey: "test("}, wantErr: true},
+		{name: "Not validate a [", args: args{lapiKey: "test["}, wantErr: true},
+		{name: "Not validate a ?", args: args{lapiKey: "test?"}, wantErr: true},
+		{name: "Not validate a \\n, (must be trimed before)", args: args{lapiKey: "test\n"}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

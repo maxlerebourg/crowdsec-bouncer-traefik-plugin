@@ -145,7 +145,7 @@ func ValidateParams(config *Config) error {
 	}
 	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
 	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
-		return fmt.Errorf("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be both false")
+		return fmt.Errorf("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be all empty")
 	} else if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
 		lapiKey = strings.TrimSpace(lapiKey)
 		if err = validateParamsAPIKey(lapiKey); err != nil {
@@ -165,13 +165,7 @@ func ValidateParams(config *Config) error {
 
 // validHeaderFieldByte reports whether b is a valid byte in a header
 // field name. RFC 7230 says:
-//
-//	header-field   = field-name ":" OWS field-value OWS
-//	field-name     = token
-//	tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
-//	        "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
-//	token = 1*tchar
-// isTokenTable is a copy of net/http/lex.go's isTokenTable.
+// valid ! # $ % & ' * + - . ^ _ ` | ~ DIGIT ALPHA
 // See https://httpwg.github.io/specs/rfc7230.html#rule.token.separators
 func validateParamsAPIKey(lapiKey string) error {
 	reg := regexp.MustCompile("^[a-zA-Z0-9 !#$%&'*+-.^_`|~]*$")
