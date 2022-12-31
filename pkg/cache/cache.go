@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
+	simpleredis "github.com/maxlerebourg/simpleredis"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
 const (
@@ -67,6 +67,7 @@ func deleteDecisionRedisCache(clientIP string) {
 
 // DeleteDecision delete decision in cache.
 func DeleteDecision(clientIP string) {
+	logger.Debug("cache:DeleteDecision")
 	if redisEnabled {
 		deleteDecisionRedisCache(clientIP)
 	} else {
@@ -77,6 +78,7 @@ func DeleteDecision(clientIP string) {
 // GetDecision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func GetDecision(clientIP string) (bool, error) {
+	logger.Debug("cache:GetDecision")
 	if redisEnabled {
 		return getDecisionRedisCache(clientIP)
 	}
@@ -92,6 +94,7 @@ func SetDecision(clientIP string, isBanned bool, duration int64) {
 	} else {
 		value = cacheNoBannedValue
 	}
+	logger.Debug("cache:SetDecision")
 	if redisEnabled {
 		setDecisionRedisCache(clientIP, value, duration)
 	} else {
