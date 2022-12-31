@@ -10,8 +10,6 @@ import (
 	"net/textproto"
 	"strings"
 	"time"
-
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // Error strings for redis.
@@ -47,9 +45,7 @@ func genRedisArray(params ...[]byte) []byte {
 
 func send(wr *textproto.Writer, method string, data []byte) {
 	if err := wr.PrintfLine(string(data)); err != nil {
-		logger.Error(fmt.Sprintf("redis:%s  %s", method, err.Error()))
-	} else {
-		logger.Debug(fmt.Sprintf("redis:%s", method))
+		fmt.Printf("redis:%s  %s", method, err.Error())
 	}
 }
 
@@ -62,7 +58,7 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 	}
 	defer func() {
 		if err := conn.Close(); err != nil {
-			logger.Error(fmt.Sprintf("redis:connClose %s", err.Error()))
+			fmt.Printf("redis:connClose %s", err.Error())
 		}
 	}()
 
