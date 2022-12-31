@@ -70,6 +70,10 @@ func Test_GetVariable(t *testing.T) {
 }
 
 func Test_ValidateParams(t *testing.T) {
+	cfg1 := New()
+	cfg1.CrowdsecLapiKey = "test\n\n"
+	cfg2 := New()
+	cfg2.CrowdsecLapiKey = "test@"
 	cfg3 := getMinimalConfig()
 	cfg3.CrowdsecMode = "bad"
 	cfg4 := getMinimalConfig()
@@ -90,6 +94,8 @@ func Test_ValidateParams(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "Validate minimal config", args: args{config: getMinimalConfig()}, wantErr: false},
+		{name: "Validate a non trimed crowdsec lapi key", args: args{config: cfg1}, wantErr: false},
+		{name: "Not validate unauthorized character in crowdsec lapi key", args: args{config: cfg2}, wantErr: true},
 		{name: "Not validate an absent crowdsec lapi key", args: args{config: New()}, wantErr: true},
 		{name: "Not validate a not listed item", args: args{config: cfg3}, wantErr: true},
 		{name: "Not validate a bad number", args: args{config: cfg4}, wantErr: true},
@@ -141,8 +147,9 @@ func Test_validateParamsIPs(t *testing.T) {
 		{name: "Not validate localhost", args: args{listIP: []string{0: "localhost"}}, wantErr: true},
 		{name: "Not validate a weird ip", args: args{listIP: []string{0: "0.0.0.0/89"}}, wantErr: true},
 		{name: "Not validate a weird ip 2", args: args{listIP: []string{0: "0.0.0.256/12"}}, wantErr: true},
+		{name: "Validate an ip not trimed", args: args{listIP: []string{0: " 0.0.0.0/0"}}, wantErr: false},
 		{name: "Validate an ip", args: args{listIP: []string{0: "0.0.0.0/12"}}, wantErr: false},
-		{name: "Validate a ip list", args: args{listIP: []string{0: "0.0.0.0/0", 1: "1.1.1.1/1"}}, wantErr: false},
+		{name: "Validate an ip list", args: args{listIP: []string{0: "0.0.0.0/0", 1: "1.1.1.1/1"}}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -180,6 +187,30 @@ func Test_validateParamsRequired(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := validateParamsRequired(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsRequired() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_validateParamsAPIKey(t *testing.T) {
+	type args struct {
+		lapiKey string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{name: "Validate minimal config", args: args{lapiKey: "test!#$%&'*+-.^_`|~"}, wantErr: false},
+		{name: "Not validate a bad crowdsec scheme", args: args{lapiKey: "test@"}, wantErr: true},
+		{name: "Not validate a bad crowdsec mode", args: args{lapiKey: "test("}, wantErr: true},
+		{name: "Not validate a bad update interval seconds", args: args{lapiKey: "test["}, wantErr: true},
+		{name: "Not validate a bad default decision seconds", args: args{lapiKey: "test?"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateParamsAPIKey(tt.args.lapiKey); (err != nil) != tt.wantErr {
+				t.Errorf("validateParamsAPIKey() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

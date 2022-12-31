@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
@@ -144,34 +145,21 @@ func ValidateParams(config *Config) error {
 	}
 	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
 	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
-		return fmt.Errorf("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be both empty")
+		return fmt.Errorf("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be both false")
 	} else if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
-		// check LAPIKey
-		lapiKey = strings.TrimSuffix(lapiKey, "\n")
-		err = validateParamsAPIKey(lapiKey)
-		if err != nil {
+		lapiKey = strings.TrimSpace(lapiKey)
+		if err = validateParamsAPIKey(lapiKey); err != nil {
 			return err
 		}
 	}
 
 	// Case https to contact Crowdsec LAPI and certificate must be provided
 	if config.CrowdsecLapiScheme == HTTPS && !config.CrowdsecLapiTLSInsecureVerify {
-		err = validateParamsTLS(config)
-		if err != nil {
+		if err = validateParamsTLS(config); err != nil {
 			return err
 		}
 	}
 
-	return nil
-}
-
-func validateParamsAPIKey(lapiKey string) error {
-	for i := 0; i < len(lapiKey); i++ {
-		c := lapiKey[i]
-		if !validHeaderFieldByte(c) {
-			return fmt.Errorf("CrowdsecLapiKey contains the following forbidden caracter %q", c)
-		}
-	}
 	return nil
 }
 
@@ -183,89 +171,14 @@ func validateParamsAPIKey(lapiKey string) error {
 //	tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
 //	        "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 //	token = 1*tchar
-func validHeaderFieldByte(b byte) bool {
-	// isTokenTable is a copy of net/http/lex.go's isTokenTable.
-	// See https://httpwg.github.io/specs/rfc7230.html#rule.token.separators
-	var isTokenTable = [127]bool{
-		'!':  true,
-		'#':  true,
-		'$':  true,
-		'%':  true,
-		'&':  true,
-		'\'': true,
-		'*':  true,
-		'+':  true,
-		'-':  true,
-		'.':  true,
-		'0':  true,
-		'1':  true,
-		'2':  true,
-		'3':  true,
-		'4':  true,
-		'5':  true,
-		'6':  true,
-		'7':  true,
-		'8':  true,
-		'9':  true,
-		'A':  true,
-		'B':  true,
-		'C':  true,
-		'D':  true,
-		'E':  true,
-		'F':  true,
-		'G':  true,
-		'H':  true,
-		'I':  true,
-		'J':  true,
-		'K':  true,
-		'L':  true,
-		'M':  true,
-		'N':  true,
-		'O':  true,
-		'P':  true,
-		'Q':  true,
-		'R':  true,
-		'S':  true,
-		'T':  true,
-		'U':  true,
-		'W':  true,
-		'V':  true,
-		'X':  true,
-		'Y':  true,
-		'Z':  true,
-		'^':  true,
-		'_':  true,
-		'`':  true,
-		'a':  true,
-		'b':  true,
-		'c':  true,
-		'd':  true,
-		'e':  true,
-		'f':  true,
-		'g':  true,
-		'h':  true,
-		'i':  true,
-		'j':  true,
-		'k':  true,
-		'l':  true,
-		'm':  true,
-		'n':  true,
-		'o':  true,
-		'p':  true,
-		'q':  true,
-		'r':  true,
-		's':  true,
-		't':  true,
-		'u':  true,
-		'v':  true,
-		'w':  true,
-		'x':  true,
-		'y':  true,
-		'z':  true,
-		'|':  true,
-		'~':  true,
+// isTokenTable is a copy of net/http/lex.go's isTokenTable.
+// See https://httpwg.github.io/specs/rfc7230.html#rule.token.separators
+func validateParamsAPIKey(lapiKey string) error {
+	reg := regexp.MustCompile("^[a-zA-Z0-9 !#$%&'*+-.^_`|~]*$")
+	if !reg.Match([]byte(lapiKey)) {
+		return fmt.Errorf("CrowdsecLapiKey doesn't valid this regexp: '/%s/'", reg.String())
 	}
-	return int(b) < len(isTokenTable) && isTokenTable[b]
+	return nil
 }
 
 func validateParamsTLS(config *Config) error {
