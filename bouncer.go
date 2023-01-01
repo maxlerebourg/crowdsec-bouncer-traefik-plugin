@@ -36,8 +36,6 @@ const (
 //nolint:gochecknoglobals
 var (
 	isCrowdsecStreamHealthy = true
-	crowdsecStreamRoute     string
-	crowdsecHeader          string
 	ticker                  chan bool
 )
 
@@ -63,6 +61,8 @@ type Bouncer struct {
 	updateInterval         int64
 	defaultDecisionTimeout int64
 	customHeader           string
+	crowdsecStreamRoute    string
+	crowdsecHeader         string
 	clientPoolStrategy     *ip.PoolStrategy
 	serverPoolStrategy     *ip.PoolStrategy
 	httpClient             *http.Client
@@ -82,6 +82,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	clientChecker, _ := ip.NewChecker(config.ClientTrustedIPs)
 
 	var tlsConfig *tls.Config
+	crowdsecStreamRoute := ""
+	crowdsecHeader := ""
 	if config.CrowdsecMode == configuration.AloneMode {
 		config.CrowdsecCapiLogin, _ = configuration.GetVariable(config, "CrowdsecCapiLogin")
 		config.CrowdsecCapiPwd, _ = configuration.GetVariable(config, "CrowdsecCapiPwd")
@@ -122,6 +124,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		updateInterval:         config.UpdateIntervalSeconds,
 		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
+		crowdsecStreamRoute: 		crowdsecStreamRoute,
+		crowdsecHeader:         crowdsecHeader,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -149,6 +153,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		})
 		go handleStreamCache(bouncer)
 	}
+	logger.Debug(fmt.Sprintf("New initialized mode:%s", config.CrowdsecMode))
 
 	return bouncer, nil
 }
@@ -186,7 +191,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if bouncer.crowdsecMode != configuration.NoneMode {
 		isBanned, erro := bouncer.cacheClient.GetDecision(remoteIP)
 		if erro != nil {
-			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s %s", remoteIP, erro.Error()))
+			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s isBanned:true %s", remoteIP, erro.Error()))
 			if erro.Error() == simpleredis.RedisUnreachable {
 				rw.WriteHeader(http.StatusForbidden)
 				return
@@ -213,9 +218,10 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	} else {
 		err = handleNoStreamCache(bouncer, remoteIP)
 		if err != nil {
-			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s %s", remoteIP, err.Error()))
+			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:true %s", remoteIP, err.Error()))
 			rw.WriteHeader(http.StatusForbidden)
 		} else {
+			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:false", remoteIP))
 			bouncer.next.ServeHTTP(rw, req)
 		}
 	}
@@ -345,7 +351,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
-		Path:     crowdsecStreamRoute,
+		Path:     bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
@@ -370,6 +376,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.DeleteDecision(decision.Value)
 	}
+	logger.Debug("handleStreamCache:updated")
 	isCrowdsecStreamHealthy = true
 }
 
@@ -386,7 +393,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
-	req.Header.Add(crowdsecHeader, bouncer.crowdsecKey)
+	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)

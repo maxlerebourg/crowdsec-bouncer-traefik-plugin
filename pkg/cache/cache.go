@@ -83,7 +83,7 @@ func (client *Client) New(isRedis bool, host string) {
 	} else {
 		client.cache = &localCache{}
 	}
-	logger.Debug("cache:New initialized")
+	logger.Debug(fmt.Sprintf("cache:New initialized isRedis:%v", isRedis))
 }
 
 // DeleteDecision delete decision in cache.
