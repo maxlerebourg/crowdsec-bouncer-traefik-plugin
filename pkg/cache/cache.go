@@ -18,14 +18,14 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	cache        = ttl_map.New()
-	redis        simpleredis.SimpleRedis
-	redisEnabled = false
+	redis simpleredis.SimpleRedis
+	cache = ttl_map.New()
 )
 
-// FileSystem Cache
+// LocalCache Local cache
+type localCache struct {}
 
-func getDecisionLocalCache(clientIP string) (bool, error) {
+func (localCache) getDecision(clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
 	if isCached && isValid && len(bannedString) > 0 {
@@ -34,17 +34,18 @@ func getDecisionLocalCache(clientIP string) (bool, error) {
 	return false, fmt.Errorf("cache:miss")
 }
 
-func setDecisionLocalCache(clientIP string, value string, duration int64) {
+func (localCache) setDecision(clientIP string, value string, duration int64) {
 	cache.Set(clientIP, value, duration)
 }
 
-func deleteDecisionLocalCache(clientIP string) {
+func (localCache) deleteDecision(clientIP string) {
 	cache.Del(clientIP)
 }
 
-// Redis Cache
+// RedisCache Redis cache
+type redisCache struct {}
 
-func getDecisionRedisCache(clientIP string) (bool, error) {
+func (redisCache) getDecision(clientIP string) (bool, error) {
 	banned, err := redis.Get(clientIP)
 	bannedString := string(banned)
 	if err == nil && len(bannedString) > 0 {
@@ -53,58 +54,58 @@ func getDecisionRedisCache(clientIP string) (bool, error) {
 	return false, err
 }
 
-func setDecisionRedisCache(clientIP string, value string, duration int64) {
+func (redisCache) setDecision(clientIP string, value string, duration int64) {
 	if err := redis.Set(clientIP, []byte(value), duration); err != nil {
 		logger.Error(fmt.Sprintf("cache:setDecisionRedisCache %s", err.Error()))
 	}
 }
 
-func deleteDecisionRedisCache(clientIP string) {
+func (redisCache) deleteDecision(clientIP string) {
 	if err := redis.Del(clientIP); err != nil {
 		logger.Error(fmt.Sprintf("cache:deleteDecisionRedisCache %s", err.Error()))
 	}
 }
 
-// DeleteDecision delete decision in cache.
-func DeleteDecision(clientIP string) {
-	logger.Debug("cache:DeleteDecision")
-	if redisEnabled {
-		deleteDecisionRedisCache(clientIP)
+type CacheInterface interface {
+	setDecision(clientIP string, value string, duration int64)
+	getDecision(clientIP string) (bool, error)
+	deleteDecision(clientIP string)
+}
+type Client struct {
+	cache CacheInterface
+}
+
+func (client *Client) New(isRedis bool, host string) {
+	if (isRedis) {
+		redis.Init(host)
+		client.cache = &redisCache{}
 	} else {
-		deleteDecisionLocalCache(clientIP)
+		client.cache = &localCache{}
 	}
+	logger.Debug("cache:New initialized")
+}
+
+// DeleteDecision delete decision in cache.
+func (client *Client) DeleteDecision(clientIP string) {
+	logger.Debug(fmt.Sprintf("cache:DeleteDecision ip:%v", clientIP))
+	client.cache.deleteDecision(clientIP)
 }
 
 // GetDecision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
-func GetDecision(clientIP string) (bool, error) {
-	logger.Debug("cache:GetDecision")
-	if redisEnabled {
-		return getDecisionRedisCache(clientIP)
-	}
-	return getDecisionLocalCache(clientIP)
+func (client *Client) GetDecision(clientIP string) (bool, error) {
+	logger.Debug(fmt.Sprintf("cache:GetDecision ip:%v", clientIP))
+	return client.cache.getDecision(clientIP)
 }
 
 // SetDecision update the cache with the IP as key and the value banned / not banned.
-func SetDecision(clientIP string, isBanned bool, duration int64) {
+func (client *Client) SetDecision(clientIP string, isBanned bool, duration int64) {
+	logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v isBanned:%v", clientIP, isBanned))
 	var value string
 	if isBanned {
-		logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v banned", clientIP))
 		value = cacheBannedValue
 	} else {
 		value = cacheNoBannedValue
 	}
-	logger.Debug("cache:SetDecision")
-	if redisEnabled {
-		setDecisionRedisCache(clientIP, value, duration)
-	} else {
-		setDecisionLocalCache(clientIP, value, duration)
-	}
-}
-
-// InitRedisClient loads variables.
-func InitRedisClient(host string) {
-	redisEnabled = true
-	redis.Init(host)
-	logger.Debug("cache:InitRedisClient redis:initialized")
+	client.cache.setDecision(clientIP, value, duration)
 }
