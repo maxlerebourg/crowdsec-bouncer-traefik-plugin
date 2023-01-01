@@ -75,7 +75,7 @@ type Client struct {
 	cache cacheInterface
 }
 
-// New Initialize cache client
+// New Initialize cache client.
 func (client *Client) New(isRedis bool, host string) {
 	if isRedis {
 		redis.Init(host)

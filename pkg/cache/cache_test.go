@@ -55,9 +55,7 @@ func Test_SetDecision(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want     bool
-		wantErr  bool
-		valueErr string
+		want bool
 	}{
 		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: true, duration: 0}, want: false},
 		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: true, duration: 10}, want: true},
@@ -84,9 +82,9 @@ func Test_DeleteDecision(t *testing.T) {
 		clientIP string
 	}
 	tests := []struct {
-		name     string
-		args     args
-		want     bool
+		name string
+		args args
+		want bool
 	}{
 		{name: "Delete Known valid IP", args: args{clientIP: IPInCache}, want: false},
 		{name: "Delete Unknown valid IP", args: args{clientIP: IPNotInCache}, want: false},
