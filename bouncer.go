@@ -3,9 +3,9 @@
 package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
-	"crypto/tls"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,10 +35,10 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isCrowdsecStreamHealthy = false
+	isCrowdsecStreamHealthy = true
 	crowdsecStreamRoute     string
+	crowdsecHeader          string
 	ticker                  chan bool
-
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -89,8 +89,10 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		config.CrowdsecLapiScheme = "https"
 		config.UpdateIntervalSeconds = 7200
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
+		crowdsecHeader = crowdsecCapiHeader
 	} else {
 		crowdsecStreamRoute = crowdsecLapiStreamRoute
+		crowdsecHeader = crowdsecLapiHeader
 		tlsConfig, err := configuration.GetTLSConfigCrowdsec(config)
 		if err != nil {
 			logger.Error(fmt.Sprintf("New:getTLSConfigCrowdsec fail to get tlsConfig %s", err.Error()))
@@ -137,7 +139,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		cacheClient: &cache.Client{},
 	}
 	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost)
-	
+
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
 			getToken(bouncer)
@@ -326,6 +328,7 @@ func getToken(bouncer *Bouncer) {
 	if login.Code == 200 && len(login.Token) > 0 {
 		bouncer.crowdsecKey = login.Token
 	}
+	logger.Debug("getToken")
 }
 
 func handleStreamCache(bouncer *Bouncer) {
@@ -383,11 +386,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
-	if bouncer.crowdsecMode == configuration.AloneMode {
-		req.Header.Add(crowdsecCapiHeader, bouncer.crowdsecKey)
-	} else {
-		req.Header.Add(crowdsecLapiHeader, bouncer.crowdsecKey)
-	}
+	req.Header.Add(crowdsecHeader, bouncer.crowdsecKey)
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)

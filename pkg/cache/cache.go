@@ -23,7 +23,7 @@ var (
 )
 
 // LocalCache Local cache
-type localCache struct {}
+type localCache struct{}
 
 func (localCache) getDecision(clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
@@ -43,7 +43,7 @@ func (localCache) deleteDecision(clientIP string) {
 }
 
 // RedisCache Redis cache
-type redisCache struct {}
+type redisCache struct{}
 
 func (redisCache) getDecision(clientIP string) (bool, error) {
 	banned, err := redis.Get(clientIP)
@@ -76,7 +76,7 @@ type Client struct {
 }
 
 func (client *Client) New(isRedis bool, host string) {
-	if (isRedis) {
+	if isRedis {
 		redis.Init(host)
 		client.cache = &redisCache{}
 	} else {
