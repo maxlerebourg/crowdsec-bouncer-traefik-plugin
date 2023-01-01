@@ -112,10 +112,10 @@ make run
   - int64
   - default: 60
   - Used only in `live` mode, decision duration of accepted IPs
-- CrowdsecCapiLogin
+- CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
-- CrowdsecCapiPwd
+- CrowdsecCapiPassword
   - string
   - Used only in `alone` mode, password for Crowdsec CAPI
 - CrowdsecCapiScenarios
@@ -170,11 +170,12 @@ http:
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
           crowdsecLapiTLSInsecureVerify: false
-          crowdsecCapiLogin: login
-          crowdsecCapiPwd: password
+          crowdsecCapiMachineId: login
+          crowdsecCapiPassword: password
           crowdsecCapiScenarios:
-            - scenario1
-            - scenario2
+            - crowdsecurity/http-path-traversal-probing
+            - crowdsecurity/http-xss-probing
+            - crowdsecurity/http-generic-bf
           forwardedHeadersTrustedIPs: 
             - 10.0.10.23/32
             - 10.0.20.0/24
@@ -209,7 +210,7 @@ http:
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiLogin`, `CrowdsecCapiPwd` and `CrowdsecLapiKey` can be provided with the content as raw or through a file path that Traefik can read.  
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword` and `CrowdsecLapiKey` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:  

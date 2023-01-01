@@ -55,8 +55,8 @@ type Bouncer struct {
 	crowdsecHost           string
 	crowdsecKey            string
 	crowdsecMode           string
-	crowdsecLogin          string
-	crowdsecPwd            string
+	crowdsecMachineId      string
+	crowdsecPassword       string
 	crowdsecScenarios      []string
 	updateInterval         int64
 	defaultDecisionTimeout int64
@@ -85,8 +85,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	crowdsecStreamRoute := ""
 	crowdsecHeader := ""
 	if config.CrowdsecMode == configuration.AloneMode {
-		config.CrowdsecCapiLogin, _ = configuration.GetVariable(config, "CrowdsecCapiLogin")
-		config.CrowdsecCapiPwd, _ = configuration.GetVariable(config, "CrowdsecCapiPwd")
+		config.CrowdsecCapiMachineId, _ = configuration.GetVariable(config, "CrowdsecCapiMachineId")
+		config.CrowdsecCapiPassword, _ = configuration.GetVariable(config, "CrowdsecCapiPassword")
 		config.CrowdsecLapiHost = "api.crowdsec.net"
 		config.CrowdsecLapiScheme = "https"
 		config.UpdateIntervalSeconds = 7200
@@ -105,7 +105,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 			logger.Error(fmt.Sprintf("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup %s", err.Error()))
 			return nil, err
 		}
-		config.CrowdsecLapiKey = strings.TrimSuffix(apiKey, "\n")
+		config.CrowdsecLapiKey = apiKey
 	}
 
 	bouncer := &Bouncer{
@@ -118,8 +118,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
 		crowdsecKey:            config.CrowdsecLapiKey,
-		crowdsecLogin:          config.CrowdsecCapiLogin,
-		crowdsecPwd:            config.CrowdsecCapiPwd,
+		crowdsecMachineId:      config.CrowdsecCapiMachineId,
+		crowdsecPassword:       config.CrowdsecCapiPassword,
 		crowdsecScenarios:      config.CrowdsecCapiScenarios,
 		updateInterval:         config.UpdateIntervalSeconds,
 		customHeader:           config.ForwardedHeadersCustomName,
@@ -314,7 +314,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 	return fmt.Errorf("handleNoStreamCache:banned")
 }
 
-func getToken(bouncer *Bouncer) {
+func getToken(bouncer *Bouncer) error {
 	loginURL := url.URL{
 		Scheme: bouncer.crowdsecScheme,
 		Host:   bouncer.crowdsecHost,
@@ -322,19 +322,21 @@ func getToken(bouncer *Bouncer) {
 	}
 	body, err := crowdsecQuery(bouncer, loginURL.String(), true)
 	if err != nil {
-		logger.Error(err.Error())
+		return err
 	}
 	var login Login
 	err = json.Unmarshal(body, &login)
 	if err != nil {
-		logger.Error(fmt.Sprintf("getToken:parsingBody %s", err))
 		isCrowdsecStreamHealthy = false
-		return
+		return fmt.Errorf("getToken:parsingBody %s", err)
 	}
 	if login.Code == 200 && len(login.Token) > 0 {
 		bouncer.crowdsecKey = login.Token
+		logger.Debug(fmt.Sprintf("getToken statusCode:%d", login.Code))
+		return nil
+	} else {
+		return fmt.Errorf("getToken statusCode:%d", login.Code)
 	}
-	logger.Debug("getToken")
 }
 
 func handleStreamCache(bouncer *Bouncer) {
@@ -385,8 +387,8 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	if isPost {
 		data := []byte(fmt.Sprintf(
 			`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
-			bouncer.crowdsecLogin,
-			bouncer.crowdsecPwd,
+			bouncer.crowdsecMachineId,
+			bouncer.crowdsecPassword,
 			strings.Join(bouncer.crowdsecScenarios, `","`),
 		))
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
@@ -399,10 +401,8 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)
 	}
 	if res.StatusCode == http.StatusUnauthorized && bouncer.crowdsecMode == configuration.AloneMode {
-		oldToken := bouncer.crowdsecKey
-		getToken(bouncer)
-		if oldToken == bouncer.crowdsecKey {
-			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, err)
+		if err := getToken(bouncer); err != nil {
+			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, err.Error())
 		}
 		return crowdsecQuery(bouncer, stringURL, false)
 	}

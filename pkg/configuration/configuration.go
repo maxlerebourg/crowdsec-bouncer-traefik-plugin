@@ -43,10 +43,10 @@ type Config struct {
 	CrowdsecLapiTLSCertificateBouncerFile    string   `json:"crowdsecLapiTlsCertificateBouncerFile,omitempty"`
 	CrowdsecLapiTLSCertificateBouncerKey     string   `json:"crowdsecLapiTlsCertificateBouncerKey,omitempty"`
 	CrowdsecLapiTLSCertificateBouncerKeyFile string   `json:"crowdsecLapiTlsCertificateBouncerKeyFile,omitempty"`
-	CrowdsecCapiLogin                        string   `json:"crowdsecCapiLogin,omitempty"`
-	CrowdsecCapiLoginFile                    string   `json:"crowdsecCapiLoginFile,omitempty"`
-	CrowdsecCapiPwd                          string   `json:"crowdsecCapiPwd,omitempty"`
-	CrowdsecCapiPwdFile                      string   `json:"crowdsecCapiPwdFile,omitempty"`
+	CrowdsecCapiMachineId                    string   `json:"crowdsecCapiMachineId,omitempty"`
+	CrowdsecCapiMachineIdFile                string   `json:"crowdsecCapiMachineIdFile,omitempty"`
+	CrowdsecCapiPassword                     string   `json:"crowdsecCapiPassword,omitempty"`
+	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
@@ -106,11 +106,11 @@ func GetVariable(config *Config, key string) (string, error) {
 			return value, fmt.Errorf("%s:%s read file path failed %w", key, fp, err)
 		}
 		value = string(fileValue)
-		return value, nil
+		return strings.TrimSpace(value), nil
 	}
 	field = object.FieldByName(key)
 	value = field.String()
-	return value, nil
+	return strings.TrimSpace(value), nil
 }
 
 // ValidateParams validate all the param gave by user.
@@ -129,10 +129,10 @@ func ValidateParams(config *Config) error {
 	}
 
 	if config.CrowdsecMode == AloneMode {
-		if _, err := GetVariable(config, "CrowdsecCapiLogin"); err != nil {
+		if _, err := GetVariable(config, "CrowdsecCapiMachineId"); err != nil {
 			return err
 		}
-		if _, err := GetVariable(config, "CrowdsecCapiPwd"); err != nil {
+		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
 			return err
 		}
 		return nil

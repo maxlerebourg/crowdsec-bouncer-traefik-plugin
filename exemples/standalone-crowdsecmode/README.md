@@ -9,17 +9,11 @@ curl -X POST "https://api.crowdsec.net/v2/watchers" -H  "accept: application/jso
 These CAPI credentials must be set in your docker-compose.yml or in your config files
 ```yaml
 ...
-traefik:
-  command:
-    ...
-    - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-    - "--experimental.plugins.bouncer.version=v1.0.0"
-    ...
 whoami:
   labels:
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapilogin=LOGIN"
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapipwd=PASSWORD"
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=scenario1, scenario2, ..."
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecCapiMachineId=LOGIN"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecCapiPassword=PASSWORD"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/http-generic-bf,crowdsecurity/http-xss-probing,..."
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
 ```
 
