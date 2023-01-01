@@ -402,7 +402,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	}
 	if res.StatusCode == http.StatusUnauthorized && bouncer.crowdsecMode == configuration.AloneMode {
 		if err := getToken(bouncer); err != nil {
-			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, err.Error())
+			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, err)
 		}
 		return crowdsecQuery(bouncer, stringURL, false)
 	}
