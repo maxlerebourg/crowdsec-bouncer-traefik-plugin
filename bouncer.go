@@ -93,7 +93,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	} else {
 		crowdsecStreamRoute = crowdsecLapiStreamRoute
 		crowdsecHeader = crowdsecLapiHeader
-		tlsConfig, err := configuration.GetTLSConfigCrowdsec(config)
+		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config)
 		if err != nil {
 			logger.Error(fmt.Sprintf("New:getTLSConfigCrowdsec fail to get tlsConfig %s", err.Error()))
 			return nil, err

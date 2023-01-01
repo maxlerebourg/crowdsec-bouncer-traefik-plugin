@@ -22,7 +22,6 @@ var (
 	cache = ttl_map.New()
 )
 
-// LocalCache Local cache
 type localCache struct{}
 
 func (localCache) getDecision(clientIP string) (bool, error) {
@@ -42,7 +41,6 @@ func (localCache) deleteDecision(clientIP string) {
 	cache.Del(clientIP)
 }
 
-// RedisCache Redis cache
 type redisCache struct{}
 
 func (redisCache) getDecision(clientIP string) (bool, error) {
@@ -66,15 +64,18 @@ func (redisCache) deleteDecision(clientIP string) {
 	}
 }
 
-type CacheInterface interface {
+type cacheInterface interface {
 	setDecision(clientIP string, value string, duration int64)
 	getDecision(clientIP string) (bool, error)
 	deleteDecision(clientIP string)
 }
+
+// Client Cache client.
 type Client struct {
-	cache CacheInterface
+	cache cacheInterface
 }
 
+// New Initialize cache client
 func (client *Client) New(isRedis bool, host string) {
 	if isRedis {
 		redis.Init(host)
