@@ -124,7 +124,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		updateInterval:         config.UpdateIntervalSeconds,
 		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
-		crowdsecStreamRoute: 		crowdsecStreamRoute,
+		crowdsecStreamRoute:    crowdsecStreamRoute,
 		crowdsecHeader:         crowdsecHeader,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
