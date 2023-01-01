@@ -6,10 +6,11 @@ import (
 	"testing"
 )
 
-func Test_getDecisionLocalCache(t *testing.T) {
+func Test_GetDecision(t *testing.T) {
 	IPInCache := "10.0.0.10"
 	IPNotInCache := "10.0.0.20"
-	setDecisionLocalCache(IPInCache, "t", 10)
+	client := &Client{cache: &localCache{}}
+	client.SetDecision(IPInCache, true, 10)
 	type args struct {
 		clientIP string
 	}
@@ -22,205 +23,82 @@ func Test_getDecisionLocalCache(t *testing.T) {
 	}{
 		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: true, wantErr: false, valueErr: ""},
 		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: false, wantErr: true, valueErr: "cache:miss"},
-		{name: "Fetch invalid value", args: args{clientIP: "zaeaea"}, want: false, wantErr: true, valueErr: "cache:miss"},
+		{name: "Fetch invalid value", args: args{clientIP: "test"}, want: false, wantErr: true, valueErr: "cache:miss"},
 		{name: "Fetch empty value", args: args{clientIP: ""}, want: false, wantErr: true, valueErr: "cache:miss"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getDecisionLocalCache(tt.args.clientIP)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getDecisionLocalCache() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("getDecisionLocalCache() = %v, want %v", got, tt.want)
-				return
-			}
-			if tt.valueErr != "" && tt.valueErr != err.Error() {
-				t.Errorf("getDecisionLocalCache() err = %v, want %v", err.Error(), tt.valueErr)
-			}
-		})
-	}
-}
-
-func Test_setDecisionLocalCache(t *testing.T) {
-	IPInCache := "10.0.0.10"
-	type args struct {
-		clientIP string
-		value    string
-		duration int64
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{name: "Set valid IP in local cache as t", args: args{clientIP: IPInCache, value: "t", duration: 0}},
-		{name: "Set valid IP in local cache as f", args: args{clientIP: IPInCache, value: "f", duration: 0}},
-		{name: "Set valid IP in local cache as empty str", args: args{clientIP: IPInCache, value: "", duration: 0}},
-		{name: "Set valid IP in local cache as f for -1 sec", args: args{clientIP: IPInCache, value: "f", duration: -1}},
-		{name: "Set valid IP in local cache as f for 10 sec", args: args{clientIP: IPInCache, value: "f", duration: 10}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			setDecisionLocalCache(tt.args.clientIP, tt.args.value, tt.args.duration)
-		})
-	}
-}
-
-func Test_deleteDecisionLocalCache(t *testing.T) {
-	type args struct {
-		clientIP string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			deleteDecisionLocalCache(tt.args.clientIP)
-		})
-	}
-}
-
-func Test_getDecisionRedisCache(t *testing.T) {
-	type args struct {
-		clientIP string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := getDecisionRedisCache(tt.args.clientIP)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getDecisionRedisCache() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("getDecisionRedisCache() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_setDecisionRedisCache(t *testing.T) {
-	type args struct {
-		clientIP string
-		value    string
-		duration int64
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			setDecisionRedisCache(tt.args.clientIP, tt.args.value, tt.args.duration)
-		})
-	}
-}
-
-func Test_deleteDecisionRedisCache(t *testing.T) {
-	type args struct {
-		clientIP string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			deleteDecisionRedisCache(tt.args.clientIP)
-		})
-	}
-}
-
-func TestDeleteDecision(t *testing.T) {
-	type args struct {
-		clientIP string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			DeleteDecision(tt.args.clientIP)
-		})
-	}
-}
-
-func TestGetDecision(t *testing.T) {
-	type args struct {
-		clientIP string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetDecision(tt.args.clientIP)
+			got, err := client.GetDecision(tt.args.clientIP)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetDecision() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
 				t.Errorf("GetDecision() = %v, want %v", got, tt.want)
+				return
+			}
+			if tt.valueErr != "" && tt.valueErr != err.Error() {
+				t.Errorf("GetDecision() err = %v, want %v", err.Error(), tt.valueErr)
 			}
 		})
 	}
 }
 
-func TestSetDecision(t *testing.T) {
+func Test_SetDecision(t *testing.T) {
+	client := &Client{cache: &localCache{}}
+	IPInCache := "10.0.0.10"
 	type args struct {
 		clientIP string
-		isBanned bool
+		value    bool
 		duration int64
 	}
 	tests := []struct {
 		name string
 		args args
+		want     bool
+		wantErr  bool
+		valueErr string
 	}{
-		// TODO: Add test cases.
+		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: true, duration: 0}, want: false},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: true, duration: 10}, want: true},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: false, duration: 10}, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			SetDecision(tt.args.clientIP, tt.args.isBanned, tt.args.duration)
+			client.SetDecision(tt.args.clientIP, tt.args.value, tt.args.duration)
+			got, _ := client.GetDecision(tt.args.clientIP)
+			if got != tt.want {
+				t.Errorf("SetDecision() = %v, want %v", got, tt.want)
+				return
+			}
 		})
 	}
 }
 
-func TestInitRedisClient(t *testing.T) {
+func Test_DeleteDecision(t *testing.T) {
+	IPInCache := "10.0.0.10"
+	IPNotInCache := "10.0.0.20"
+	client := &Client{cache: &localCache{}}
+	client.SetDecision(IPInCache, true, 10)
 	type args struct {
-		host string
+		clientIP string
 	}
 	tests := []struct {
-		name string
-		args args
+		name     string
+		args     args
+		want     bool
 	}{
-		// TODO: Add test cases.
+		{name: "Delete Known valid IP", args: args{clientIP: IPInCache}, want: false},
+		{name: "Delete Unknown valid IP", args: args{clientIP: IPNotInCache}, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			InitRedisClient(tt.args.host)
+			client.DeleteDecision(tt.args.clientIP)
+			got, _ := client.GetDecision(tt.args.clientIP)
+			if got != tt.want {
+				t.Errorf("DeleteDecision() = %v, want %v", got, tt.want)
+				return
+			}
 		})
 	}
 }
