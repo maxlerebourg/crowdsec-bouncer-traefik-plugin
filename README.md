@@ -6,18 +6,18 @@
 
 # Crowdsec Bouncer Traefik plugin
 
-This plugin aims to implement a Crowdsec Bouncer in a traefik plugin.
+This plugin aims to implement a Crowdsec Bouncer in a Traefik plugin.
 
 > [CrowdSec](https://www.crowdsec.net/) is an open-source and collaborative IPS (Intrusion Prevention System) and a security suite.
 > We leverage local behavior analysis and crowd power to build the largest CTI network in the world.
 
-The purpose is to enable treafik to authorize or block requests from IPs based on their reputation and behavior.
+The purpose is to enable Traefik to authorize or block requests from IPs based on their reputation and behavior.
 
-The crowdsec utility will provide the community blocklist which contains highly reported and validated IPs banned from the crowdsec network.
+The Crowdsec utility will provide the community blocklist which contains highly reported and validated IPs banned from the Crowdsec network.
 
-When used with crowdsec it will leverage the local API which will analyze traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns against your website.
+When used with Crowdsec it will leverage the local API which will analyze Traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns used against your website.
 
-There are 3 operating modes (CrowdsecMode) for this plugin:
+There are 4 operating modes (CrowdsecMode) for this plugin:
 
 | Mode | Description |
 |------|------|
@@ -26,10 +26,10 @@ There are 3 operating modes (CrowdsecMode) for this plugin:
 | stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI. |
 | alone | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any localy banned IP, but can work without a crowdsec service. |
 
-The streaming mode is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between traefik and crowdsec. Every request that happens hits the cache for quick decisions.
+The `streaming mode` is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between Traefik and Crowdsec. Every request that happens hits the cache for quick decisions.
 
-The cache can be local to Traefik using the filesystem, or a separate redis instance.  
-Support for Redis is currently in beta (requires version 7.0.X).
+The cache can be local to Traefik using the filesystem, or a separate Redis instance.  
+Support for Redis is currently in beta (requires version 7.0.X of Redis).
 
 ## Usage
 
@@ -42,9 +42,8 @@ make run
 
 ### Note
 
-**/!\ Since Release 1.1.0, the cache is no longer duplicated but shared by all services**
-*This lowers the overhead of the cache in memory and the numbers of cache to fetch it from crowdsec in situations with many services*
-
+**/!\ Cache is shared by all services**
+*This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP*
 
 ### Variables
 - Enabled
@@ -99,11 +98,11 @@ make run
 - RedisCacheEnabled
   - bool
   - default: false
-  - enable redis cache instead of filesystem cache
+  - enable Redis cache instead of filesystem cache
 - RedisCacheHost
   - string 
   - default: "redis:6379"
-  - hostname and port for the redis service
+  - hostname and port for the Redis service
 - UpdateIntervalSeconds
   - int64
   - default: 60
@@ -143,7 +142,7 @@ experimental:
 http:
   routers:
     my-router:
-      rule: host(`woami.localhost`)
+      rule: host(`whoami.localhost`)
       service: service-foo
       entryPoints:
         - web
@@ -224,7 +223,7 @@ Please see below for more details on each option.
 
 #### Generate LAPI KEY
 You can generate a crowdsec API key for the LAPI.  
-You can follow the documentation here: https://docs.crowdsec.net/docs/user_guides/lapi_mgmt/
+You can follow the documentation here: [docs.crowdsec.net/docs/user_guides/lapi_mgmt](https://docs.crowdsec.net/docs/user_guides/lapi_mgmt)
 
 ```bash
 docker-compose -f docker-compose-local.yml up -d crowdsec
@@ -257,7 +256,7 @@ docker-compose up -d
 #### Use certificates to authenticate with CrowdSec
 
 You can follow the example in `exemples/tls-auth` to view how to authenticate with client certificates with the LAPI.  
-In that case communications with the LAPI must go through HTTPS.
+In that case, communications with the LAPI must go through HTTPS.
 
 A script is available to generate certificates in `exemples/tls-auth/gencerts.sh` and must be in the same directory as the inputs for the PKI creation.
 
@@ -267,7 +266,7 @@ To communicate with the LAPI in HTTPS you need to either accept any certificates
 Set the `crowdsecLapiScheme` to https.
 
 Crowdsec must be listening in HTTPS for this to work.
-Please see the tls-auth exemple or the official documentation: [https://docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
+Please see the [tls-auth exemple](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md) or the official documentation: [docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
 
 #### Manually add an IP to the blocklist (for testing purposes)
 
@@ -276,6 +275,22 @@ docker-compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 ```
+
+### Exemples
+
+#### 1. Behind another proxy service (ex: clouflare) [exemples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/behind-proxy/README.md)
+
+#### 2. With Redis as an external shared cache [exemples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/redis-cache/README.md)
+
+#### 3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec [exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
+
+#### 4. Using Crowdsec and Traefik installed as binary in a single VM [exemples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/binary-vm/README.md)
+
+#### 5. Using https communication and tls authentication with Crowdsec [exemples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md)
+
+#### 6. Using Crowdsec and Traefik in Kubernetes [exemples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/kubernetes/README.md)
+
+#### 7. Using Traefik in standalone mode without Crowdsec [exemples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/standalone-mode/README.md)
 
 ### Local Mode
 
@@ -301,7 +316,8 @@ The source code of the plugin should be organized as follows:
                     └── vendor/* 
 ```
 
-For local development, a docker-compose.local.yml is provided which reproduces the directory layout needed by traefik. This works once you have generated and filled your LAPI-KEY (crowdsecLapiKey), if not look below for information
+For local development, a `docker-compose.local.yml` is provided which reproduces the directory layout needed by Traefik.  
+This works once you have generated and filled your *LAPI-KEY* (crowdsecLapiKey), if not read above for informations.
 
 ```bash
 docker-compose -f docker-compose.local.yml up -d
@@ -311,39 +327,13 @@ Equivalent to
 make run_local
 ```
 
-### Examples
-
-1. Behind another proxy service (ex: clouflare)
-
-A complete exemple is available in [exemples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/behind-proxy/README.md)
-
-2. With Redis as an external shared cache
-
-A complete exemple is available in [exemples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/redis-cache/README.md)
-
-3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
-
-A complete exemple is available in [exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
-
-4. Using Crowdsec and Traefik installed as binary in a single VM
-
-A complete exemple is available in [exemples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/binary-vm/README.md)
-
-5. Using https communication and tls authentication with Crowdsec
-
-A complete exemple is available in [exemples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md)
-
-6. Using Crowdsec and Traefik in Kubernetes
-
-A complete exemple is available in [exemples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/kubernetes/README.md)
-
 ### About
 
-Me and [mathieuHa](https://github.com/mathieuHa) have been using traefik since 2020 at [Primadviz](https://primadviz.com).
-We come from a web development and security engineer background and wanted to add the power of a very promising technology (Crowdsec) to the edge router we love.
+[mathieuHa](https://github.com/mathieuHa) and [I](https://github.com/maxlerebourg) have been using Traefik since 2020 at [Primadviz](https://primadviz.com).
+We come from a web development and security engineer background and wanted to add the power of a very promising technology (Crowdsec) to the edge router we love.  
 
-We initially ran into this project: https://github.com/fbonalair/traefik-crowdsec-bouncer
-It was using traefik and forward auth middleware to verify every request.
-They had to go through a webserver which then contacts another webservice (the crowdsec LAPI) to make a decision based on the source IP.
-We initially proposed some improvements by implementing a streaming mode and a local cache.
-With the Traefik hackathon we decided to implement our solution directly as a traefik plugin which could be found by everyone on plugins.traefik.io and be more performant.
+We initially ran into this project: [github.com/fbonalair/traefik-crowdsec-bouncer](https://github.com/fbonalair/traefik-crowdsec-bouncer)
+It was using traefik and forward auth middleware to verify every request.  
+They had to go through a webserver which then contacts another webservice (the crowdsec LAPI) to make a decision based on the source IP.  
+We initially proposed some improvements by implementing a streaming mode and a local cache.  
+With the Traefik hackathon we decided to implement our solution directly as a Traefik plugin which could be found by everyone on [plugins.traefik.io](https://plugins.traefik.io) and be more performant.
