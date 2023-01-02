@@ -223,7 +223,7 @@ Please see below for more details on each option.
 
 #### Generate LAPI KEY
 You can generate a crowdsec API key for the LAPI.  
-You can follow the documentation here: https://docs.crowdsec.net/docs/user_guides/lapi_mgmt/
+You can follow the documentation here: [docs.crowdsec.net/docs/user_guides/lapi_mgmt](https://docs.crowdsec.net/docs/user_guides/lapi_mgmt)
 
 ```bash
 docker-compose -f docker-compose-local.yml up -d crowdsec
