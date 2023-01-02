@@ -332,7 +332,7 @@ make run_local
 [mathieuHa](https://github.com/mathieuHa) and [I](https://github.com/maxlerebourg) have been using Traefik since 2020 at [Primadviz](https://primadviz.com).
 We come from a web development and security engineer background and wanted to add the power of a very promising technology (Crowdsec) to the edge router we love.  
 
-We initially ran into this project: https://github.com/fbonalair/traefik-crowdsec-bouncer
+We initially ran into this project: [github.com/fbonalair/traefik-crowdsec-bouncer](https://github.com/fbonalair/traefik-crowdsec-bouncer)
 It was using traefik and forward auth middleware to verify every request.  
 They had to go through a webserver which then contacts another webservice (the crowdsec LAPI) to make a decision based on the source IP.  
 We initially proposed some improvements by implementing a streaming mode and a local cache.  
