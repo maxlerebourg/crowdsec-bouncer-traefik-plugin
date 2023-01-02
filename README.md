@@ -280,31 +280,31 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 
 #### 1. Behind another proxy service (ex: clouflare)
 
-The exemple is available in [exemples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/behind-proxy/README.md)
+[exemples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/behind-proxy/README.md)
 
 #### 2. With Redis as an external shared cache
 
-The exemple is available in [exemples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/redis-cache/README.md)
+[exemples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/redis-cache/README.md)
 
 #### 3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
 
-The exemple is available in [exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
+[exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
 
 #### 4. Using Crowdsec and Traefik installed as binary in a single VM
 
-The exemple is available in [exemples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/binary-vm/README.md)
+[exemples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/binary-vm/README.md)
 
 #### 5. Using https communication and tls authentication with Crowdsec
 
-The exemple is available in [exemples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md)
+[exemples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md)
 
 #### 6. Using Crowdsec and Traefik in Kubernetes
 
-The exemple is available in [exemples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/kubernetes/README.md)
+[exemples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/kubernetes/README.md)
 
 #### 7. Using Traefik in standalone mode without Crowdsec
 
-The exemple is available in [exemples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/standalone-mode/README.md)
+[exemples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/standalone-mode/README.md)
 
 ### Local Mode
 
