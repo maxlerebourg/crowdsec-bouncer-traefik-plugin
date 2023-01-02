@@ -24,6 +24,7 @@ There are 3 operating modes (CrowdsecMode) for this plugin:
 | none | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. All request call the Crowdsec LAPI |
 | live | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual.    The bouncer can leverage use of a local cache in order to reduce the number of requests made to the Crowdsec LAPI. It will keep in cache the status for  each IP that makes queries. |
 | stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI. |
+| alone | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any localy banned IP, but can work without a crowdsec service. |
 
 The streaming mode is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between traefik and crowdsec. Every request that happens hits the cache for quick decisions.
 
@@ -55,7 +56,7 @@ make run
   - default: `INFO`, expected values are: `INFO`, `DEBUG`
 - CrowdsecMode
   - string
-  - default: `live`, expected values are: `none`, `live`, `stream`
+  - default: `live`, expected values are: `none`, `live`, `stream`, `alone`
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected values are: `http`, `https`
@@ -83,14 +84,6 @@ make run
   - string
   - default: ""
   - PEM-encoded client private key of the Bouncer
-- UpdateIntervalSeconds
-  - int64
-  - default: 60
-  - Used only in `stream` mode, the interval between requests to fetch blacklisted IPs from LAPI
-- DefaultDecisionSeconds
-  - int64
-  - default: 60
-  - Used only in `live` mode, decision duration of accepted IPs
 - ClientTrustedIPs
   - string 
   - default: []
@@ -111,6 +104,23 @@ make run
   - string 
   - default: "redis:6379"
   - hostname and port for the redis service
+- UpdateIntervalSeconds
+  - int64
+  - default: 60
+  - Used only in `stream` mode, the interval between requests to fetch blacklisted IPs from LAPI
+- DefaultDecisionSeconds
+  - int64
+  - default: 60
+  - Used only in `live` mode, decision duration of accepted IPs
+- CrowdsecCapiMachineId
+  - string
+  - Used only in `alone` mode, login for Crowdsec CAPI
+- CrowdsecCapiPassword
+  - string
+  - Used only in `alone` mode, password for Crowdsec CAPI
+- CrowdsecCapiScenarios
+  - []string
+  - Used only in `alone` mode, scenarios for Crowdsec CAPI
 
 ### Configuration
 
@@ -160,6 +170,12 @@ http:
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
           crowdsecLapiTLSInsecureVerify: false
+          crowdsecCapiMachineId: login
+          crowdsecCapiPassword: password
+          crowdsecCapiScenarios:
+            - crowdsecurity/http-path-traversal-probing
+            - crowdsecurity/http-xss-probing
+            - crowdsecurity/http-generic-bf
           forwardedHeadersTrustedIPs: 
             - 10.0.10.23/32
             - 10.0.20.0/24
@@ -190,12 +206,11 @@ http:
             ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
             -----END RSA PRIVATE KEY-----
           crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
-
 ```
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority` and `CrowdsecLapiKey` can be provided with the content as raw or through a file path that Traefik can read.  
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword` and `CrowdsecLapiKey` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:  

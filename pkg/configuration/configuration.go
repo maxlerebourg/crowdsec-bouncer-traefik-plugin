@@ -19,6 +19,7 @@ import (
 
 // Enums for crowdsec mode.
 const (
+	AloneMode  = "alone"
 	StreamMode = "stream"
 	LiveMode   = "live"
 	NoneMode   = "none"
@@ -42,6 +43,11 @@ type Config struct {
 	CrowdsecLapiTLSCertificateBouncerFile    string   `json:"crowdsecLapiTlsCertificateBouncerFile,omitempty"`
 	CrowdsecLapiTLSCertificateBouncerKey     string   `json:"crowdsecLapiTlsCertificateBouncerKey,omitempty"`
 	CrowdsecLapiTLSCertificateBouncerKeyFile string   `json:"crowdsecLapiTlsCertificateBouncerKeyFile,omitempty"`
+	CrowdsecCapiMachineID                    string   `json:"crowdsecCapiMachineId,omitempty"`
+	CrowdsecCapiMachineIDFile                string   `json:"crowdsecCapiMachineIdFile,omitempty"`
+	CrowdsecCapiPassword                     string   `json:"crowdsecCapiPassword,omitempty"`
+	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
+	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedheaderscustomheader,omitempty"`
@@ -100,11 +106,11 @@ func GetVariable(config *Config, key string) (string, error) {
 			return value, fmt.Errorf("%s:%s read file path failed %w", key, fp, err)
 		}
 		value = string(fileValue)
-		return value, nil
+		return strings.TrimSpace(value), nil
 	}
 	field = object.FieldByName(key)
 	value = field.String()
-	return value, nil
+	return strings.TrimSpace(value), nil
 }
 
 // ValidateParams validate all the param gave by user.
@@ -115,6 +121,23 @@ func ValidateParams(config *Config) error {
 		return err
 	}
 
+	if err := validateParamsIPs(config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
+		return err
+	}
+	if err := validateParamsIPs(config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
+		return err
+	}
+
+	if config.CrowdsecMode == AloneMode {
+		if _, err := GetVariable(config, "CrowdsecCapiMachineId"); err != nil {
+			return err
+		}
+		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	// This only check that the format of the URL scheme:// is correct and do not make requests
 	testURL := url.URL{
 		Scheme: config.CrowdsecLapiScheme,
@@ -122,13 +145,6 @@ func ValidateParams(config *Config) error {
 	}
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
 		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
-	}
-
-	if err := validateParamsIPs(config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
-		return err
-	}
-	if err := validateParamsIPs(config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
-		return err
 	}
 
 	lapiKey, err := GetVariable(config, "CrowdsecLapiKey")
@@ -222,8 +238,8 @@ func validateParamsRequired(config *Config) error {
 			return fmt.Errorf("%v: cannot be less than 1", key)
 		}
 	}
-	if !contains([]string{NoneMode, LiveMode, StreamMode}, config.CrowdsecMode) {
-		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live' or 'stream'")
+	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode}, config.CrowdsecMode) {
+		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live', 'stream' or 'alone'")
 	}
 	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
 		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
@@ -237,10 +253,10 @@ func GetTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 	tlsConfig.RootCAs = x509.NewCertPool()
 	//nolint:gocritic
 	if config.CrowdsecLapiScheme != HTTPS {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme not https")
+		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme https:no")
 		return tlsConfig, nil
 	} else if config.CrowdsecLapiTLSInsecureVerify {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify is true")
+		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify tlsInsecure:true")
 		tlsConfig.InsecureSkipVerify = true
 		// If we return here and still want to use client auth this won't work
 		// return tlsConfig, nil

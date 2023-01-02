@@ -8,6 +8,7 @@ import (
 	"testing"
 	"text/template"
 
+	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
@@ -77,7 +78,8 @@ func TestBouncer_ServeHTTP(t *testing.T) {
 		customHeader           string
 		clientPoolStrategy     *ip.PoolStrategy
 		serverPoolStrategy     *ip.PoolStrategy
-		client                 *http.Client
+		httpClient             *http.Client
+		cacheClient            *cache.Client
 	}
 	type args struct {
 		rw  http.ResponseWriter
@@ -106,7 +108,8 @@ func TestBouncer_ServeHTTP(t *testing.T) {
 				customHeader:           tt.fields.customHeader,
 				clientPoolStrategy:     tt.fields.clientPoolStrategy,
 				serverPoolStrategy:     tt.fields.serverPoolStrategy,
-				client:                 tt.fields.client,
+				httpClient:             tt.fields.httpClient,
+				cacheClient:            tt.fields.cacheClient,
 			}
 			bouncer.ServeHTTP(tt.args.rw, tt.args.req)
 		})
@@ -155,6 +158,7 @@ func Test_crowdsecQuery(t *testing.T) {
 	type args struct {
 		bouncer   *Bouncer
 		stringURL string
+		isPost    bool
 	}
 	tests := []struct {
 		name    string
@@ -166,7 +170,7 @@ func Test_crowdsecQuery(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := crowdsecQuery(tt.args.bouncer, tt.args.stringURL)
+			got, err := crowdsecQuery(tt.args.bouncer, tt.args.stringURL, tt.args.isPost)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("crowdsecQuery() error = %v, wantErr %v", err, tt.wantErr)
 				return

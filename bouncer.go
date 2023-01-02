@@ -5,6 +5,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,14 +25,17 @@ import (
 
 const (
 	crowdsecLapiHeader      = "X-Api-Key"
+	crowdsecCapiHeader      = "Authorization"
 	crowdsecLapiRoute       = "v1/decisions"
 	crowdsecLapiStreamRoute = "v1/decisions/stream"
+	crowdsecCapiLogin       = "v2/watchers/login"
+	crowdsecCapiStreamRoute = "v2/decisions/stream"
 	cacheTimeoutKey         = "updated"
 )
 
 //nolint:gochecknoglobals
 var (
-	isCrowdsecStreamHealthy = false
+	isCrowdsecStreamHealthy = true
 	ticker                  chan bool
 )
 
@@ -51,12 +55,18 @@ type Bouncer struct {
 	crowdsecHost           string
 	crowdsecKey            string
 	crowdsecMode           string
+	crowdsecMachineID      string
+	crowdsecPassword       string
+	crowdsecScenarios      []string
 	updateInterval         int64
 	defaultDecisionTimeout int64
 	customHeader           string
+	crowdsecStreamRoute    string
+	crowdsecHeader         string
 	clientPoolStrategy     *ip.PoolStrategy
 	serverPoolStrategy     *ip.PoolStrategy
-	client                 *http.Client
+	httpClient             *http.Client
+	cacheClient            *cache.Client
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -64,24 +74,39 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	logger.Init(config.LogLevel)
 	err := configuration.ValidateParams(config)
 	if err != nil {
-		logger.Info(fmt.Sprintf("New:validateParams %s", err.Error()))
+		logger.Error(fmt.Sprintf("New:validateParams %s", err.Error()))
 		return nil, err
 	}
 
 	serverChecker, _ := ip.NewChecker(config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(config.ClientTrustedIPs)
 
-	tlsConfig, err := configuration.GetTLSConfigCrowdsec(config)
-	if err != nil {
-		logger.Error(fmt.Sprintf("New:getTLSConfigCrowdsec fail to get tlsConfig %s", err.Error()))
-		return nil, err
+	var tlsConfig *tls.Config
+	crowdsecStreamRoute := ""
+	crowdsecHeader := ""
+	if config.CrowdsecMode == configuration.AloneMode {
+		config.CrowdsecCapiMachineID, _ = configuration.GetVariable(config, "CrowdsecCapiMachineId")
+		config.CrowdsecCapiPassword, _ = configuration.GetVariable(config, "CrowdsecCapiPassword")
+		config.CrowdsecLapiHost = "api.crowdsec.net"
+		config.CrowdsecLapiScheme = "https"
+		config.UpdateIntervalSeconds = 7200
+		crowdsecStreamRoute = crowdsecCapiStreamRoute
+		crowdsecHeader = crowdsecCapiHeader
+	} else {
+		crowdsecStreamRoute = crowdsecLapiStreamRoute
+		crowdsecHeader = crowdsecLapiHeader
+		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config)
+		if err != nil {
+			logger.Error(fmt.Sprintf("New:getTLSConfigCrowdsec fail to get tlsConfig %s", err.Error()))
+			return nil, err
+		}
+		apiKey, errAPIKey := configuration.GetVariable(config, "CrowdsecLapiKey")
+		if errAPIKey != nil && len(tlsConfig.Certificates) == 0 {
+			logger.Error(fmt.Sprintf("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup %s", errAPIKey.Error()))
+			return nil, err
+		}
+		config.CrowdsecLapiKey = apiKey
 	}
-	apiKey, err := configuration.GetVariable(config, "CrowdsecLapiKey")
-	if err != nil && len(tlsConfig.Certificates) == 0 {
-		logger.Error(fmt.Sprintf("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup %s", err.Error()))
-		return nil, err
-	}
-	apiKey = strings.TrimSuffix(apiKey, "\n")
 
 	bouncer := &Bouncer{
 		next:     next,
@@ -92,17 +117,22 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		crowdsecMode:           config.CrowdsecMode,
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
-		crowdsecKey:            apiKey,
+		crowdsecKey:            config.CrowdsecLapiKey,
+		crowdsecMachineID:      config.CrowdsecCapiMachineID,
+		crowdsecPassword:       config.CrowdsecCapiPassword,
+		crowdsecScenarios:      config.CrowdsecCapiScenarios,
 		updateInterval:         config.UpdateIntervalSeconds,
 		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
+		crowdsecStreamRoute:    crowdsecStreamRoute,
+		crowdsecHeader:         crowdsecHeader,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
 		clientPoolStrategy: &ip.PoolStrategy{
 			Checker: clientChecker,
 		},
-		client: &http.Client{
+		httpClient: &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConns:    10,
 				IdleConnTimeout: 30 * time.Second,
@@ -110,16 +140,24 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 			},
 			Timeout: 10 * time.Second,
 		},
+		cacheClient: &cache.Client{},
 	}
-	if config.RedisCacheEnabled {
-		cache.InitRedisClient(config.RedisCacheHost)
-	}
-	if config.CrowdsecMode == configuration.StreamMode && ticker == nil {
+	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost)
+
+	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
+		if config.CrowdsecMode == configuration.AloneMode {
+			err = getToken(bouncer)
+			if err != nil {
+				logger.Error(fmt.Sprintf("New:getToken %s", err.Error()))
+				return nil, err
+			}
+		}
 		ticker = startTicker(config, func() {
 			handleStreamCache(bouncer)
 		})
 		go handleStreamCache(bouncer)
 	}
+	logger.Debug(fmt.Sprintf("New initialized mode:%s", config.CrowdsecMode))
 
 	return bouncer, nil
 }
@@ -155,9 +193,9 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
-		isBanned, erro := cache.GetDecision(remoteIP)
+		isBanned, erro := bouncer.cacheClient.GetDecision(remoteIP)
 		if erro != nil {
-			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s %s", remoteIP, erro.Error()))
+			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s isBanned:true %s", remoteIP, erro.Error()))
 			if erro.Error() == simpleredis.RedisUnreachable {
 				rw.WriteHeader(http.StatusForbidden)
 				return
@@ -174,19 +212,20 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Right here if we cannot join the stream we forbid the request to go on.
-	if bouncer.crowdsecMode == configuration.StreamMode {
+	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
 			bouncer.next.ServeHTTP(rw, req)
 		} else {
-			logger.Error(fmt.Sprintf("ServeHTTP:isCrowdsecStreamHealthy ip:%s", remoteIP))
+			logger.Error(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
 			rw.WriteHeader(http.StatusForbidden)
 		}
 	} else {
 		err = handleNoStreamCache(bouncer, remoteIP)
 		if err != nil {
-			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s %s", remoteIP, err.Error()))
+			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:true %s", remoteIP, err.Error()))
 			rw.WriteHeader(http.StatusForbidden)
 		} else {
+			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:false", remoteIP))
 			bouncer.next.ServeHTTP(rw, req)
 		}
 	}
@@ -211,6 +250,13 @@ type Decision struct {
 type Stream struct {
 	Deleted []Decision `json:"deleted"`
 	New     []Decision `json:"new"`
+}
+
+// Login Body returned from Crowdsec Login CAPI.
+type Login struct {
+	Code   int    `json:"code"`
+	Token  string `json:"token"`
+	Expire string `json:"expire"`
 }
 
 func startTicker(config *configuration.Config, work func()) chan bool {
@@ -239,14 +285,14 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 		Path:     crowdsecLapiRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
 	}
-	body, err := crowdsecQuery(bouncer, routeURL.String())
+	body, err := crowdsecQuery(bouncer, routeURL.String(), false)
 	if err != nil {
 		return err
 	}
 
 	if bytes.Equal(body, []byte("null")) {
 		if isLiveMode {
-			cache.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
+			bouncer.cacheClient.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
 		}
 		return nil
 	}
@@ -258,7 +304,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 	}
 	if len(decisions) == 0 {
 		if isLiveMode {
-			cache.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
+			bouncer.cacheClient.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
 		}
 		return nil
 	}
@@ -267,9 +313,33 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 		return fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
 	if isLiveMode {
-		cache.SetDecision(remoteIP, true, int64(duration.Seconds()))
+		bouncer.cacheClient.SetDecision(remoteIP, true, int64(duration.Seconds()))
 	}
 	return fmt.Errorf("handleNoStreamCache:banned")
+}
+
+func getToken(bouncer *Bouncer) error {
+	loginURL := url.URL{
+		Scheme: bouncer.crowdsecScheme,
+		Host:   bouncer.crowdsecHost,
+		Path:   crowdsecCapiLogin,
+	}
+	body, err := crowdsecQuery(bouncer, loginURL.String(), true)
+	if err != nil {
+		return err
+	}
+	var login Login
+	err = json.Unmarshal(body, &login)
+	if err != nil {
+		isCrowdsecStreamHealthy = false
+		return fmt.Errorf("getToken:parsingBody %w", err)
+	}
+	if login.Code == 200 && len(login.Token) > 0 {
+		bouncer.crowdsecKey = login.Token
+		logger.Debug(fmt.Sprintf("getToken statusCode:%d", login.Code))
+		return nil
+	}
+	return fmt.Errorf("getToken statusCode:%d", login.Code)
 }
 
 func handleStreamCache(bouncer *Bouncer) {
@@ -277,19 +347,19 @@ func handleStreamCache(bouncer *Bouncer) {
 	// Instead of blocking the goroutine interval for all the secondary node,
 	// if the master service is shut down, other goroutine can take the lead
 	// because updated routine information is in the cache
-	_, err := cache.GetDecision(cacheTimeoutKey)
+	_, err := bouncer.cacheClient.GetDecision(cacheTimeoutKey)
 	if err == nil {
 		logger.Debug("handleStreamCache:alreadyUpdated")
 		return
 	}
-	cache.SetDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
+	bouncer.cacheClient.SetDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
-		Path:     crowdsecLapiStreamRoute,
+		Path:     bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy),
 	}
-	body, err := crowdsecQuery(bouncer, streamRouteURL.String())
+	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
 	if err != nil {
 		logger.Error(err.Error())
 		isCrowdsecStreamHealthy = false
@@ -305,22 +375,39 @@ func handleStreamCache(bouncer *Bouncer) {
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
-			cache.SetDecision(decision.Value, true, int64(duration.Seconds()))
+			bouncer.cacheClient.SetDecision(decision.Value, true, int64(duration.Seconds()))
 		}
 	}
 	for _, decision := range stream.Deleted {
-		cache.DeleteDecision(decision.Value)
+		bouncer.cacheClient.DeleteDecision(decision.Value)
 	}
+	logger.Debug("handleStreamCache:updated")
 	isCrowdsecStreamHealthy = true
 }
 
-func crowdsecQuery(bouncer *Bouncer, stringURL string) ([]byte, error) {
+func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, error) {
 	var req *http.Request
-	req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
-	req.Header.Add(crowdsecLapiHeader, bouncer.crowdsecKey)
-	res, err := bouncer.client.Do(req)
+	if isPost {
+		data := []byte(fmt.Sprintf(
+			`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
+			bouncer.crowdsecMachineID,
+			bouncer.crowdsecPassword,
+			strings.Join(bouncer.crowdsecScenarios, `","`),
+		))
+		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
+	} else {
+		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
+	}
+	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
+	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)
+	}
+	if res.StatusCode == http.StatusUnauthorized && bouncer.crowdsecMode == configuration.AloneMode {
+		if errToken := getToken(bouncer); errToken != nil {
+			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
+		}
+		return crowdsecQuery(bouncer, stringURL, false)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("crowdsecQuery url:%s, statusCode:%d", stringURL, res.StatusCode)
