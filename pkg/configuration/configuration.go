@@ -43,8 +43,8 @@ type Config struct {
 	CrowdsecLapiTLSCertificateBouncerFile    string   `json:"crowdsecLapiTlsCertificateBouncerFile,omitempty"`
 	CrowdsecLapiTLSCertificateBouncerKey     string   `json:"crowdsecLapiTlsCertificateBouncerKey,omitempty"`
 	CrowdsecLapiTLSCertificateBouncerKeyFile string   `json:"crowdsecLapiTlsCertificateBouncerKeyFile,omitempty"`
-	CrowdsecCapiMachineId                    string   `json:"crowdsecCapiMachineId,omitempty"`
-	CrowdsecCapiMachineIdFile                string   `json:"crowdsecCapiMachineIdFile,omitempty"`
+	CrowdsecCapiMachineID                    string   `json:"crowdsecCapiMachineId,omitempty"`
+	CrowdsecCapiMachineIDFile                string   `json:"crowdsecCapiMachineIdFile,omitempty"`
 	CrowdsecCapiPassword                     string   `json:"crowdsecCapiPassword,omitempty"`
 	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
