@@ -343,7 +343,7 @@ make run_local
 
 ### About
 
-[mathieuHa](https://github.com/mathieuHa) and [I](https://github.com/mathieuHa) have been using Traefik since 2020 at [Primadviz](https://primadviz.com).
+[mathieuHa](https://github.com/mathieuHa) and [I](https://github.com/maxlerebourg) have been using Traefik since 2020 at [Primadviz](https://primadviz.com).
 We come from a web development and security engineer background and wanted to add the power of a very promising technology (Crowdsec) to the edge router we love.  
 
 We initially ran into this project: https://github.com/fbonalair/traefik-crowdsec-bouncer
