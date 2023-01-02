@@ -266,7 +266,7 @@ To communicate with the LAPI in HTTPS you need to either accept any certificates
 Set the `crowdsecLapiScheme` to https.
 
 Crowdsec must be listening in HTTPS for this to work.
-Please see the tls-auth exemple or the official documentation: [https://docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
+Please see the [tls-auth exemple](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md) or the official documentation: [https://docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
 
 #### Manually add an IP to the blocklist (for testing purposes)
 
@@ -330,7 +330,8 @@ The source code of the plugin should be organized as follows:
                     └── vendor/* 
 ```
 
-For local development, a docker-compose.local.yml is provided which reproduces the directory layout needed by traefik. This works once you have generated and filled your LAPI-KEY (crowdsecLapiKey), if not look below for information
+For local development, a `docker-compose.local.yml` is provided which reproduces the directory layout needed by Traefik.  
+This works once you have generated and filled your *LAPI-KEY* (crowdsecLapiKey), if not read above for informations.
 
 ```bash
 docker-compose -f docker-compose.local.yml up -d
