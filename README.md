@@ -288,7 +288,7 @@ The exemple is available in [exemples/redis-cache/README.md](https://github.com/
 
 #### 3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
 
-A complete exemple is available in [exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
+The exemple is available in [exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
 
 #### 4. Using Crowdsec and Traefik installed as binary in a single VM
 
