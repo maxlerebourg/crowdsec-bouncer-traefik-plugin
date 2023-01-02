@@ -142,7 +142,7 @@ experimental:
 http:
   routers:
     my-router:
-      rule: host(`woami.localhost`)
+      rule: host(`whoami.localhost`)
       service: service-foo
       entryPoints:
         - web
@@ -256,7 +256,7 @@ docker-compose up -d
 #### Use certificates to authenticate with CrowdSec
 
 You can follow the example in `exemples/tls-auth` to view how to authenticate with client certificates with the LAPI.  
-In that case communications with the LAPI must go through HTTPS.
+In that case, communications with the LAPI must go through HTTPS.
 
 A script is available to generate certificates in `exemples/tls-auth/gencerts.sh` and must be in the same directory as the inputs for the PKI creation.
 
@@ -275,6 +275,36 @@ docker-compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 ```
+
+### Examples
+
+#### 1. Behind another proxy service (ex: clouflare)
+
+The exemple is available in [exemples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/behind-proxy/README.md)
+
+#### 2. With Redis as an external shared cache
+
+The exemple is available in [exemples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/redis-cache/README.md)
+
+#### 3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
+
+A complete exemple is available in [exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
+
+#### 4. Using Crowdsec and Traefik installed as binary in a single VM
+
+The exemple is available in [exemples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/binary-vm/README.md)
+
+#### 5. Using https communication and tls authentication with Crowdsec
+
+The exemple is available in [exemples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md)
+
+#### 6. Using Crowdsec and Traefik in Kubernetes
+
+The exemple is available in [exemples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/kubernetes/README.md)
+
+#### 7. Using Traefik in standalone mode without Crowdsec
+
+The exemple is available in [exemples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/standalone-mode/README.md)
 
 ### Local Mode
 
@@ -310,43 +340,13 @@ Equivalent to
 make run_local
 ```
 
-### Examples
-
-#### 1. Behind another proxy service (ex: clouflare)
-
-The exemple is available in [exemples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/behind-proxy/README.md)
-
-#### 2. With Redis as an external shared cache
-
-The exemple is available in [exemples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/redis-cache/README.md)
-
-#### 3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
-
-A complete exemple is available in [exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
-
-#### 4. Using Crowdsec and Traefik installed as binary in a single VM
-
-The exemple is available in [exemples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/binary-vm/README.md)
-
-#### 5. Using https communication and tls authentication with Crowdsec
-
-The exemple is available in [exemples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md)
-
-#### 6. Using Crowdsec and Traefik in Kubernetes
-
-The exemple is available in [exemples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/kubernetes/README.md)
-
-#### 7. Using Traefik in standalone mode without Crowdsec
-
-The exemple is available in [exemples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/standalone-mode/README.md)
-
 ### About
 
-Me and [mathieuHa](https://github.com/mathieuHa) have been using traefik since 2020 at [Primadviz](https://primadviz.com).
-We come from a web development and security engineer background and wanted to add the power of a very promising technology (Crowdsec) to the edge router we love.
+[mathieuHa](https://github.com/mathieuHa) and [I](https://github.com/mathieuHa) have been using Traefik since 2020 at [Primadviz](https://primadviz.com).
+We come from a web development and security engineer background and wanted to add the power of a very promising technology (Crowdsec) to the edge router we love.  
 
 We initially ran into this project: https://github.com/fbonalair/traefik-crowdsec-bouncer
-It was using traefik and forward auth middleware to verify every request.
-They had to go through a webserver which then contacts another webservice (the crowdsec LAPI) to make a decision based on the source IP.
-We initially proposed some improvements by implementing a streaming mode and a local cache.
-With the Traefik hackathon we decided to implement our solution directly as a traefik plugin which could be found by everyone on plugins.traefik.io and be more performant.
+It was using traefik and forward auth middleware to verify every request.  
+They had to go through a webserver which then contacts another webservice (the crowdsec LAPI) to make a decision based on the source IP.  
+We initially proposed some improvements by implementing a streaming mode and a local cache.  
+With the Traefik hackathon we decided to implement our solution directly as a Traefik plugin which could be found by everyone on [plugins.traefik.io](https://plugins.traefik.io) and be more performant.
