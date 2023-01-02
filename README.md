@@ -6,18 +6,18 @@
 
 # Crowdsec Bouncer Traefik plugin
 
-This plugin aims to implement a Crowdsec Bouncer in a traefik plugin.
+This plugin aims to implement a Crowdsec Bouncer in a Traefik plugin.
 
 > [CrowdSec](https://www.crowdsec.net/) is an open-source and collaborative IPS (Intrusion Prevention System) and a security suite.
 > We leverage local behavior analysis and crowd power to build the largest CTI network in the world.
 
-The purpose is to enable treafik to authorize or block requests from IPs based on their reputation and behavior.
+The purpose is to enable Traefik to authorize or block requests from IPs based on their reputation and behavior.
 
-The crowdsec utility will provide the community blocklist which contains highly reported and validated IPs banned from the crowdsec network.
+The Crowdsec utility will provide the community blocklist which contains highly reported and validated IPs banned from the Crowdsec network.
 
-When used with crowdsec it will leverage the local API which will analyze traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns against your website.
+When used with Crowdsec it will leverage the local API which will analyze Traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns used against your website.
 
-There are 3 operating modes (CrowdsecMode) for this plugin:
+There are 4 operating modes (CrowdsecMode) for this plugin:
 
 | Mode | Description |
 |------|------|
@@ -26,10 +26,10 @@ There are 3 operating modes (CrowdsecMode) for this plugin:
 | stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI. |
 | alone | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any localy banned IP, but can work without a crowdsec service. |
 
-The streaming mode is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between traefik and crowdsec. Every request that happens hits the cache for quick decisions.
+The `streaming mode` is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between Traefik and Crowdsec. Every request that happens hits the cache for quick decisions.
 
 The cache can be local to Traefik using the filesystem, or a separate redis instance.  
-Support for Redis is currently in beta (requires version 7.0.X).
+Support for Redis is currently in beta (requires version 7.0.X of redis).
 
 ## Usage
 
@@ -42,9 +42,8 @@ make run
 
 ### Note
 
-**/!\ Since Release 1.1.0, the cache is no longer duplicated but shared by all services**
-*This lowers the overhead of the cache in memory and the numbers of cache to fetch it from crowdsec in situations with many services*
-
+**/!\ Cache is shared by all services**
+*This means if an IP is banned, all services which are protected by an instance of a plugin will deny requests from that IP*
 
 ### Variables
 - Enabled
@@ -313,29 +312,33 @@ make run_local
 
 ### Examples
 
-1. Behind another proxy service (ex: clouflare)
+#### 1. Behind another proxy service (ex: clouflare)
 
 A complete exemple is available in [exemples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/behind-proxy/README.md)
 
-2. With Redis as an external shared cache
+#### 2. With Redis as an external shared cache
 
 A complete exemple is available in [exemples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/redis-cache/README.md)
 
-3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
+#### 3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
 
 A complete exemple is available in [exemples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/trusted-ips/README.md)
 
-4. Using Crowdsec and Traefik installed as binary in a single VM
+#### 4. Using Crowdsec and Traefik installed as binary in a single VM
 
 A complete exemple is available in [exemples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/binary-vm/README.md)
 
-5. Using https communication and tls authentication with Crowdsec
+#### 5. Using https communication and tls authentication with Crowdsec
 
 A complete exemple is available in [exemples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/tls-auth/README.md)
 
-6. Using Crowdsec and Traefik in Kubernetes
+#### 6. Using Crowdsec and Traefik in Kubernetes
 
 A complete exemple is available in [exemples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/kubernetes/README.md)
+
+#### 6. Using Traefik in standalone mode without Crowdsec
+
+A complete exemple is available in [exemples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/exemples/standalone-mode/README.md)
 
 ### About
 
