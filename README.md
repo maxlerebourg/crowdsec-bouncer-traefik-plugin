@@ -110,7 +110,7 @@ make run
 - DefaultDecisionSeconds
   - int64
   - default: 60
-  - Used only in `live` mode, decision duration of accepted IPs
+  - Used only in `live` mode, maximum decision duration
 - CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI

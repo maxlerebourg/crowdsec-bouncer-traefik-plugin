@@ -101,7 +101,7 @@ func (client *Client) GetDecision(clientIP string) (bool, error) {
 
 // SetDecision update the cache with the IP as key and the value banned / not banned.
 func (client *Client) SetDecision(clientIP string, isBanned bool, duration int64) {
-	logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v isBanned:%v", clientIP, isBanned))
+	logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v isBanned:%v duration:%vs", clientIP, isBanned, duration))
 	var value string
 	if isBanned {
 		value = cacheBannedValue

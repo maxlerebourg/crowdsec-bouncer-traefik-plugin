@@ -313,7 +313,11 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 		return fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
 	if isLiveMode {
-		bouncer.cacheClient.SetDecision(remoteIP, true, int64(duration.Seconds()))
+		durationSecond := int64(duration.Seconds())
+		if bouncer.defaultDecisionTimeout < durationSecond {
+			durationSecond = bouncer.defaultDecisionTimeout
+		}
+		bouncer.cacheClient.SetDecision(remoteIP, true, durationSecond)
 	}
 	return fmt.Errorf("handleNoStreamCache:banned")
 }
