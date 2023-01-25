@@ -11,10 +11,11 @@ These CAPI credentials must be set in your docker-compose.yml or in your config 
 ...
 whoami:
   labels:
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecMode=alone"
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecCapiMachineId=LOGIN"
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecCapiPassword=PASSWORD"
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/http-generic-bf,crowdsecurity/http-xss-probing,..."
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecCapiScenarios=crowdsecurity/http-generic-bf,crowdsecurity/http-xss-probing,..."
 ```
 
 You can then run all the containers:

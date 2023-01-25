@@ -129,7 +129,7 @@ func ValidateParams(config *Config) error {
 	}
 
 	if config.CrowdsecMode == AloneMode {
-		if _, err := GetVariable(config, "CrowdsecCapiMachineId"); err != nil {
+		if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
 			return err
 		}
 		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {

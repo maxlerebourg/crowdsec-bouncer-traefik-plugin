@@ -85,7 +85,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	crowdsecStreamRoute := ""
 	crowdsecHeader := ""
 	if config.CrowdsecMode == configuration.AloneMode {
-		config.CrowdsecCapiMachineID, _ = configuration.GetVariable(config, "CrowdsecCapiMachineId")
+		config.CrowdsecCapiMachineID, _ = configuration.GetVariable(config, "CrowdsecCapiMachineID")
 		config.CrowdsecCapiPassword, _ = configuration.GetVariable(config, "CrowdsecCapiPassword")
 		config.CrowdsecLapiHost = "api.crowdsec.net"
 		config.CrowdsecLapiScheme = "https"
