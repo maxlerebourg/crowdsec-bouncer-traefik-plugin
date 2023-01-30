@@ -15,6 +15,8 @@ const (
 	cacheBannedValue   = "t"
 	cacheNoBannedValue = "f"
 )
+// CacheMiss error string when cache is miss
+const	CacheMiss = "cache:miss"
 
 //nolint:gochecknoglobals
 var (
@@ -30,7 +32,7 @@ func (localCache) getDecision(clientIP string) (bool, error) {
 	if isCached && isValid && len(bannedString) > 0 {
 		return bannedString == cacheBannedValue, nil
 	}
-	return false, fmt.Errorf("cache:miss")
+	return false, fmt.Errorf(CacheMiss)
 }
 
 func (localCache) setDecision(clientIP string, value string, duration int64) {
@@ -48,6 +50,9 @@ func (redisCache) getDecision(clientIP string) (bool, error) {
 	bannedString := string(banned)
 	if err == nil && len(bannedString) > 0 {
 		return bannedString == cacheBannedValue, nil
+	}
+	if err.Error() == simpleredis.RedisMiss {
+		return false, fmt.Errorf(CacheMiss) 
 	}
 	return false, err
 }
