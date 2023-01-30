@@ -15,7 +15,8 @@ const (
 	cacheBannedValue   = "t"
 	cacheNoBannedValue = "f"
 )
-// CacheMiss error string when cache is miss
+
+// CacheMiss error string when cache is miss.
 const	CacheMiss = "cache:miss"
 
 //nolint:gochecknoglobals
