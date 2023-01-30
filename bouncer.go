@@ -35,6 +35,7 @@ const (
 
 //nolint:gochecknoglobals
 var (
+	isStartup               = true
 	isCrowdsecStreamHealthy = true
 	ticker                  chan bool
 )
@@ -155,7 +156,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		ticker = startTicker(config, func() {
 			handleStreamCache(bouncer)
 		})
-		go handleStreamCache(bouncer)
+		handleStreamCache(bouncer)
+		isStartup = false
 	}
 	logger.Debug(fmt.Sprintf("New initialized mode:%s", config.CrowdsecMode))
 
@@ -193,10 +195,12 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
-		isBanned, erro := bouncer.cacheClient.GetDecision(remoteIP)
-		if erro != nil {
-			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s isBanned:true %s", remoteIP, erro.Error()))
-			if erro.Error() == simpleredis.RedisUnreachable {
+		isBanned, cacheErr := bouncer.cacheClient.GetDecision(remoteIP)
+		if cacheErr != nil {
+			errString := cacheErr.Error()
+			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s isBanned:false %s", remoteIP, errString))
+			if errString != cache.CacheMiss {
+				logger.Error(fmt.Sprintf("ServeHTTP:getDecision ip:%s %s", remoteIP, errString))
 				rw.WriteHeader(http.StatusForbidden)
 				return
 			}
@@ -361,7 +365,7 @@ func handleStreamCache(bouncer *Bouncer) {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy),
+		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
 	if err != nil {
