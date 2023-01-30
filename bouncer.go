@@ -15,8 +15,6 @@ import (
 	"text/template"
 	"time"
 
-	simpleredis "github.com/maxlerebourg/simpleredis"
-
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
