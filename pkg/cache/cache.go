@@ -17,7 +17,7 @@ const (
 )
 
 // CacheMiss error string when cache is miss.
-const	CacheMiss = "cache:miss"
+const CacheMiss = "cache:miss"
 
 //nolint:gochecknoglobals
 var (
@@ -53,7 +53,7 @@ func (redisCache) getDecision(clientIP string) (bool, error) {
 		return bannedString == cacheBannedValue, nil
 	}
 	if err.Error() == simpleredis.RedisMiss {
-		return false, fmt.Errorf(CacheMiss) 
+		return false, fmt.Errorf(CacheMiss)
 	}
 	return false, err
 }
