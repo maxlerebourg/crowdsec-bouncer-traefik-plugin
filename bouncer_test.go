@@ -142,8 +142,8 @@ func Test_handleStreamCache(t *testing.T) {
 		bouncer *Bouncer
 	}
 	tests := []struct {
-		name string
-		args args
+		name    string
+		args    args
 		wantErr bool
 	}{
 		// TODO: Add test cases.
