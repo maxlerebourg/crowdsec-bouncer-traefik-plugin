@@ -141,13 +141,12 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		},
 		cacheClient: &cache.Client{},
 	}
-	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost)
+	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost, config.RedisCachePass)
 
 	//nolint:nestif
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
-			err = getToken(bouncer)
-			if err != nil {
+			if err := getToken(bouncer); err != nil {
 				logger.Error(fmt.Sprintf("New:getToken %s", err.Error()))
 				return nil, err
 			}
@@ -365,6 +364,9 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err == nil {
 		logger.Debug("handleStreamCache:alreadyUpdated")
 		return nil
+	}
+	if err.Error() != cache.CacheMiss {
+		return err
 	}
 	bouncer.cacheClient.SetDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{

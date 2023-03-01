@@ -10,6 +10,7 @@ import (
 	"net/textproto"
 	"strings"
 	"time"
+	"log"
 )
 
 // Error strings for redis.
@@ -17,10 +18,11 @@ const (
 	RedisUnreachable = "redis:unreachable"
 	RedisMiss        = "redis:miss"
 	RedisTimeout     = "redis:timeout"
+	RedisNoAuth      = "redis:noauth"
 )
 
-// A RedisCmd is used to communicate with redis at low level using commands.
-type RedisCmd struct {
+// A redisCmd is used to communicate with redis at low level using commands.
+type redisCmd struct {
 	Command  string
 	Name     string
 	Data     []byte
@@ -30,7 +32,8 @@ type RedisCmd struct {
 
 // A SimpleRedis is used to communicate with redis.
 type SimpleRedis struct {
-	redisHost string
+	host string
+	pass string
 }
 
 func genRedisArray(params ...[]byte) []byte {
@@ -49,11 +52,11 @@ func send(wr *textproto.Writer, method string, data []byte) {
 	}
 }
 
-func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
+func askRedis(sr *SimpleRedis, cmd redisCmd, channel chan redisCmd) {
 	dialer := net.Dialer{Timeout: 2 * time.Second}
-	conn, err := dialer.Dial("tcp", hostnamePort)
+	conn, err := dialer.Dial("tcp", sr.host)
 	if err != nil {
-		channel <- RedisCmd{Error: fmt.Errorf(RedisUnreachable)}
+		channel <- redisCmd{Error: fmt.Errorf(RedisUnreachable)}
 		return
 	}
 	defer func() {
@@ -64,6 +67,25 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 
 	writer := textproto.NewWriter(bufio.NewWriter(conn))
 	reader := textproto.NewReader(bufio.NewReader(conn))
+
+	if sr.pass != "" {
+		data := genRedisArray([]byte("AUTH"), []byte(sr.pass))
+		send(writer, "auth", data)
+		for {
+			select {
+			case <-time.After(time.Second * 1):
+				channel <- redisCmd{Error: fmt.Errorf(RedisTimeout)}
+				return
+			default:
+				read, _ := reader.ReadLineBytes()
+				if string(read) != "+OK" {
+					channel <- redisCmd{Error: fmt.Errorf(RedisNoAuth)}
+					return
+				}
+				break
+			}
+		}
+	}
 
 	switch cmd.Command {
 	case "SET":
@@ -78,16 +100,20 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 		for {
 			select {
 			case <-time.After(time.Second * 1):
-				channel <- RedisCmd{Error: fmt.Errorf(RedisTimeout)}
+				channel <- redisCmd{Error: fmt.Errorf(RedisTimeout)}
 				return
 			default:
 				read, _ := reader.ReadLineBytes()
-				if string(read) != "$1" {
-					channel <- RedisCmd{Error: fmt.Errorf(RedisMiss)}
+				str := string(read)
+				if strings.Contains(str, "-NOAUTH") {
+					channel <- redisCmd{Error: fmt.Errorf(RedisNoAuth)}
+					return
+				} else if str != "$1" {
+					channel <- redisCmd{Error: fmt.Errorf(RedisMiss)}
 					return
 				}
 				read, _ = reader.ReadLineBytes()
-				channel <- RedisCmd{Data: read}
+				channel <- redisCmd{Data: read}
 				return
 			}
 		}
@@ -95,18 +121,19 @@ func askRedis(hostnamePort string, cmd RedisCmd, channel chan RedisCmd) {
 }
 
 // Init sets the redisHost used to connect to redis.
-func (sr *SimpleRedis) Init(redisHost string) {
-	sr.redisHost = redisHost
+func (sr *SimpleRedis) Init(host string, pass string) {
+	sr.host = host
+	sr.pass = pass
 }
 
 // Get fetches the value for key name in redis.
 func (sr *SimpleRedis) Get(name string) ([]byte, error) {
-	redisCmd := RedisCmd{
+	cmd := redisCmd{
 		Command: "GET",
 		Name:    name,
 	}
-	channel := make(chan RedisCmd)
-	go askRedis(sr.redisHost, redisCmd, channel)
+	channel := make(chan redisCmd)
+	go askRedis(sr, cmd, channel)
 	resp := <-channel
 	if resp.Error != nil {
 		return nil, resp.Error
@@ -116,22 +143,22 @@ func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 
 // Set updates the value for key name in redis with value data for duration.
 func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
-	redisCmd := RedisCmd{
+	cmd := redisCmd{
 		Command:  "SET",
 		Name:     name,
 		Data:     data,
 		Duration: duration,
 	}
-	go askRedis(sr.redisHost, redisCmd, nil)
+	go askRedis(sr, cmd, nil)
 	return nil
 }
 
 // Del removes the key name in redis.
 func (sr *SimpleRedis) Del(name string) error {
-	redisCmd := RedisCmd{
+	cmd := redisCmd{
 		Command: "DEL",
 		Name:    name,
 	}
-	go askRedis(sr.redisHost, redisCmd, nil)
+	go askRedis(sr, cmd, nil)
 	return nil
 }
