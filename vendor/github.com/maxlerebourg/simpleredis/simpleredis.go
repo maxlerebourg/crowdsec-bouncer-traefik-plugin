@@ -10,7 +10,6 @@ import (
 	"net/textproto"
 	"strings"
 	"time"
-	"log"
 )
 
 // Error strings for redis.

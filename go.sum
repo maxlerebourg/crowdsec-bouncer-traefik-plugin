@@ -1,5 +1,4 @@
 github.com/leprosus/golang-ttl-map v1.1.7 h1:cF4AAFDDnJTFSV+/42sKLhmMluvLdRlCGS2UaifH6UM=
 github.com/leprosus/golang-ttl-map v1.1.7/go.mod h1:4QWHJPeVBbrkhOhXdhCv9IEiyj/YzkO04/iexy4vSe0=
-github.com/maxlerebourg/simpleredis v1.0.3 h1:VhXq9bVytWDqD/TS/GjHKayvQb/VUeEql5F+yUbdOiI=
-github.com/maxlerebourg/simpleredis v1.0.4 h1:7xKEqZB2bS1xpdeL8xFJo+l5PdkqjG3uYJr1bIMjyH4=
-github.com/maxlerebourg/simpleredis v1.0.4/go.mod h1:/DH8zOK6kDskSqoX/m5CJJdNGfkIQZd/ERBJgytDDSk=
+github.com/maxlerebourg/simpleredis v1.0.5 h1:1ubyIpTgIb+dadpILivAxuhZTHOOapEHRhcMakveuYY=
+github.com/maxlerebourg/simpleredis v1.0.5/go.mod h1:/DH8zOK6kDskSqoX/m5CJJdNGfkIQZd/ERBJgytDDSk=
