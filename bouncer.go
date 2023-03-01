@@ -143,6 +143,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	}
 	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost)
 
+	//nolint:nestif
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
 			err = getToken(bouncer)
@@ -151,11 +152,18 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 				return nil, err
 			}
 		}
-		ticker = startTicker(config, func() {
-			handleStreamCache(bouncer)
-		})
-		handleStreamCache(bouncer)
+		if err := handleStreamCache(bouncer); err != nil {
+			return nil, err
+		}
 		isStartup = false
+		ticker = startTicker(config, func() {
+			if err := handleStreamCache(bouncer); err != nil {
+				isCrowdsecStreamHealthy = false
+				logger.Error(err.Error())
+			} else {
+				isCrowdsecStreamHealthy = true
+			}
+		})
 	}
 	logger.Debug(fmt.Sprintf("New initialized mode:%s", config.CrowdsecMode))
 
@@ -218,7 +226,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if isCrowdsecStreamHealthy {
 			bouncer.next.ServeHTTP(rw, req)
 		} else {
-			logger.Error(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
+			logger.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
 			rw.WriteHeader(http.StatusForbidden)
 		}
 	} else {
@@ -348,7 +356,7 @@ func getToken(bouncer *Bouncer) error {
 	return fmt.Errorf("getToken statusCode:%d", login.Code)
 }
 
-func handleStreamCache(bouncer *Bouncer) {
+func handleStreamCache(bouncer *Bouncer) error {
 	// TODO clean properly on exit.
 	// Instead of blocking the goroutine interval for all the secondary node,
 	// if the master service is shut down, other goroutine can take the lead
@@ -356,7 +364,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	_, err := bouncer.cacheClient.GetDecision(cacheTimeoutKey)
 	if err == nil {
 		logger.Debug("handleStreamCache:alreadyUpdated")
-		return
+		return nil
 	}
 	bouncer.cacheClient.SetDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{
@@ -367,16 +375,12 @@ func handleStreamCache(bouncer *Bouncer) {
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
 	if err != nil {
-		logger.Error(err.Error())
-		isCrowdsecStreamHealthy = false
-		return
+		return err
 	}
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
-		logger.Error(fmt.Sprintf("handleStreamCache:parsingBody %s", err.Error()))
-		isCrowdsecStreamHealthy = false
-		return
+		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
@@ -389,6 +393,7 @@ func handleStreamCache(bouncer *Bouncer) {
 	}
 	logger.Debug("handleStreamCache:updated")
 	isCrowdsecStreamHealthy = true
+	return nil
 }
 
 func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, error) {
