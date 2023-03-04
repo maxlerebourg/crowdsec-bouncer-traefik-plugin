@@ -118,7 +118,7 @@ func GetVariable(config *Config, key string) (string, error) {
 
 // ValidateParams validate all the param gave by user.
 //
-//nolint:gocyclo
+//nolint:gocyclo,gocognit
 func ValidateParams(config *Config) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err
