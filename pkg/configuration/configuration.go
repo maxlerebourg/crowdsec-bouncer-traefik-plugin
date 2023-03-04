@@ -55,6 +55,7 @@ type Config struct {
 	ClientTrustedIPs                         []string `json:"clientTrustedIps,omitempty"`
 	RedisCacheEnabled                        bool     `json:"redisCacheEnabled,omitempty"`
 	RedisCacheHost                           string   `json:"redisCacheHost,omitempty"`
+	RedisCachePass                           string   `json:"redisCachePass,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -83,6 +84,7 @@ func New() *Config {
 		ClientTrustedIPs:              []string{},
 		RedisCacheEnabled:             false,
 		RedisCacheHost:                "redis:6379",
+		RedisCachePass:                "",
 	}
 }
 
