@@ -103,6 +103,10 @@ make run
   - string 
   - default: "redis:6379"
   - hostname and port for the Redis service
+- RedisCachePassword
+  - string 
+  - default: ""
+  - Password for the Redis service
 - UpdateIntervalSeconds
   - int64
   - default: 60
@@ -183,6 +187,7 @@ http:
           forwardedHeadersCustomName: X-Custom-Header
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
+          redisCachePassword: password
           crowdsecLapiTLSCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT

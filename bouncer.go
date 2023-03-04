@@ -141,7 +141,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		},
 		cacheClient: &cache.Client{},
 	}
-	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost, config.RedisCachePass)
+	config.RedisCachePassword, _ = configuration.GetVariable(config, "RedisCachePassword")
+	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost, config.RedisCachePassword)
 
 	//nolint:nestif
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
