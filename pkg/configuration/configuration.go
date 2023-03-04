@@ -130,7 +130,7 @@ func ValidateParams(config *Config) error {
 	if err := validateParamsIPs(config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
 		return err
 	}
-	
+
 	if _, err := GetVariable(config, "RedisCachePassword"); err != nil {
 		return err
 	}
