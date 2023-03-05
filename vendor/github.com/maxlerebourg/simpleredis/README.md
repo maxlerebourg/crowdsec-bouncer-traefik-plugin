@@ -1,6 +1,7 @@
 # simpleredis
 Minimal go redis with only `get`, `set` and `delete` operation.  
-With **NO** extern dependencies.
+It supports password authentication with redis.
+With **NO** external dependencies.
 
 ## Example
 ```go
@@ -27,3 +28,4 @@ if err != nil {
 
 ## Author
 Max Lerebourg @ [Primadviz.com](https://primadviz.com)
+Mathieu Hanotaux
