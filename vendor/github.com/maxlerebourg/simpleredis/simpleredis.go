@@ -81,8 +81,9 @@ func askRedis(sr *SimpleRedis, cmd redisCmd, channel chan redisCmd) {
 					channel <- redisCmd{Error: fmt.Errorf(RedisNoAuth)}
 					return
 				}
-				break
 			}
+			// breaks out of for
+			break
 		}
 	}
 
