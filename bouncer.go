@@ -144,7 +144,6 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	config.RedisCachePassword, _ = configuration.GetVariable(config, "RedisCachePassword")
 	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost, config.RedisCachePassword)
 
-	//nolint:nestif
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
 			if err := getToken(bouncer); err != nil {
