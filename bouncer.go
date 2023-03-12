@@ -144,7 +144,6 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	config.RedisCachePassword, _ = configuration.GetVariable(config, "RedisCachePassword")
 	bouncer.cacheClient.New(config.RedisCacheEnabled, config.RedisCacheHost, config.RedisCachePassword)
 
-	//nolint:nestif
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
 			if err := getToken(bouncer); err != nil {
@@ -152,17 +151,10 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 				return nil, err
 			}
 		}
-		if err := handleStreamCache(bouncer); err != nil {
-			return nil, err
-		}
+		handleStreamTicker(bouncer)
 		isStartup = false
 		ticker = startTicker(config, func() {
-			if err := handleStreamCache(bouncer); err != nil {
-				isCrowdsecStreamHealthy = false
-				logger.Error(err.Error())
-			} else {
-				isCrowdsecStreamHealthy = true
-			}
+			handleStreamTicker(bouncer)
 		})
 	}
 	logger.Debug(fmt.Sprintf("New initialized mode:%s", config.CrowdsecMode))
@@ -267,6 +259,15 @@ type Login struct {
 	Code   int    `json:"code"`
 	Token  string `json:"token"`
 	Expire string `json:"expire"`
+}
+
+func handleStreamTicker(bouncer *Bouncer) {
+	if err := handleStreamCache(bouncer); err != nil {
+		isCrowdsecStreamHealthy = false
+		logger.Error(err.Error())
+	} else {
+		isCrowdsecStreamHealthy = true
+	}
 }
 
 func startTicker(config *configuration.Config, work func()) chan bool {
