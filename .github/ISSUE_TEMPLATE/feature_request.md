@@ -16,4 +16,6 @@ A clear and concise description of what you want to happen.
 **Additional context**
 Add any other context or screenshots about the feature request here.
 
+<!---
 If you like the plugin, please consider starring it, so you can get updates and we get some more visibility ✨
+-->

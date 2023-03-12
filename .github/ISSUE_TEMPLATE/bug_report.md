@@ -30,4 +30,6 @@ Steps to reproduce the behavior:
 3. Scroll down to '....'
 4. See error
 
+<!---
 If you like the plugin, please consider starring it, so you can get updates and we get some more visibility ✨
+-->
