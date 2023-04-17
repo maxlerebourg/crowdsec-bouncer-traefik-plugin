@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   cloudflare:
-    image: "traefik:v2.9.6"
+    image: "traefik:v2.9.10"
     container_name: "cloudflare"
     restart: unless-stopped
     command:
@@ -12,7 +12,6 @@ services:
       - "--api.insecure=true"
       - "--entrypoints.web.address=:80"
       - "--providers.file.filename=/cloud.yaml"
-      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./cloudflare-exemple.yaml:/cloud.yaml:ro
@@ -22,7 +21,7 @@ services:
       - 8080:8080
 
   traefik:
-    image: "traefik:v2.9.6"
+    image: "traefik:v2.9.10"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -36,7 +35,7 @@ services:
       - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.1.7"
+      - "--experimental.plugins.bouncer.version=v1.1.11"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-traefik:/var/log/traefik
@@ -46,7 +45,7 @@ services:
     depends_on:
       - crowdsec
 
-  whoami1:
+  whoami-foo:
     image: traefik/whoami
     container_name: "simple-service-foo"
     restart: unless-stopped
@@ -66,7 +65,7 @@ services:
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
       - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
   
-  whoami2:
+  whoami-bar:
     image: traefik/whoami
     container_name: "simple-service-bar"
     restart: unless-stopped
@@ -88,7 +87,7 @@ services:
   
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.4.3
+    image: crowdsecurity/crowdsec:v1.4.6
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
