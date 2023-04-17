@@ -138,6 +138,7 @@ experimental:
   plugins:
     bouncer:
       moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: vX.Y.Z # To update
 ```
 
 ```yaml
