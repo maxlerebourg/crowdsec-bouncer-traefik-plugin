@@ -107,6 +107,10 @@ make run
   - string 
   - default: ""
   - Password for the Redis service
+- RedisCacheDatabase
+  - string 
+  - default: ""
+  - Database selection for the Redis service
 - UpdateIntervalSeconds
   - int64
   - default: 60
