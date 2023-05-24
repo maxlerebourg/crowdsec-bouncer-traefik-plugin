@@ -193,6 +193,7 @@ http:
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
           redisCachePassword: password
+          redisCacheDatabase: "5"
           crowdsecLapiTLSCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
