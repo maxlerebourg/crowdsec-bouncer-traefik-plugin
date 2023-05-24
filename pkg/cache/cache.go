@@ -82,9 +82,9 @@ type Client struct {
 }
 
 // New Initialize cache client.
-func (client *Client) New(isRedis bool, host string, pass string) {
+func (client *Client) New(isRedis bool, host, pass, database string) {
 	if isRedis {
-		redis.Init(host, pass)
+		redis.Init(host, pass, database)
 		client.cache = &redisCache{}
 	} else {
 		client.cache = &localCache{}

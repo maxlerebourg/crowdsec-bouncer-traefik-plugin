@@ -9,7 +9,7 @@ import simpleredis "github.com/maxlerebourg/simpleredis"
 
 var redis simpleredis.SimpleRedis
 
-redis.Init("redis:6379", "") // redisHost, redisPass
+redis.Init("redis:6379", "", "") // redisHost, redisPass, redisDatabase
 
 err := redis.Set("test", []bytes("whatever"), 60),  // Set key "test" with "whatever" for 60 seconds
 if err != nil {
