@@ -107,6 +107,10 @@ make run
   - string 
   - default: ""
   - Password for the Redis service
+- RedisCacheDatabase
+  - string 
+  - default: ""
+  - Database selection for the Redis service
 - UpdateIntervalSeconds
   - int64
   - default: 60
@@ -189,6 +193,7 @@ http:
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
           redisCachePassword: password
+          redisCacheDatabase: "5"
           crowdsecLapiTLSCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT

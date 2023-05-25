@@ -31,8 +31,9 @@ type redisCmd struct {
 
 // A SimpleRedis is used to communicate with redis.
 type SimpleRedis struct {
-	host string
-	pass string
+	host     string
+	pass     string
+	database string
 }
 
 func genRedisArray(params ...[]byte) []byte {
@@ -51,7 +52,25 @@ func send(wr *textproto.Writer, method string, data []byte) {
 	}
 }
 
-func askRedis(sr *SimpleRedis, cmd redisCmd, channel chan redisCmd) {
+func (sr *SimpleRedis) waitRedis(reader *textproto.Reader, channel chan redisCmd) {
+	for {
+		select {
+		case <-time.After(time.Second * 1):
+			channel <- redisCmd{Error: fmt.Errorf(RedisTimeout)}
+			return
+		default:
+			read, _ := reader.ReadLineBytes()
+			if string(read) != "+OK" {
+				channel <- redisCmd{Error: fmt.Errorf(RedisNoAuth)}
+				return
+			}
+		}
+		// breaks out of for
+		break
+	}
+}
+
+func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) {
 	dialer := net.Dialer{Timeout: 2 * time.Second}
 	conn, err := dialer.Dial("tcp", sr.host)
 	if err != nil {
@@ -70,21 +89,13 @@ func askRedis(sr *SimpleRedis, cmd redisCmd, channel chan redisCmd) {
 	if sr.pass != "" {
 		data := genRedisArray([]byte("AUTH"), []byte(sr.pass))
 		send(writer, "auth", data)
-		for {
-			select {
-			case <-time.After(time.Second * 1):
-				channel <- redisCmd{Error: fmt.Errorf(RedisTimeout)}
-				return
-			default:
-				read, _ := reader.ReadLineBytes()
-				if string(read) != "+OK" {
-					channel <- redisCmd{Error: fmt.Errorf(RedisNoAuth)}
-					return
-				}
-			}
-			// breaks out of for
-			break
-		}
+		sr.waitRedis(reader, channel)
+	}
+
+	if sr.database != "" {
+		data := genRedisArray([]byte("SELECT"), []byte(sr.database))
+		send(writer, "select", data)
+		sr.waitRedis(reader, channel)
 	}
 
 	switch cmd.Command {
@@ -121,9 +132,10 @@ func askRedis(sr *SimpleRedis, cmd redisCmd, channel chan redisCmd) {
 }
 
 // Init sets the redisHost used to connect to redis.
-func (sr *SimpleRedis) Init(host string, pass string) {
+func (sr *SimpleRedis) Init(host, pass, database string) {
 	sr.host = host
 	sr.pass = pass
+	sr.database = database
 }
 
 // Get fetches the value for key name in redis.
@@ -133,7 +145,7 @@ func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 		Name:    name,
 	}
 	channel := make(chan redisCmd)
-	go askRedis(sr, cmd, channel)
+	go sr.askRedis(cmd, channel)
 	resp := <-channel
 	if resp.Error != nil {
 		return nil, resp.Error
@@ -149,7 +161,7 @@ func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 		Data:     data,
 		Duration: duration,
 	}
-	go askRedis(sr, cmd, nil)
+	go sr.askRedis(cmd, nil)
 	return nil
 }
 
@@ -159,6 +171,6 @@ func (sr *SimpleRedis) Del(name string) error {
 		Command: "DEL",
 		Name:    name,
 	}
-	go askRedis(sr, cmd, nil)
+	go sr.askRedis(cmd, nil)
 	return nil
 }
