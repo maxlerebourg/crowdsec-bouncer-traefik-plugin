@@ -70,12 +70,11 @@ func (sr *SimpleRedis) waitRedis(reader *textproto.Reader, channel chan redisCmd
 	}
 }
 
-func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) {
+func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) redisCmd {
 	dialer := net.Dialer{Timeout: 2 * time.Second}
 	conn, err := dialer.Dial("tcp", sr.host)
 	if err != nil {
-		channel <- redisCmd{Error: fmt.Errorf(RedisUnreachable)}
-		return
+		return redisCmd{Error: fmt.Errorf(RedisUnreachable)}
 	}
 	defer func() {
 		if err := conn.Close(); err != nil {
@@ -111,21 +110,18 @@ func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) {
 		for {
 			select {
 			case <-time.After(time.Second * 1):
-				channel <- redisCmd{Error: fmt.Errorf(RedisTimeout)}
-				return
+				return redisCmd{Error: fmt.Errorf(RedisTimeout)}
 			default:
 				read, _ := reader.ReadLineBytes()
 				str := string(read)
 				if strings.Contains(str, "-NOAUTH") {
-					channel <- redisCmd{Error: fmt.Errorf(RedisNoAuth)}
-					return
+					return redisCmd{Error: fmt.Errorf(RedisNoAuth)}
 				} else if str != "$1" {
-					channel <- redisCmd{Error: fmt.Errorf(RedisMiss)}
-					return
+					return redisCmd{Error: fmt.Errorf(RedisMiss)}
 				}
 				read, _ = reader.ReadLineBytes()
-				channel <- redisCmd{Data: read}
-				return
+				return redisCmd{Data: read}
+				
 			}
 		}
 	}
@@ -145,8 +141,7 @@ func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 		Name:    name,
 	}
 	channel := make(chan redisCmd)
-	go sr.askRedis(cmd, channel)
-	resp := <-channel
+	resp := sr.askRedis(cmd, channel)
 	if resp.Error != nil {
 		return nil, resp.Error
 	}
@@ -161,7 +156,7 @@ func (sr *SimpleRedis) Set(name string, data []byte, duration int64) error {
 		Data:     data,
 		Duration: duration,
 	}
-	go sr.askRedis(cmd, nil)
+	sr.askRedis(cmd, nil)
 	return nil
 }
 
@@ -171,6 +166,6 @@ func (sr *SimpleRedis) Del(name string) error {
 		Command: "DEL",
 		Name:    name,
 	}
-	go sr.askRedis(cmd, nil)
+	sr.askRedis(cmd, nil)
 	return nil
 }
