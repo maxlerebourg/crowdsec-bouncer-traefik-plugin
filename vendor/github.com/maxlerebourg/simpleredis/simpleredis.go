@@ -18,6 +18,7 @@ const (
 	RedisMiss        = "redis:miss"
 	RedisTimeout     = "redis:timeout"
 	RedisNoAuth      = "redis:noauth"
+	RedisIssue      = "redis:issue?"
 )
 
 // A redisCmd is used to communicate with redis at low level using commands.
@@ -125,6 +126,7 @@ func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) redisCmd {
 			}
 		}
 	}
+	return redisCmd{Error: fmt.Errorf(RedisIssue)}
 }
 
 // Init sets the redisHost used to connect to redis.
