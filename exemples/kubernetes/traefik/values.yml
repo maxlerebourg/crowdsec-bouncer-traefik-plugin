@@ -1,5 +1,5 @@
 image:
-  tag: v2.9.10
+  tag: v2.10.4
 
 logs:
   general:
@@ -16,4 +16,4 @@ experimental:
 
 additionalArguments:
   - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-  - "--experimental.plugins.bouncer.version=v1.1.11"
+  - "--experimental.plugins.bouncer.version=v1.1.13"

@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   cloudflare:
-    image: "traefik:v2.9.10"
+    image: "traefik:v2.10.4"
     container_name: "cloudflare"
     restart: unless-stopped
     command:
@@ -21,7 +21,7 @@ services:
       - 8080:8080
 
   traefik:
-    image: "traefik:v2.9.10"
+    image: "traefik:v2.10.4"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -35,7 +35,7 @@ services:
       - "--entrypoints.web.forwardedheaders.trustedips=172.21.0.5"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.1.11"
+      - "--experimental.plugins.bouncer.version=v1.1.13"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-traefik:/var/log/traefik
@@ -57,13 +57,12 @@ services:
       - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
       # Definition of the service
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
-      # Definitin of the middleware
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
-      # crowdseclapikey must be uniq to the middleware attached to the service
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdsecmode=live"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
+      # Definition of the middleware
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
   
   whoami-bar:
     image: traefik/whoami
@@ -77,24 +76,22 @@ services:
       - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker" 
       # Definition of the service
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
-      # Definitin of the middleware
+      # Definition of the middleware
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
-      # crowdseclapikey must be uniq to the middleware attached to the service
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapikey=44c36dac5c4140af9f06f397508e82c7"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecmode=live"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
   
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.4.6
+    image: crowdsecurity/crowdsec:v1.5.2
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
       COLLECTIONS: crowdsecurity/traefik
       CUSTOM_HOSTNAME: crowdsec
-      BOUNCER_KEY_TRAEFIK_DEV_1: 40796d93c2958f9e58345514e67740e5
-      BOUNCER_KEY_TRAEFIK_DEV_2: 44c36dac5c4140af9f06f397508e82c7
+      BOUNCER_KEY_TRAEFIK_DEV: 40796d93c2958f9e58345514e67740e5
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - logs-cloudflare:/var/log/traefik:ro
