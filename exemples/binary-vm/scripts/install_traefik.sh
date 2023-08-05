@@ -2,7 +2,7 @@
 
 DEBIAN_FRONTEND=noninteractive sudo apt-get update && sudo apt-get install wget -y
 # DEBIAN_FRONTEND=noninteractive sudo apt-get upgrade -y --assume-yes
-wget -O traefik.tar.gz "https://github.com/traefik/traefik/releases/download/v2.9.10/traefik_v2.9.10_linux_amd64.tar.gz"
+wget -O traefik.tar.gz "https://github.com/traefik/traefik/releases/download/v2.10.4/traefik_v2.10.4_linux_amd64.tar.gz"
 tar -zxvf traefik.tar.gz
 # inspired from https://gist.github.com/ubergesundheit/7c9d875befc2d7bfd0bf43d8b3862d85
 sudo mv ./traefik /usr/local/bin/
