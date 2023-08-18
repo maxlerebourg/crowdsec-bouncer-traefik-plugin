@@ -87,7 +87,11 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	// here we have GetVariable which returns a string
 	crowdsecStreamTimeoutStr, _ := configuration.GetVariable(config, "CrowdsecStreamTimeout")
 	// I would had a test that the value can be converted to int
-	fmt.Sscan(crowdsecStreamTimeoutStr, &config.CrowdsecStreamTimeout)
+	_, err = fmt.Sscan(crowdsecStreamTimeoutStr, &config.CrowdsecStreamTimeout)
+	if err != nil {
+		logger.Error(fmt.Sprintf("New:sscan: %s", err.Error()))
+		return nil, err
+	}
 	if config.CrowdsecMode == configuration.AloneMode {
 		config.CrowdsecCapiMachineID, _ = configuration.GetVariable(config, "CrowdsecCapiMachineID")
 		config.CrowdsecCapiPassword, _ = configuration.GetVariable(config, "CrowdsecCapiPassword")
