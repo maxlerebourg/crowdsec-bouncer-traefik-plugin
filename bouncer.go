@@ -59,6 +59,7 @@ type Bouncer struct {
 	crowdsecScenarios      []string
 	updateInterval         int64
 	defaultDecisionTimeout int64
+	CrowdsecStreamTimeout  int64
 	customHeader           string
 	crowdsecStreamRoute    string
 	crowdsecHeader         string
@@ -83,6 +84,10 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	var tlsConfig *tls.Config
 	crowdsecStreamRoute := ""
 	crowdsecHeader := ""
+	// here we have GetVariable which returns a string
+	crowdsecStreamTimeoutStr, _ := configuration.GetVariable(config, "CrowdsecStreamTimeout")
+	// I would had a test that the value can be converted to int
+	fmt.Sscan(crowdsecStreamTimeoutStr, &config.CrowdsecStreamTimeout)
 	if config.CrowdsecMode == configuration.AloneMode {
 		config.CrowdsecCapiMachineID, _ = configuration.GetVariable(config, "CrowdsecCapiMachineID")
 		config.CrowdsecCapiPassword, _ = configuration.GetVariable(config, "CrowdsecCapiPassword")

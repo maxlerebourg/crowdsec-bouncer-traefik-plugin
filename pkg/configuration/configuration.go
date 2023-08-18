@@ -48,6 +48,7 @@ type Config struct {
 	CrowdsecCapiPassword                     string   `json:"crowdsecCapiPassword,omitempty"`
 	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
+	CrowdsecStreamTimeout                    int64    `json:"crowdsecStreamTimeout,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedheaderscustomheader,omitempty"`
@@ -79,6 +80,7 @@ func New() *Config {
 		CrowdsecLapiHost:              "crowdsec:8080",
 		CrowdsecLapiKey:               "",
 		CrowdsecLapiTLSInsecureVerify: false,
+		CrowdsecStreamTimeout:         10,
 		UpdateIntervalSeconds:         60,
 		DefaultDecisionSeconds:        60,
 		ForwardedHeadersCustomName:    "X-Forwarded-For",
