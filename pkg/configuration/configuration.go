@@ -51,6 +51,7 @@ type Config struct {
 	CrowdsecStreamTimeout                    int64    `json:"crowdsecStreamTimeout,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
+	DefaultTimeoutSeconds                    int64    `json:"defaultTimeoutSeconds,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedheaderscustomheader,omitempty"`
 	ForwardedHeadersTrustedIPs               []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                         []string `json:"clientTrustedIps,omitempty"`
@@ -83,6 +84,7 @@ func New() *Config {
 		CrowdsecStreamTimeout:         10,
 		UpdateIntervalSeconds:         60,
 		DefaultDecisionSeconds:        60,
+		DefaultTimeoutSeconds:         10,
 		ForwardedHeadersCustomName:    "X-Forwarded-For",
 		ForwardedHeadersTrustedIPs:    []string{},
 		ClientTrustedIPs:              []string{},
@@ -243,6 +245,7 @@ func validateParamsRequired(config *Config) error {
 	requiredInt := map[string]int64{
 		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
 		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
+		"DefaultTimeoutSeconds": config.DefaultTimeoutSeconds,
 	}
 	for key, val := range requiredInt {
 		if val < 1 {

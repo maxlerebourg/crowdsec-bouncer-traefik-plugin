@@ -146,7 +146,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 				IdleConnTimeout: 30 * time.Second,
 				TLSClientConfig: tlsConfig,
 			},
-			Timeout: 10 * time.Second,
+			Timeout: config.defaultTimeoutSeconds * time.Second,
 		},
 		cacheClient: &cache.Client{},
 	}
