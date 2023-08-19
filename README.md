@@ -112,6 +112,10 @@ Only one instance of the plugin is *possible*.
   - string 
   - default: ""
   - Database selection for the Redis service
+- DefaultTimeoutSeconds
+  - int64
+  - default: 10
+  - Default timeout in seconds for contacting Crowdsec LAPI
 - UpdateIntervalSeconds
   - int64
   - default: 60
@@ -173,6 +177,7 @@ http:
           logLevel: DEBUG
           updateIntervalSeconds: 60
           defaultDecisionSeconds: 60
+          defaultTimeoutSeconds: 10
           crowdsecMode: live
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
