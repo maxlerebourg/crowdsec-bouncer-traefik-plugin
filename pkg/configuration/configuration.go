@@ -243,7 +243,7 @@ func validateParamsRequired(config *Config) error {
 	requiredInt := map[string]int64{
 		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
 		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
-		"DefaultTimeoutSeconds": config.DefaultTimeoutSeconds,
+		"DefaultTimeoutSeconds":  config.DefaultTimeoutSeconds,
 	}
 	for key, val := range requiredInt {
 		if val < 1 {
