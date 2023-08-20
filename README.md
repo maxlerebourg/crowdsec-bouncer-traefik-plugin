@@ -112,7 +112,7 @@ Only one instance of the plugin is *possible*.
   - string 
   - default: ""
   - Database selection for the Redis service
-- HttpTimeoutSeconds
+- HTTPTimeoutSeconds
   - int64
   - default: 10
   - Default timeout in seconds for contacting Crowdsec LAPI
