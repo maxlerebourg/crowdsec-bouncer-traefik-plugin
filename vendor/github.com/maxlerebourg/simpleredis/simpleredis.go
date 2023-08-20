@@ -18,7 +18,7 @@ const (
 	RedisMiss        = "redis:miss"
 	RedisTimeout     = "redis:timeout"
 	RedisNoAuth      = "redis:noauth"
-	RedisIssue       = "redis:issue?"
+	RedisIssue      = "redis:issue?"
 )
 
 // A redisCmd is used to communicate with redis at low level using commands.
@@ -122,7 +122,7 @@ func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) redisCmd {
 				}
 				read, _ = reader.ReadLineBytes()
 				return redisCmd{Data: read}
-
+				
 			}
 		}
 	}
