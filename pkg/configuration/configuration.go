@@ -50,7 +50,7 @@ type Config struct {
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
-	DefaultTimeoutSeconds                    int64    `json:"defaultTimeoutSeconds,omitempty"`
+	HttpTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedheaderscustomheader,omitempty"`
 	ForwardedHeadersTrustedIPs               []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                         []string `json:"clientTrustedIps,omitempty"`
@@ -82,7 +82,7 @@ func New() *Config {
 		CrowdsecLapiTLSInsecureVerify: false,
 		UpdateIntervalSeconds:         60,
 		DefaultDecisionSeconds:        60,
-		DefaultTimeoutSeconds:         10,
+		HttpTimeoutSeconds:            10,
 		ForwardedHeadersCustomName:    "X-Forwarded-For",
 		ForwardedHeadersTrustedIPs:    []string{},
 		ClientTrustedIPs:              []string{},
@@ -243,7 +243,7 @@ func validateParamsRequired(config *Config) error {
 	requiredInt := map[string]int64{
 		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
 		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
-		"DefaultTimeoutSeconds":  config.DefaultTimeoutSeconds,
+		"HttpTimeoutSeconds":     config.HttpTimeoutSeconds,
 	}
 	for key, val := range requiredInt {
 		if val < 1 {
