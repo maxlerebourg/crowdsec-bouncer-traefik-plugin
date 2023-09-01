@@ -22,4 +22,4 @@ lapi:
       value: "k8s linux test"
     # If it's a test, we don't want to share signals with CrowdSec so disable the Online API.
     - name: DISABLE_ONLINE_API
-      value: true
+      value: "true"
