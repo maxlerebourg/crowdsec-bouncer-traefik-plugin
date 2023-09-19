@@ -26,7 +26,7 @@ services:
       - 8080:8080
     depends_on:
       - crowdsec
-      - redis-insecure
+      # - redis-insecure
       - redis-secure
 
 # Either use secure, or insecure but do not mix both
