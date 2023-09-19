@@ -29,6 +29,9 @@ const (
 	crowdsecCapiLogin       = "v2/watchers/login"
 	crowdsecCapiStreamRoute = "v2/decisions/stream"
 	cacheTimeoutKey         = "updated"
+	decisionTypeBan         = "ban"
+	decisionTypeCaptcha     = "captcha"
+	decisionTypeThrottle    = "throttle"
 )
 
 //nolint:gochecknoglobals
@@ -49,23 +52,24 @@ type Bouncer struct {
 	name     string
 	template *template.Template
 
-	enabled                bool
-	crowdsecScheme         string
-	crowdsecHost           string
-	crowdsecKey            string
-	crowdsecMode           string
-	crowdsecMachineID      string
-	crowdsecPassword       string
-	crowdsecScenarios      []string
-	updateInterval         int64
-	defaultDecisionTimeout int64
-	customHeader           string
-	crowdsecStreamRoute    string
-	crowdsecHeader         string
-	clientPoolStrategy     *ip.PoolStrategy
-	serverPoolStrategy     *ip.PoolStrategy
-	httpClient             *http.Client
-	cacheClient            *cache.Client
+	enabled                  bool
+	crowdsecScheme           string
+	crowdsecHost             string
+	crowdsecKey              string
+	crowdsecMode             string
+	crowdsecMachineID        string
+	crowdsecPassword         string
+	crowdsecScenarios        []string
+	updateInterval           int64
+	defaultDecisionTimeout   int64
+	customHeader             string
+	crowdsecStreamRoute      string
+	crowdsecHeader           string
+	clientPoolStrategy       *ip.PoolStrategy
+	serverPoolStrategy       *ip.PoolStrategy
+	httpClient               *http.Client
+	cacheClient              *cache.Client
+	forbidOnStreamNotHealthy bool
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -112,19 +116,20 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
-		enabled:                config.Enabled,
-		crowdsecMode:           config.CrowdsecMode,
-		crowdsecScheme:         config.CrowdsecLapiScheme,
-		crowdsecHost:           config.CrowdsecLapiHost,
-		crowdsecKey:            config.CrowdsecLapiKey,
-		crowdsecMachineID:      config.CrowdsecCapiMachineID,
-		crowdsecPassword:       config.CrowdsecCapiPassword,
-		crowdsecScenarios:      config.CrowdsecCapiScenarios,
-		updateInterval:         config.UpdateIntervalSeconds,
-		customHeader:           config.ForwardedHeadersCustomName,
-		defaultDecisionTimeout: config.DefaultDecisionSeconds,
-		crowdsecStreamRoute:    crowdsecStreamRoute,
-		crowdsecHeader:         crowdsecHeader,
+		enabled:                  config.Enabled,
+		crowdsecMode:             config.CrowdsecMode,
+		crowdsecScheme:           config.CrowdsecLapiScheme,
+		crowdsecHost:             config.CrowdsecLapiHost,
+		crowdsecKey:              config.CrowdsecLapiKey,
+		crowdsecMachineID:        config.CrowdsecCapiMachineID,
+		crowdsecPassword:         config.CrowdsecCapiPassword,
+		crowdsecScenarios:        config.CrowdsecCapiScenarios,
+		updateInterval:           config.UpdateIntervalSeconds,
+		customHeader:             config.ForwardedHeadersCustomName,
+		defaultDecisionTimeout:   config.DefaultDecisionSeconds,
+		crowdsecStreamRoute:      crowdsecStreamRoute,
+		crowdsecHeader:           crowdsecHeader,
+		forbidOnStreamNotHealthy: config.ForbidOnStreamNotHealthy,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -198,7 +203,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
-		isBanned, cacheErr := bouncer.cacheClient.GetDecision(remoteIP)
+		isBanned, isCaptcha, cacheErr := bouncer.cacheClient.GetDecision(remoteIP)
 		if cacheErr != nil {
 			errString := cacheErr.Error()
 			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s isBanned:false %s", remoteIP, errString))
@@ -221,10 +226,17 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
+			logger.Debug(fmt.Sprintf("ServeHTTP:stream is healthy"))
 			bouncer.next.ServeHTTP(rw, req)
 		} else {
+			logger.Debug(fmt.Sprintf("ServeHTTP:stream isn't healthy. The decision is to forbid the request."))
 			logger.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
-			rw.WriteHeader(http.StatusForbidden)
+			if bouncer.forbidOnStreamNotHealthy {
+				rw.WriteHeader(http.StatusForbidden)
+			} else {
+				logger.Debug(fmt.Sprintf("ServeHTTP:stream isn't healthy. But the decision is to process the request."))
+				bouncer.next.ServeHTTP(rw, req)
+			}
 		}
 	} else {
 		err = handleNoStreamCache(bouncer, remoteIP)
@@ -308,7 +320,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 
 	if bytes.Equal(body, []byte("null")) {
 		if isLiveMode {
-			bouncer.cacheClient.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
+			bouncer.cacheClient.SetDecision(remoteIP, cache.cacheNoBannedValue, bouncer.defaultDecisionTimeout)
 		}
 		return nil
 	}
@@ -320,7 +332,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 	}
 	if len(decisions) == 0 {
 		if isLiveMode {
-			bouncer.cacheClient.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
+			bouncer.cacheClient.SetDecision(remoteIP, cache.cacheNoBannedValue, bouncer.defaultDecisionTimeout)
 		}
 		return nil
 	}
@@ -333,7 +345,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 		if bouncer.defaultDecisionTimeout < durationSecond {
 			durationSecond = bouncer.defaultDecisionTimeout
 		}
-		bouncer.cacheClient.SetDecision(remoteIP, true, durationSecond)
+		bouncer.cacheClient.SetDecision(remoteIP, cache.cacheBannedValue, durationSecond)
 	}
 	return fmt.Errorf("handleNoStreamCache:banned")
 }
@@ -367,7 +379,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	// Instead of blocking the goroutine interval for all the secondary node,
 	// if the master service is shut down, other goroutine can take the lead
 	// because updated routine information is in the cache
-	_, err := bouncer.cacheClient.GetDecision(cacheTimeoutKey)
+	_, _, err := bouncer.cacheClient.GetDecision(cacheTimeoutKey)
 	if err == nil {
 		logger.Debug("handleStreamCache:alreadyUpdated")
 		return nil
@@ -375,7 +387,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err.Error() != cache.CacheMiss {
 		return err
 	}
-	bouncer.cacheClient.SetDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
+	bouncer.cacheClient.SetDecision(cacheTimeoutKey, cache.cacheNoBannedValue, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
@@ -383,6 +395,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
+
 	if err != nil {
 		return err
 	}
@@ -391,15 +404,23 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
-	for _, decision := range stream.New {
-		duration, err := time.ParseDuration(decision.Duration)
-		if err == nil {
-			bouncer.cacheClient.SetDecision(decision.Value, true, int64(duration.Seconds()))
-		}
-	}
+
+	var decisionType string
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.DeleteDecision(decision.Value)
 	}
+	for _, decision := range stream.New {
+		duration, err := time.ParseDuration(decision.Duration)
+		if decisionTypeCaptcha == decision.Type {
+			decisionType = cache.cacheCaptchaValue
+		} else {
+			decisionType = cache.cacheBannedValue
+		}
+		if err == nil {
+			bouncer.cacheClient.SetDecision(decision.Value, decisionType, int64(duration.Seconds()))
+		}
+	}
+
 	logger.Debug("handleStreamCache:updated")
 	isCrowdsecStreamHealthy = true
 	return nil

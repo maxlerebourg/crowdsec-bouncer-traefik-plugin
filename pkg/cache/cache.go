@@ -14,10 +14,9 @@ import (
 const (
 	cacheBannedValue   = "t"
 	cacheNoBannedValue = "f"
+	cacheCaptchaValue  = "c"
+	CacheMiss          = "cache:miss" // CacheMiss error string when cache is miss.
 )
-
-// CacheMiss error string when cache is miss.
-const CacheMiss = "cache:miss"
 
 //nolint:gochecknoglobals
 var (
@@ -27,13 +26,16 @@ var (
 
 type localCache struct{}
 
-func (localCache) getDecision(clientIP string) (bool, error) {
+func (localCache) getDecision(clientIP string) (bool, bool, error) {
 	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
+	logger.Debug(fmt.Sprintf("cache:getDecision:bannedString '%s', isValid '%t', isCached '%t'", bannedString, isValid, isCached))
 	if isCached && isValid && len(bannedString) > 0 {
-		return bannedString == cacheBannedValue, nil
+		isBanned := bannedString == cacheBannedValue || bannedString == cacheCaptchaValue
+		isCaptcha := bannedString == cacheCaptchaValue
+		return isBanned, isCaptcha, nil
 	}
-	return false, fmt.Errorf(CacheMiss)
+	return false, false, fmt.Errorf(CacheMiss)
 }
 
 func (localCache) setDecision(clientIP string, value string, duration int64) {
@@ -46,16 +48,18 @@ func (localCache) deleteDecision(clientIP string) {
 
 type redisCache struct{}
 
-func (redisCache) getDecision(clientIP string) (bool, error) {
+func (redisCache) getDecision(clientIP string) (bool, bool, error) {
 	banned, err := redis.Get(clientIP)
 	bannedString := string(banned)
 	if err == nil && len(bannedString) > 0 {
-		return bannedString == cacheBannedValue, nil
+		isBanned := bannedString == cacheBannedValue || bannedString == cacheCaptchaValue
+		isCaptcha := bannedString == cacheCaptchaValue
+		return isBanned, isCaptcha, nil
 	}
 	if err.Error() == simpleredis.RedisMiss {
-		return false, fmt.Errorf(CacheMiss)
+		return false, false, fmt.Errorf(CacheMiss)
 	}
-	return false, err
+	return false, false, err
 }
 
 func (redisCache) setDecision(clientIP string, value string, duration int64) {
@@ -72,7 +76,7 @@ func (redisCache) deleteDecision(clientIP string) {
 
 type cacheInterface interface {
 	setDecision(clientIP string, value string, duration int64)
-	getDecision(clientIP string) (bool, error)
+	getDecision(clientIP string) (bool, bool, error)
 	deleteDecision(clientIP string)
 }
 
@@ -99,20 +103,14 @@ func (client *Client) DeleteDecision(clientIP string) {
 }
 
 // GetDecision check in the cache if the IP has the banned / not banned value.
-// Otherwise return with an error to add the IP in cache if we are on.
-func (client *Client) GetDecision(clientIP string) (bool, error) {
+// Otherwise, return with an error to add the IP in cache if we are on.
+func (client *Client) GetDecision(clientIP string) (bool, bool, error) {
 	logger.Debug(fmt.Sprintf("cache:GetDecision ip:%v", clientIP))
 	return client.cache.getDecision(clientIP)
 }
 
 // SetDecision update the cache with the IP as key and the value banned / not banned.
-func (client *Client) SetDecision(clientIP string, isBanned bool, duration int64) {
-	logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v isBanned:%v duration:%vs", clientIP, isBanned, duration))
-	var value string
-	if isBanned {
-		value = cacheBannedValue
-	} else {
-		value = cacheNoBannedValue
-	}
-	client.cache.setDecision(clientIP, value, duration)
+func (client *Client) SetDecision(clientIP string, banDecision string, duration int64) {
+	logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v banDecision:%v duration:%vs", clientIP, banDecision, duration))
+	client.cache.setDecision(clientIP, banDecision, duration)
 }
