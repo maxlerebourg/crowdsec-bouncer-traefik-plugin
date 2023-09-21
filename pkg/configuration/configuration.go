@@ -48,6 +48,8 @@ type Config struct {
 	CrowdsecCapiPassword                     string   `json:"crowdsecCapiPassword,omitempty"`
 	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
+	CrowdsecLapiMachineID                    string   `json:"crowdsecLapiMachineId,omitempty"`
+	CrowdsecLapiPassword                     string   `json:"crowdsecLapiPassword,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`

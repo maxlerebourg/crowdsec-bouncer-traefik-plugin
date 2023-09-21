@@ -23,17 +23,18 @@ import (
 )
 
 const (
-	crowdsecLapiHeader      = "X-Api-Key"
-	crowdsecCapiHeader      = "Authorization"
-	crowdsecLapiRoute       = "v1/decisions"
-	crowdsecLapiStreamRoute = "v1/decisions/stream"
-	crowdsecCapiLogin       = "v2/watchers/login"
-	crowdsecCapiStreamRoute = "v2/decisions/stream"
-	cacheTimeoutKey         = "updated"
-	captchaSiteVerifyURL    = "https://www.google.com/recaptcha/api/siteverify"
-	decisionTypeBan         = "ban"
-	decisionTypeCaptcha     = "captcha"
-	decisionTypeThrottle    = "throttle"
+	crowdsecLapiHeader         = "X-Api-Key"
+	crowdsecCapiHeader         = "Authorization"
+	crowdsecLapiDecisionsRoute = "v1/decisions"
+	crowdsecLapiStreamRoute    = "v1/decisions/stream"
+	crowdsecLapiLoginRoute     = "v1/watchers/login"
+	crowdsecCapiLoginRoute     = "v2/watchers/login"
+	crowdsecCapiStreamRoute    = "v2/decisions/stream"
+	cacheTimeoutKey            = "updated"
+	captchaSiteVerifyURL       = "https://www.google.com/recaptcha/api/siteverify"
+	decisionTypeBan            = "ban"
+	decisionTypeCaptcha        = "captcha"
+	decisionTypeThrottle       = "throttle"
 )
 
 //nolint:gochecknoglobals
@@ -44,6 +45,7 @@ var (
 	captchaSecretKey        = ""
 	captchaSiteKey          = ""
 	captchaVerifyRoute      = ""
+	jwtLapiToken            = ""
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -61,6 +63,8 @@ type Bouncer struct {
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
+	crowdsecLapiMachineID  string
+	crowdsecLapiPassword   string
 	crowdsecMode           string
 	crowdsecMachineID      string
 	crowdsecPassword       string
@@ -130,6 +134,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
 		crowdsecKey:            config.CrowdsecLapiKey,
+		crowdsecLapiMachineID:  config.CrowdsecLapiMachineID,
+		crowdsecLapiPassword:   config.CrowdsecLapiPassword,
 		crowdsecMachineID:      config.CrowdsecCapiMachineID,
 		crowdsecPassword:       config.CrowdsecCapiPassword,
 		crowdsecScenarios:      config.CrowdsecCapiScenarios,
@@ -206,7 +212,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if handleCaptchaValidation(rw, req, remoteIP) {
+	if handleCaptchaValidation(bouncer, rw, req, remoteIP) {
 		return
 	}
 
@@ -289,6 +295,13 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
+// DecisionDeleted Deleted decision (in case if we verify captcha)
+type DecisionDeleted struct {
+	NbDeleted string `json:"nbDeleted"`
+	Errors    bool   `json:"errors"`
+	Message   string `json:"message"`
+}
+
 // Stream Body returned from Crowdsec Stream LAPI.
 type Stream struct {
 	Deleted []Decision `json:"deleted"`
@@ -300,6 +313,19 @@ type Login struct {
 	Code   int    `json:"code"`
 	Token  string `json:"token"`
 	Expire string `json:"expire"`
+}
+
+type SiteVerifyResponse struct {
+	Success     bool      `json:"success"`
+	Action      string    `json:"action"`
+	ChallengeTS time.Time `json:"challenge_ts"`
+	Hostname    string    `json:"hostname"`
+	ErrorCodes  []string  `json:"error-codes"`
+}
+
+type ValidationResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }
 
 func handleBanResponseSoft(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request) {
@@ -336,20 +362,7 @@ func handleBanResponseOrCaptcha(bouncer *Bouncer, rw http.ResponseWriter, req *h
 	_, err = rw.Write(content)
 }
 
-type SiteVerifyResponse struct {
-	Success     bool      `json:"success"`
-	Action      string    `json:"action"`
-	ChallengeTS time.Time `json:"challenge_ts"`
-	Hostname    string    `json:"hostname"`
-	ErrorCodes  []string  `json:"error-codes"`
-}
-
-type ValidationResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func handleCaptchaValidation(rw http.ResponseWriter, req *http.Request, remoteIP string) bool {
+func handleCaptchaValidation(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, remoteIP string) bool {
 	if !(req.RequestURI == captchaVerifyRoute && req.Method == "POST") {
 		return false
 	}
@@ -408,7 +421,11 @@ func handleCaptchaValidation(rw http.ResponseWriter, req *http.Request, remoteIP
 		return false
 	}
 
-	deleteIpDecisions(remoteIP)
+	err = deleteIpDecisions(bouncer, remoteIP)
+	if err != nil {
+		response.Message = err.Error()
+		respondJson(rw, response)
+	}
 
 	response.Success = true
 	respondJson(rw, response)
@@ -423,8 +440,30 @@ func respondJson(rw http.ResponseWriter, response ValidationResponse) {
 	}
 }
 
-func deleteIpDecisions(remoteIP string) {
+func deleteIpDecisions(bouncer *Bouncer, remoteIP string) error {
+	refreshLapiToken(bouncer)
 
+	deleteRouteURL := url.URL{
+		Scheme:   bouncer.crowdsecScheme,
+		Host:     bouncer.crowdsecHost,
+		Path:     crowdsecLapiDecisionsRoute,
+		RawQuery: fmt.Sprintf("ip=%s", remoteIP),
+	}
+	body, err := crowdsecQuery(bouncer, deleteRouteURL.String(), http.MethodDelete)
+	if err != nil {
+		return err
+	}
+
+	var result DecisionDeleted
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return fmt.Errorf("%w", err)
+	}
+
+	logger.Debug(fmt.Sprintf("deleteIpDecisions NbDeleted:%d", result.NbDeleted))
+	logger.Debug(fmt.Sprintf("deleteIpDecisions Message:%d", result.Message))
+
+	return nil
 }
 
 func handleStreamTicker(bouncer *Bouncer) {
@@ -459,10 +498,10 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
-		Path:     crowdsecLapiRoute,
+		Path:     crowdsecLapiDecisionsRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
 	}
-	body, err := crowdsecQuery(bouncer, routeURL.String(), false)
+	body, err := crowdsecQuery(bouncer, routeURL.String(), http.MethodGet)
 	if err != nil {
 		return err
 	}
@@ -503,9 +542,9 @@ func getToken(bouncer *Bouncer) error {
 	loginURL := url.URL{
 		Scheme: bouncer.crowdsecScheme,
 		Host:   bouncer.crowdsecHost,
-		Path:   crowdsecCapiLogin,
+		Path:   crowdsecCapiLoginRoute,
 	}
-	body, err := crowdsecQuery(bouncer, loginURL.String(), true)
+	body, err := crowdsecQuery(bouncer, loginURL.String(), http.MethodPost)
 	if err != nil {
 		return err
 	}
@@ -521,6 +560,30 @@ func getToken(bouncer *Bouncer) error {
 		return nil
 	}
 	return fmt.Errorf("getToken statusCode:%d", login.Code)
+}
+
+func refreshLapiToken(bouncer *Bouncer) {
+	loginURL := url.URL{
+		Scheme: bouncer.crowdsecScheme,
+		Host:   bouncer.crowdsecHost,
+		Path:   crowdsecLapiLoginRoute,
+	}
+	body, err := crowdsecQuery(bouncer, loginURL.String(), http.MethodPost)
+	if err != nil {
+		jwtLapiToken = ""
+	}
+	var login Login
+	err = json.Unmarshal(body, &login)
+	if err != nil {
+		isCrowdsecStreamHealthy = false
+		jwtLapiToken = ""
+	}
+	if login.Code == 200 && len(login.Token) > 0 {
+		logger.Debug(fmt.Sprintf("New LAPI TOKEN: %s", login.Token))
+		jwtLapiToken = login.Token
+		return
+	}
+	jwtLapiToken = ""
 }
 
 func handleStreamCache(bouncer *Bouncer) error {
@@ -543,7 +606,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Path:     bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
-	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
+	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), http.MethodGet)
 
 	if err != nil {
 		return err
@@ -575,20 +638,41 @@ func handleStreamCache(bouncer *Bouncer) error {
 	return nil
 }
 
-func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, error) {
+func crowdsecQuery(bouncer *Bouncer, stringURL string, method string) ([]byte, error) {
 	var req *http.Request
-	if isPost {
+	var machineId string
+	var password string
+
+	if method == http.MethodPost {
+		if bouncer.crowdsecMode == configuration.AloneMode {
+			machineId = bouncer.crowdsecMachineID
+			password = bouncer.crowdsecPassword
+		} else {
+			machineId = bouncer.crowdsecLapiMachineID
+			password = bouncer.crowdsecLapiPassword
+		}
+
 		data := []byte(fmt.Sprintf(
 			`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
-			bouncer.crowdsecMachineID,
-			bouncer.crowdsecPassword,
+			machineId,
+			password,
 			strings.Join(bouncer.crowdsecScenarios, `","`),
 		))
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
 	} else {
-		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
+		req, _ = http.NewRequest(method, stringURL, nil)
 	}
+
+	if method == http.MethodDelete {
+		bearer := fmt.Sprintf("Bearer %s", jwtLapiToken)
+		logger.Debug(fmt.Sprintf("BEARER: '%s'", bearer))
+		req.Header.Add("Authorization", bearer)
+	}
+
 	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
+
+	logger.Debug(fmt.Sprintf("crowdsecQuery:request | method: '%s', URL: '%s', Secret: '%s'",
+		method, stringURL, bouncer.crowdsecKey))
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)
@@ -597,7 +681,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 		if errToken := getToken(bouncer); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}
-		return crowdsecQuery(bouncer, stringURL, false)
+		return crowdsecQuery(bouncer, stringURL, http.MethodGet)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("crowdsecQuery url:%s, statusCode:%d", stringURL, res.StatusCode)

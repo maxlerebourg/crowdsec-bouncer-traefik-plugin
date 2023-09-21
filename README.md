@@ -67,7 +67,13 @@ Only one instance of the plugin is *possible*.
 - CrowdsecLapiKey
   - string
   - default: ""
-  - Crowdsec LAPI key for the bouncer : **must be unique by service**. 
+  - Crowdsec LAPI key for the bouncer : **must be unique by service**.
+- CrowdsecLapiMachineId
+  - string
+  - Used in NON-`alone` mode, Machine ID for Crowdsec LAPI (from `/etc/crowdsec/local_api_credentials.yaml`)
+- CrowdsecLapiPassword
+  - string
+  - Used in NON-`alone` mode, password for Crowdsec LAPI (from `/etc/crowdsec/local_api_credentials.yaml`)
 - CrowdsecLapiTlsInsecureVerify
   - bool
   - default: false
