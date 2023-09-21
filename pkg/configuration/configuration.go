@@ -59,7 +59,11 @@ type Config struct {
 	RedisCachePassword                       string   `json:"redisCachePassword,omitempty"`
 	RedisCachePasswordFile                   string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                       string   `json:"redisCacheDatabase,omitempty"`
-	ForbidOnStreamNotHealthy                 bool     `json:"forbidOnStreamNotHealthy,omitempty"`
+	ForbidOnFailure                          bool     `json:"forbidOnFailure,omitempty"`
+	CaptchaHtmlFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
+	CaptchaSiteKey                           string   `json:"captchaSiteKey,omitempty"`
+	CaptchaSecretKey                         string   `json:"captchaSecretKey,omitempty"`
+	CaptchaVerifyRoute                       string   `json:"captchaVerifyRoute,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -91,7 +95,8 @@ func New() *Config {
 		RedisCacheHost:                "redis:6379",
 		RedisCachePassword:            "",
 		RedisCacheDatabase:            "",
-		ForbidOnStreamNotHealthy:      true,
+		ForbidOnFailure:               true,
+		CaptchaVerifyRoute:            "not-a-robot",
 	}
 }
 
