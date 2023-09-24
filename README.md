@@ -283,7 +283,7 @@ To communicate with the LAPI in HTTPS you need to either accept any certificates
 Set the `crowdsecLapiScheme` to https.
 
 Crowdsec must be listening in HTTPS for this to work.
-Please see the [tls-auth exemple](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/tls-auth/README.md) or the official documentation: [docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
+Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/tls-auth/README.md) or the official documentation: [docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
 
 #### Manually add an IP to the blocklist (for testing purposes)
 

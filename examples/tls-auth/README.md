@@ -1,4 +1,4 @@
-# Exemple
+# example
 ## Using https communication and tls authentication with Crowdsec
 
 ##### Summary

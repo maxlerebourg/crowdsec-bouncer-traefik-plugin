@@ -1,4 +1,4 @@
-### Kubernetes Exemple
+### Kubernetes example
 
 #### Official docs
 
