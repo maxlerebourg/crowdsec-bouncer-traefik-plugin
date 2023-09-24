@@ -195,7 +195,7 @@ func ValidateParams(config *Config) error {
 // valid ! # $ % & ' * + - . ^ _ ` | ~ DIGIT ALPHA
 // See https://httpwg.github.io/specs/rfc7230.html#rule.token.separators
 func validateParamsAPIKey(lapiKey string) error {
-	reg := regexp.MustCompile("^[a-zA-Z0-9 !#$%&'*+-.^_`|~=]*$")
+	reg := regexp.MustCompile("^[a-zA-Z0-9 !#$%&'*+-.^_`|~=/]*$")
 	if !reg.Match([]byte(lapiKey)) {
 		return fmt.Errorf("CrowdsecLapiKey doesn't valid this regexp: '/%s/'", reg.String())
 	}
