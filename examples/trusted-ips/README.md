@@ -1,4 +1,4 @@
-# Exemple
+# Example
 ## Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec
 
 You need to configure your Traefik to trust Forwarded headers by your front proxy
