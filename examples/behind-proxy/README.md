@@ -1,4 +1,4 @@
-# example
+# Example
 ## Behind another proxy service (ex: clouflare)
 
 You need to configure your Traefik to trust Forwarded headers by your front proxy
