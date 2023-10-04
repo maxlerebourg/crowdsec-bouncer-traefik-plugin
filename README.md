@@ -67,7 +67,13 @@ Only one instance of the plugin is *possible*.
 - CrowdsecLapiKey
   - string
   - default: ""
-  - Crowdsec LAPI key for the bouncer : **must be unique by service**. 
+  - Crowdsec LAPI key for the bouncer : **must be unique by service**.
+- CrowdsecLapiMachineId
+  - string
+  - Used in NON-`alone` mode, Machine ID for Crowdsec LAPI (from `/etc/crowdsec/local_api_credentials.yaml`)
+- CrowdsecLapiPassword
+  - string
+  - Used in NON-`alone` mode, password for Crowdsec LAPI (from `/etc/crowdsec/local_api_credentials.yaml`)
 - CrowdsecLapiTlsInsecureVerify
   - bool
   - default: false
@@ -133,6 +139,23 @@ Only one instance of the plugin is *possible*.
 - CrowdsecCapiScenarios
   - []string
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
+- ForbidOnFailure
+  - bool
+  - default: true
+  - Affects how bouncer will behave in case is Crowdsec LAPI or Redis ar down. By default, 403 will be thrown. When set to `false` requests will be processes normally.
+- CaptchaHtmlFilePath
+  - string
+  - Used to specify the location of the captcha HTML file to be sent in the response if Crowdsec decision is to show captcha.
+- CaptchaSiteKey
+  - string
+  - Google reCaptcha Site Key
+- CaptchaSecretKey
+  - string
+  - Google reCaptcha Secret Key
+- CaptchaVerifyRoute
+  - string
+  - default: `not-a-robot`
+  - Your custom route (URI) on which the captcha validation request must be sent.
 
 ### Configuration
 

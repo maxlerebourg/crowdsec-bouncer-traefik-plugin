@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"text/template"
 	"time"
@@ -22,13 +23,18 @@ import (
 )
 
 const (
-	crowdsecLapiHeader      = "X-Api-Key"
-	crowdsecCapiHeader      = "Authorization"
-	crowdsecLapiRoute       = "v1/decisions"
-	crowdsecLapiStreamRoute = "v1/decisions/stream"
-	crowdsecCapiLogin       = "v2/watchers/login"
-	crowdsecCapiStreamRoute = "v2/decisions/stream"
-	cacheTimeoutKey         = "updated"
+	crowdsecLapiHeader         = "X-Api-Key"
+	crowdsecCapiHeader         = "Authorization"
+	crowdsecLapiDecisionsRoute = "v1/decisions"
+	crowdsecLapiStreamRoute    = "v1/decisions/stream"
+	crowdsecLapiLoginRoute     = "v1/watchers/login"
+	crowdsecCapiLoginRoute     = "v2/watchers/login"
+	crowdsecCapiStreamRoute    = "v2/decisions/stream"
+	cacheTimeoutKey            = "updated"
+	captchaSiteVerifyURL       = "https://www.google.com/recaptcha/api/siteverify"
+	decisionTypeBan            = "ban"
+	decisionTypeCaptcha        = "captcha"
+	decisionTypeThrottle       = "throttle"
 )
 
 //nolint:gochecknoglobals
@@ -53,6 +59,8 @@ type Bouncer struct {
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
+	crowdsecLapiMachineID  string
+	crowdsecLapiPassword   string
 	crowdsecMode           string
 	crowdsecMachineID      string
 	crowdsecPassword       string
@@ -66,6 +74,12 @@ type Bouncer struct {
 	serverPoolStrategy     *ip.PoolStrategy
 	httpClient             *http.Client
 	cacheClient            *cache.Client
+	forbidOnFailure        bool
+	captchaHtmlFilePath    string
+	captchaHtmlFileContent []byte
+	captchaSiteKey         string
+	captchaSecretKey       string
+	captchaVerifyRoute     string
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -117,6 +131,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
 		crowdsecKey:            config.CrowdsecLapiKey,
+		crowdsecLapiMachineID:  config.CrowdsecLapiMachineID,
+		crowdsecLapiPassword:   config.CrowdsecLapiPassword,
 		crowdsecMachineID:      config.CrowdsecCapiMachineID,
 		crowdsecPassword:       config.CrowdsecCapiPassword,
 		crowdsecScenarios:      config.CrowdsecCapiScenarios,
@@ -125,6 +141,11 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
 		crowdsecStreamRoute:    crowdsecStreamRoute,
 		crowdsecHeader:         crowdsecHeader,
+		forbidOnFailure:        config.ForbidOnFailure,
+		captchaHtmlFilePath:    config.CaptchaHtmlFilePath,
+		captchaSiteKey:         config.CaptchaSiteKey,
+		captchaSecretKey:       config.CaptchaSecretKey,
+		captchaVerifyRoute:     config.CaptchaVerifyRoute,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -148,6 +169,19 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		config.RedisCachePassword,
 		config.RedisCacheDatabase,
 	)
+
+	if len(bouncer.captchaHtmlFilePath) > 0 {
+		content, err := os.ReadFile(bouncer.captchaHtmlFilePath)
+		if err != nil {
+			logger.Debug(fmt.Sprintf("Error reading captcha HTML file '%s'", bouncer.captchaHtmlFilePath))
+			bouncer.captchaHtmlFileContent = []byte("")
+		} else {
+			content = bytes.Replace(content, []byte("{SITE_KEY}"), []byte(bouncer.captchaSiteKey), -1)
+			content = bytes.Replace(content, []byte("{VERIFY_ROUTE}"), []byte(bouncer.captchaVerifyRoute), -1)
+			bouncer.captchaHtmlFileContent = content
+			logger.Debug(fmt.Sprintf("Captcha HTML file '%s' has been read and parsed", bouncer.captchaHtmlFilePath))
+		}
+	}
 
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
@@ -180,13 +214,18 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
 	if err != nil {
 		logger.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
-		rw.WriteHeader(http.StatusForbidden)
+		handleBanResponseSoft(bouncer, rw, req)
 		return
 	}
+
+	if handleCaptchaValidation(bouncer, rw, req, remoteIP) {
+		return
+	}
+
 	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
 		logger.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
-		rw.WriteHeader(http.StatusForbidden)
+		handleBanResponseSoft(bouncer, rw, req)
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
@@ -198,19 +237,20 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
-		isBanned, cacheErr := bouncer.cacheClient.GetDecision(remoteIP)
+		isBanned, isCaptcha, cacheErr := bouncer.cacheClient.GetDecision(remoteIP)
 		if cacheErr != nil {
 			errString := cacheErr.Error()
 			logger.Debug(fmt.Sprintf("ServeHTTP:getDecision ip:%s isBanned:false %s", remoteIP, errString))
 			if errString != cache.CacheMiss {
 				logger.Error(fmt.Sprintf("ServeHTTP:getDecision ip:%s %s", remoteIP, errString))
-				rw.WriteHeader(http.StatusForbidden)
+				handleBanResponseOrCaptcha(bouncer, rw, req, isCaptcha)
 				return
 			}
 		} else {
 			logger.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, isBanned))
 			if isBanned {
-				rw.WriteHeader(http.StatusForbidden)
+				handleBanResponseOrCaptcha(bouncer, rw, req, isCaptcha)
+				return
 			} else {
 				bouncer.next.ServeHTTP(rw, req)
 			}
@@ -221,16 +261,24 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
+			logger.Debug(fmt.Sprintf("ServeHTTP:stream is healthy"))
 			bouncer.next.ServeHTTP(rw, req)
 		} else {
 			logger.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
-			rw.WriteHeader(http.StatusForbidden)
+			if bouncer.forbidOnFailure {
+				handleBanResponseHard(bouncer, rw, req)
+				return
+			} else {
+				logger.Debug(fmt.Sprintf("ServeHTTP:stream isn't healthy. But the decision is to process the request."))
+				bouncer.next.ServeHTTP(rw, req)
+			}
 		}
 	} else {
-		err = handleNoStreamCache(bouncer, remoteIP)
+		isCaptcha, err := handleNoStreamCache(bouncer, remoteIP)
 		if err != nil {
 			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:true %s", remoteIP, err.Error()))
-			rw.WriteHeader(http.StatusForbidden)
+			handleBanResponseOrCaptcha(bouncer, rw, req, isCaptcha)
+			return
 		} else {
 			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:false", remoteIP))
 			bouncer.next.ServeHTTP(rw, req)
@@ -253,6 +301,13 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
+// DecisionDeleted Deleted decision (in case if we verify captcha)
+type DecisionDeleted struct {
+	NbDeleted string `json:"nbDeleted"`
+	Errors    bool   `json:"errors"`
+	Message   string `json:"message"`
+}
+
 // Stream Body returned from Crowdsec Stream LAPI.
 type Stream struct {
 	Deleted []Decision `json:"deleted"`
@@ -264,6 +319,190 @@ type Login struct {
 	Code   int    `json:"code"`
 	Token  string `json:"token"`
 	Expire string `json:"expire"`
+}
+
+type SiteVerifyResponse struct {
+	Success     bool      `json:"success"`
+	Action      string    `json:"action"`
+	ChallengeTS time.Time `json:"challenge_ts"`
+	Hostname    string    `json:"hostname"`
+	ErrorCodes  []string  `json:"error-codes"`
+}
+
+type ValidationResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+func handleBanResponseSoft(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request) {
+	if bouncer.forbidOnFailure {
+		logger.Debug("handleBanResponseSoft: returned 403")
+		if validateByPassCookie(req) == false {
+			rw.WriteHeader(http.StatusForbidden)
+		}
+		return
+	}
+	bouncer.next.ServeHTTP(rw, req)
+}
+
+func handleBanResponseHard(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request) {
+	logger.Debug("handleBanResponseHard: returned 403")
+	if validateByPassCookie(req) == false {
+		rw.WriteHeader(http.StatusForbidden)
+	}
+	return
+}
+
+func handleBanResponseOrCaptcha(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, isCaptcha bool) {
+	logger.Debug(fmt.Sprintf("handleBanResponseOrCaptcha '%t'", isCaptcha))
+
+	if validateByPassCookie(req) {
+		bouncer.next.ServeHTTP(rw, req)
+		return
+	}
+
+	if !isCaptcha {
+		handleBanResponseHard(bouncer, rw, req)
+		return
+	}
+
+	logger.Debug(fmt.Sprintf("Must respond with captcha here.... Captcha file '%s'", bouncer.captchaHtmlFilePath))
+	rw.Header().Add("Content-Type", "text/html")
+	rw.WriteHeader(200)
+	_, err := rw.Write(bouncer.captchaHtmlFileContent)
+	if err != nil {
+		logger.Debug(fmt.Sprintf("Unknown error while sending the captha HTML: '%s'", err.Error()))
+	}
+}
+
+func handleCaptchaValidation(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, remoteIP string) bool {
+	requestProcessed := true
+	requestNotProcessed := false
+
+	if !(req.RequestURI == bouncer.captchaVerifyRoute) && !(req.Method == http.MethodPost) {
+		return requestNotProcessed
+	}
+
+	logger.Debug(fmt.Sprintf("handleCaptchaValidation: route matched"))
+
+	var response ValidationResponse
+	response.Success = false
+
+	err := req.ParseForm()
+	if err != nil {
+		response.Message = err.Error()
+		respondJson(rw, response, http.StatusForbidden)
+	}
+	validationResponse := req.Form.Get("response")
+
+	req, err = http.NewRequest(http.MethodPost, captchaSiteVerifyURL, nil)
+	if err != nil {
+		response.Message = err.Error()
+		respondJson(rw, response, http.StatusForbidden)
+		return requestProcessed
+	}
+
+	// Add necessary request parameters.
+	q := req.URL.Query()
+	q.Add("secret", bouncer.captchaSecretKey)
+	q.Add("response", validationResponse)
+	req.URL.RawQuery = q.Encode()
+
+	// Make request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		response.Message = err.Error()
+		respondJson(rw, response, http.StatusForbidden)
+		return requestProcessed
+	}
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			response.Message = err.Error()
+			respondJson(rw, response, http.StatusForbidden)
+		}
+	}(resp.Body)
+
+	// Decode response.
+	var body SiteVerifyResponse
+	if err = json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		response.Message = err.Error()
+		respondJson(rw, response, http.StatusForbidden)
+		return requestProcessed
+	}
+
+	// Check recaptcha verification success.
+	if !body.Success {
+		response.Message = err.Error()
+		respondJson(rw, response, http.StatusForbidden)
+		return requestProcessed
+	}
+	err = deleteIpDecisions(bouncer, remoteIP)
+	if err != nil {
+		// Do no provide real error message here returned by LAPI...
+		response.Message = "Could not unlock the IP address due to internal issue."
+		respondJson(rw, response, http.StatusForbidden)
+		return requestProcessed
+	}
+
+	bypassCookie := &http.Cookie{
+		Name:   "bypass",
+		Value:  createBypassCookie(),
+		MaxAge: int(bouncer.updateInterval | bouncer.defaultDecisionTimeout),
+	}
+
+	response.Success = true
+	http.SetCookie(rw, bypassCookie)
+	respondJson(rw, response, http.StatusOK)
+	return requestProcessed
+}
+
+func respondJson(rw http.ResponseWriter, response ValidationResponse, statusCode int) {
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(statusCode)
+	err := json.NewEncoder(rw).Encode(response)
+	if err != nil {
+		logger.Error(fmt.Sprintf("respondJson:Error while sending JSON responce '%s", err.Error()))
+	}
+}
+
+func createBypassCookie() string {
+	return "1"
+}
+
+func validateByPassCookie(req *http.Request) bool {
+	_, err := req.Cookie("bypass")
+	if err != nil {
+		return false
+	}
+
+	logger.Debug("The cookie was found, need to match it ")
+	return true
+}
+
+func deleteIpDecisions(bouncer *Bouncer, remoteIP string) error {
+	deleteRouteURL := url.URL{
+		Scheme:   bouncer.crowdsecScheme,
+		Host:     bouncer.crowdsecHost,
+		Path:     crowdsecLapiDecisionsRoute,
+		RawQuery: fmt.Sprintf("ip=%s", remoteIP),
+	}
+	body, err := crowdsecQuery(bouncer, deleteRouteURL.String(), http.MethodDelete)
+	if err != nil {
+		return err
+	}
+
+	var result DecisionDeleted
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return fmt.Errorf("%w", err)
+	}
+
+	logger.Debug(fmt.Sprintf("deleteIpDecisions NbDeleted:%d", result.NbDeleted))
+	logger.Debug(fmt.Sprintf("deleteIpDecisions Message:%d", result.Message))
+
+	return nil
 }
 
 func handleStreamTicker(bouncer *Bouncer) {
@@ -293,58 +532,73 @@ func startTicker(config *configuration.Config, work func()) chan bool {
 }
 
 // We are now in none or live mode.
-func handleNoStreamCache(bouncer *Bouncer, remoteIP string) error {
+func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (bool, error) {
 	isLiveMode := bouncer.crowdsecMode == configuration.LiveMode
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
-		Path:     crowdsecLapiRoute,
+		Path:     crowdsecLapiDecisionsRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
 	}
-	body, err := crowdsecQuery(bouncer, routeURL.String(), false)
+	body, err := crowdsecQuery(bouncer, routeURL.String(), http.MethodGet)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if bytes.Equal(body, []byte("null")) {
 		if isLiveMode {
-			bouncer.cacheClient.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
+			bouncer.cacheClient.SetDecision(remoteIP, cache.cacheNoBannedValue, bouncer.defaultDecisionTimeout)
 		}
-		return nil
+		return false, nil
 	}
 
 	var decisions []Decision
 	err = json.Unmarshal(body, &decisions)
 	if err != nil {
-		return fmt.Errorf("handleNoStreamCache:parseBody %w", err)
+		return false, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
 	}
 	if len(decisions) == 0 {
 		if isLiveMode {
-			bouncer.cacheClient.SetDecision(remoteIP, false, bouncer.defaultDecisionTimeout)
+			bouncer.cacheClient.SetDecision(remoteIP, cache.cacheNoBannedValue, bouncer.defaultDecisionTimeout)
 		}
-		return nil
+		return false, nil
 	}
-	duration, err := time.ParseDuration(decisions[0].Duration)
+
+	decision := decisions[0]
+	duration, err := time.ParseDuration(decision.Duration)
 	if err != nil {
-		return fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
+		return false, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
+	decisionType := cache.cacheBannedValue
 	if isLiveMode {
+
 		durationSecond := int64(duration.Seconds())
 		if bouncer.defaultDecisionTimeout < durationSecond {
 			durationSecond = bouncer.defaultDecisionTimeout
 		}
-		bouncer.cacheClient.SetDecision(remoteIP, true, durationSecond)
+		if decisionTypeCaptcha == decision.Type {
+			decisionType = cache.cacheCaptchaValue
+		}
+		bouncer.cacheClient.SetDecision(remoteIP, decisionType, durationSecond)
 	}
-	return fmt.Errorf("handleNoStreamCache:banned")
+	return decisionType == cache.cacheCaptchaValue, fmt.Errorf("handleNoStreamCache:banned")
 }
 
 func getToken(bouncer *Bouncer) error {
+	var loginRoute string
+
+	if bouncer.crowdsecMode == configuration.AloneMode {
+		loginRoute = crowdsecCapiLoginRoute
+	} else {
+		loginRoute = crowdsecLapiLoginRoute
+	}
+
 	loginURL := url.URL{
 		Scheme: bouncer.crowdsecScheme,
 		Host:   bouncer.crowdsecHost,
-		Path:   crowdsecCapiLogin,
+		Path:   loginRoute,
 	}
-	body, err := crowdsecQuery(bouncer, loginURL.String(), true)
+	body, err := crowdsecQuery(bouncer, loginURL.String(), http.MethodPost)
 	if err != nil {
 		return err
 	}
@@ -367,7 +621,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	// Instead of blocking the goroutine interval for all the secondary node,
 	// if the master service is shut down, other goroutine can take the lead
 	// because updated routine information is in the cache
-	_, err := bouncer.cacheClient.GetDecision(cacheTimeoutKey)
+	_, _, err := bouncer.cacheClient.GetDecision(cacheTimeoutKey)
 	if err == nil {
 		logger.Debug("handleStreamCache:alreadyUpdated")
 		return nil
@@ -375,14 +629,15 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err.Error() != cache.CacheMiss {
 		return err
 	}
-	bouncer.cacheClient.SetDecision(cacheTimeoutKey, false, bouncer.updateInterval-1)
+	bouncer.cacheClient.SetDecision(cacheTimeoutKey, cache.cacheNoBannedValue, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
-	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
+	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), http.MethodGet)
+
 	if err != nil {
 		return err
 	}
@@ -391,43 +646,71 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
-	for _, decision := range stream.New {
-		duration, err := time.ParseDuration(decision.Duration)
-		if err == nil {
-			bouncer.cacheClient.SetDecision(decision.Value, true, int64(duration.Seconds()))
-		}
-	}
+
+	var decisionType string
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.DeleteDecision(decision.Value)
 	}
+	for _, decision := range stream.New {
+		duration, err := time.ParseDuration(decision.Duration)
+		if decisionTypeCaptcha == decision.Type {
+			decisionType = cache.cacheCaptchaValue
+		} else {
+			decisionType = cache.cacheBannedValue
+		}
+		if err == nil {
+			bouncer.cacheClient.SetDecision(decision.Value, decisionType, int64(duration.Seconds()))
+		}
+	}
+
 	logger.Debug("handleStreamCache:updated")
 	isCrowdsecStreamHealthy = true
 	return nil
 }
 
-func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, error) {
+func crowdsecQuery(bouncer *Bouncer, stringURL string, method string) ([]byte, error) {
 	var req *http.Request
-	if isPost {
+	var machineId string
+	var password string
+
+	if bouncer.crowdsecMode == configuration.AloneMode {
+		machineId = bouncer.crowdsecMachineID
+		password = bouncer.crowdsecPassword
+	} else {
+		machineId = bouncer.crowdsecLapiMachineID
+		password = bouncer.crowdsecLapiPassword
+	}
+
+	if method == http.MethodPost {
 		data := []byte(fmt.Sprintf(
 			`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
-			bouncer.crowdsecMachineID,
-			bouncer.crowdsecPassword,
+			machineId,
+			password,
 			strings.Join(bouncer.crowdsecScenarios, `","`),
 		))
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
 	} else {
-		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
+		req, _ = http.NewRequest(method, stringURL, nil)
 	}
+
+	if method == http.MethodDelete {
+		bearer := fmt.Sprintf("Bearer %s", bouncer.crowdsecKey)
+		req.Header.Add("Authorization", bearer)
+	}
+
 	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
+
+	logger.Debug(fmt.Sprintf("crowdsecQuery:request | method: '%s', URL: '%s', Secret: '%s'",
+		method, stringURL, bouncer.crowdsecKey))
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)
 	}
-	if res.StatusCode == http.StatusUnauthorized && bouncer.crowdsecMode == configuration.AloneMode {
+	if res.StatusCode == http.StatusUnauthorized {
 		if errToken := getToken(bouncer); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}
-		return crowdsecQuery(bouncer, stringURL, false)
+		return crowdsecQuery(bouncer, stringURL, method)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("crowdsecQuery url:%s, statusCode:%d", stringURL, res.StatusCode)

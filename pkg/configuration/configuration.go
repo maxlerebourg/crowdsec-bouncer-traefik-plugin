@@ -48,6 +48,8 @@ type Config struct {
 	CrowdsecCapiPassword                     string   `json:"crowdsecCapiPassword,omitempty"`
 	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
+	CrowdsecLapiMachineID                    string   `json:"crowdsecLapiMachineId,omitempty"`
+	CrowdsecLapiPassword                     string   `json:"crowdsecLapiPassword,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
@@ -59,6 +61,11 @@ type Config struct {
 	RedisCachePassword                       string   `json:"redisCachePassword,omitempty"`
 	RedisCachePasswordFile                   string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                       string   `json:"redisCacheDatabase,omitempty"`
+	ForbidOnFailure                          bool     `json:"forbidOnFailure,omitempty"`
+	CaptchaHtmlFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
+	CaptchaSiteKey                           string   `json:"captchaSiteKey,omitempty"`
+	CaptchaSecretKey                         string   `json:"captchaSecretKey,omitempty"`
+	CaptchaVerifyRoute                       string   `json:"captchaVerifyRoute,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -90,6 +97,8 @@ func New() *Config {
 		RedisCacheHost:                "redis:6379",
 		RedisCachePassword:            "",
 		RedisCacheDatabase:            "",
+		ForbidOnFailure:               true,
+		CaptchaVerifyRoute:            "not-a-robot",
 	}
 }
 

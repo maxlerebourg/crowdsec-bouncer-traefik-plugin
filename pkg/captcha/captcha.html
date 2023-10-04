@@ -1,0 +1,27 @@
+<html>
+    <head>
+        <title>reCAPTCHA demo: Explicit render for multiple widgets</title>
+        <script type="text/javascript">
+            var verifyCallback = function(response) {
+                const xhttp = new XMLHttpRequest();
+                xhttp.open("POST", "{VERIFY_ROUTE}");
+                xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+                xhttp.send("response=" + response);
+            };
+            var onloadCallback = function() {
+                grecaptcha.render('recaptcha', {
+                    'sitekey' : '{SITE_KEY}',
+                    'callback' : verifyCallback,
+                    'theme' : 'dark'
+                });
+            };
+        </script>
+    </head>
+    <body>
+        <h1>Please verify you're not a robot</h1>
+        <div id="recaptcha"></div>
+        <script src="https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit"
+                async defer>
+        </script>
+    </body>
+</html>
