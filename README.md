@@ -143,18 +143,18 @@ Only one instance of the plugin is *possible*.
   - bool
   - default: true
   - Affects how bouncer will behave in case is Crowdsec LAPI or Redis ar down. By default, 403 will be thrown. When set to `false` requests will be processes normally.
-- captchaHtmlFilePath
+- CaptchaHtmlFilePath
   - string
   - Used to specify the location of the captcha HTML file to be sent in the response if Crowdsec decision is to show captcha.
-- captchaSiteKey
+- CaptchaSiteKey
   - string
   - Google reCaptcha Site Key
-- captchaSecretKey
+- CaptchaSecretKey
   - string
   - Google reCaptcha Secret Key
-- captchaVerifyRoute
+- CaptchaVerifyRoute
   - string
-  - dafault: `not-a-robot`
+  - default: `not-a-robot`
   - Your custom route (URI) on which the captcha validation request must be sent.
 
 ### Configuration
