@@ -76,6 +76,7 @@ type Bouncer struct {
 	cacheClient            *cache.Client
 	forbidOnFailure        bool
 	captchaHtmlFilePath    string
+	captchaHtmlFileContent []byte
 	captchaSiteKey         string
 	captchaSecretKey       string
 	captchaVerifyRoute     string
@@ -168,6 +169,19 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		config.RedisCachePassword,
 		config.RedisCacheDatabase,
 	)
+
+	if len(bouncer.captchaHtmlFilePath) > 0 {
+		content, err := os.ReadFile(bouncer.captchaHtmlFilePath)
+		if err != nil {
+			logger.Debug(fmt.Sprintf("Error reading captcha HTML file '%s'", bouncer.captchaHtmlFilePath))
+			bouncer.captchaHtmlFileContent = []byte("")
+		} else {
+			content = bytes.Replace(content, []byte("{SITE_KEY}"), []byte(bouncer.captchaSiteKey), -1)
+			content = bytes.Replace(content, []byte("{VERIFY_ROUTE}"), []byte(bouncer.captchaVerifyRoute), -1)
+			bouncer.captchaHtmlFileContent = content
+			logger.Debug(fmt.Sprintf("Captcha HTML file '%s' has been read and parsed", bouncer.captchaHtmlFilePath))
+		}
+	}
 
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
@@ -323,7 +337,9 @@ type ValidationResponse struct {
 func handleBanResponseSoft(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request) {
 	if bouncer.forbidOnFailure {
 		logger.Debug("handleBanResponseSoft: returned 403")
-		rw.WriteHeader(http.StatusForbidden)
+		if validateByPassCookie(req) == false {
+			rw.WriteHeader(http.StatusForbidden)
+		}
 		return
 	}
 	bouncer.next.ServeHTTP(rw, req)
@@ -331,12 +347,19 @@ func handleBanResponseSoft(bouncer *Bouncer, rw http.ResponseWriter, req *http.R
 
 func handleBanResponseHard(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request) {
 	logger.Debug("handleBanResponseHard: returned 403")
-	rw.WriteHeader(http.StatusForbidden)
+	if validateByPassCookie(req) == false {
+		rw.WriteHeader(http.StatusForbidden)
+	}
 	return
 }
 
 func handleBanResponseOrCaptcha(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, isCaptcha bool) {
 	logger.Debug(fmt.Sprintf("handleBanResponseOrCaptcha '%t'", isCaptcha))
+
+	if validateByPassCookie(req) {
+		bouncer.next.ServeHTTP(rw, req)
+		return
+	}
 
 	if !isCaptcha {
 		handleBanResponseHard(bouncer, rw, req)
@@ -344,21 +367,20 @@ func handleBanResponseOrCaptcha(bouncer *Bouncer, rw http.ResponseWriter, req *h
 	}
 
 	logger.Debug(fmt.Sprintf("Must respond with captcha here.... Captcha file '%s'", bouncer.captchaHtmlFilePath))
-	content, err := os.ReadFile(bouncer.captchaHtmlFilePath)
-	content = bytes.Replace(content, []byte("{SITE_KEY}"), []byte(bouncer.captchaSiteKey), -1)
-	content = bytes.Replace(content, []byte("{VERIFY_ROUTE}"), []byte(bouncer.captchaVerifyRoute), -1)
-	if err != nil {
-		logger.Debug(fmt.Sprintf("Error reading captcha HTML file '%s'", bouncer.captchaHtmlFilePath))
-	}
-
 	rw.Header().Add("Content-Type", "text/html")
 	rw.WriteHeader(200)
-	_, err = rw.Write(content)
+	_, err := rw.Write(bouncer.captchaHtmlFileContent)
+	if err != nil {
+		logger.Debug(fmt.Sprintf("Unknown error while sending the captha HTML: '%s'", err.Error()))
+	}
 }
 
 func handleCaptchaValidation(bouncer *Bouncer, rw http.ResponseWriter, req *http.Request, remoteIP string) bool {
-	if !(req.RequestURI == bouncer.captchaVerifyRoute && req.Method == http.MethodPost) {
-		return false
+	requestProcessed := true
+	requestNotProcessed := false
+
+	if !(req.RequestURI == bouncer.captchaVerifyRoute) && !(req.Method == http.MethodPost) {
+		return requestNotProcessed
 	}
 
 	logger.Debug(fmt.Sprintf("handleCaptchaValidation: route matched"))
@@ -377,7 +399,7 @@ func handleCaptchaValidation(bouncer *Bouncer, rw http.ResponseWriter, req *http
 	if err != nil {
 		response.Message = err.Error()
 		respondJson(rw, response, http.StatusForbidden)
-		return false
+		return requestProcessed
 	}
 
 	// Add necessary request parameters.
@@ -391,7 +413,7 @@ func handleCaptchaValidation(bouncer *Bouncer, rw http.ResponseWriter, req *http
 	if err != nil {
 		response.Message = err.Error()
 		respondJson(rw, response, http.StatusForbidden)
-		return false
+		return requestProcessed
 	}
 
 	defer func(Body io.ReadCloser) {
@@ -407,24 +429,33 @@ func handleCaptchaValidation(bouncer *Bouncer, rw http.ResponseWriter, req *http
 	if err = json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		response.Message = err.Error()
 		respondJson(rw, response, http.StatusForbidden)
-		return false
+		return requestProcessed
 	}
 
 	// Check recaptcha verification success.
 	if !body.Success {
 		response.Message = err.Error()
 		respondJson(rw, response, http.StatusForbidden)
-		return false
+		return requestProcessed
 	}
 	err = deleteIpDecisions(bouncer, remoteIP)
 	if err != nil {
-		response.Message = err.Error()
+		// Do no provide real error message here returned by LAPI...
+		response.Message = "Could not unlock the IP address due to internal issue."
 		respondJson(rw, response, http.StatusForbidden)
+		return requestProcessed
+	}
+
+	bypassCookie := &http.Cookie{
+		Name:   "bypass",
+		Value:  createBypassCookie(),
+		MaxAge: int(bouncer.updateInterval | bouncer.defaultDecisionTimeout),
 	}
 
 	response.Success = true
+	http.SetCookie(rw, bypassCookie)
 	respondJson(rw, response, http.StatusOK)
-	return true
+	return requestProcessed
 }
 
 func respondJson(rw http.ResponseWriter, response ValidationResponse, statusCode int) {
@@ -434,6 +465,20 @@ func respondJson(rw http.ResponseWriter, response ValidationResponse, statusCode
 	if err != nil {
 		logger.Error(fmt.Sprintf("respondJson:Error while sending JSON responce '%s", err.Error()))
 	}
+}
+
+func createBypassCookie() string {
+	return "1"
+}
+
+func validateByPassCookie(req *http.Request) bool {
+	_, err := req.Cookie("bypass")
+	if err != nil {
+		return false
+	}
+
+	logger.Debug("The cookie was found, need to match it ")
+	return true
 }
 
 func deleteIpDecisions(bouncer *Bouncer, remoteIP string) error {

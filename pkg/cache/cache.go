@@ -31,7 +31,7 @@ func (localCache) getDecision(clientIP string) (bool, bool, error) {
 	bannedString, isValid := banned.(string)
 	logger.Debug(fmt.Sprintf("cache:getDecision:bannedString '%s', isValid '%t', isCached '%t'", bannedString, isValid, isCached))
 	if isCached && isValid && len(bannedString) > 0 {
-		isBanned := bannedString == cacheBannedValue || bannedString == cacheCaptchaValue
+		isBanned := bannedString != cacheNoBannedValue
 		isCaptcha := bannedString == cacheCaptchaValue
 		return isBanned, isCaptcha, nil
 	}
@@ -52,7 +52,7 @@ func (redisCache) getDecision(clientIP string) (bool, bool, error) {
 	banned, err := redis.Get(clientIP)
 	bannedString := string(banned)
 	if err == nil && len(bannedString) > 0 {
-		isBanned := bannedString == cacheBannedValue || bannedString == cacheCaptchaValue
+		isBanned := bannedString != cacheNoBannedValue
 		isCaptcha := bannedString == cacheCaptchaValue
 		return isBanned, isCaptcha, nil
 	}
