@@ -14,7 +14,7 @@ services:
       - "--providers.file.filename=/cloud.yaml"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./cloudflare-exemple.yaml:/cloud.yaml:ro
+      - ./cloudflare-example.yaml:/cloud.yaml:ro
       - logs-cloudflare:/var/log/traefik
     ports:
       - 80:80

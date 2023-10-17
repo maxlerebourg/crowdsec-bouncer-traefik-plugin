@@ -26,19 +26,19 @@ run_local:
 	docker-compose -f docker-compose.local.yml up -d --remove-orphans
 
 run_behindproxy:
-	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml up -d --remove-orphans
+	docker-compose -f examples/behind-proxy/docker-compose.cloudflare.yml up -d --remove-orphans
 
 run_cacheredis:
-	docker-compose -f exemples/redis-cache/docker-compose.redis.yml up -d --remove-orphans
+	docker-compose -f examples/redis-cache/docker-compose.redis.yml up -d --remove-orphans
 
 run_trustedips:
-	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml up -d --remove-orphans
+	docker-compose -f examples/trusted-ips/docker-compose.trusted.yml up -d --remove-orphans
 
 run_binaryvm:
-	cd exemples/binary-vm/ && sudo vagrant up
+	cd examples/binary-vm/ && sudo vagrant up
 
 run_tlsauth:
-	docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml down && docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml up -d && docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml restart && docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml logs -f
+	docker-compose -f examples/tls-auth/docker-compose.tls-auth.yml down && docker-compose -f examples/tls-auth/docker-compose.tls-auth.yml up -d && docker-compose -f examples/tls-auth/docker-compose.tls-auth.yml restart && docker-compose -f examples/tls-auth/docker-compose.tls-auth.yml logs -f
 
 run:
 	docker-compose -f docker-compose.yml up -d --remove-orphans
@@ -53,16 +53,16 @@ restart:
 	docker-compose -f docker-compose.yml restart
 
 restart_behindproxy:
-	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml restart
+	docker-compose -f examples/behind-proxy/docker-compose.cloudflare.yml restart
 
 restart_cacheredis:
-	docker-compose -f exemples/redis-cache/docker-compose.redis.yml restart
+	docker-compose -f examples/redis-cache/docker-compose.redis.yml restart
 
 restart_trustedips:
-	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml restart
+	docker-compose -f examples/trusted-ips/docker-compose.trusted.yml restart
 
 restart_tlsauth:
-	docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml
+	docker-compose -f examples/tls-auth/docker-compose.tls-auth.yml
 
 show_logs:
 	docker-compose -f docker-compose.yml restart
@@ -74,15 +74,15 @@ show_dev_logs:
 	docker-compose -f docker-compose.dev.yml logs -f
 
 clean_all_docker:
-	docker-compose -f exemples/behind-proxy/docker-compose.cloudflare.yml down --remove-orphans
-	docker-compose -f exemples/redis-cache/docker-compose.redis.yml down --remove-orphans
-	docker-compose -f exemples/trusted-ips/docker-compose.trusted.yml down --remove-orphans
-	docker-compose -f exemples/tls-auth/docker-compose.tls-auth.yml down --remove-orphans
+	docker-compose -f examples/behind-proxy/docker-compose.cloudflare.yml down --remove-orphans
+	docker-compose -f examples/redis-cache/docker-compose.redis.yml down --remove-orphans
+	docker-compose -f examples/trusted-ips/docker-compose.trusted.yml down --remove-orphans
+	docker-compose -f examples/tls-auth/docker-compose.tls-auth.yml down --remove-orphans
 	docker-compose -f docker-compose.local.yml down --remove-orphans
 	docker-compose -f docker-compose.yml down --remove-orphans
 
 clean_vagrant:
-	cd exemples/binary-vm/ && sudo vagrant destroy -f
+	cd examples/binary-vm/ && sudo vagrant destroy -f
 
 
 show_metrics:

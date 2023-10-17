@@ -1,4 +1,4 @@
-# Exemple
+# Example
 
 ### Install vagrant
 
