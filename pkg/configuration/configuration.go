@@ -98,7 +98,7 @@ func New() *Config {
 		RedisCachePassword:            "",
 		RedisCacheDatabase:            "",
 		FallbackRemediation:           "ban",
-		CaptchaGracePeriod:            60 * 30,
+		CaptchaGracePeriod:            30,
 	}
 }
 

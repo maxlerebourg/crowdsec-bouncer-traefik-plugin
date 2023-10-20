@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -23,6 +24,7 @@ type Client struct {
 	GracePeriod         int64
 	SiteKey             string
 	SecretKey           string
+	Cache               *cache.Client
 	Http                *http.Client
 }
 
@@ -39,7 +41,7 @@ var (
 		"turnstile": "cf-captcha",
 	}
 	ValidateEndpoints = map[string]string{
-		"hcaptcha":  "https://api.hcaptcha.com/verify",
+		"hcaptcha":  "https://api.hcaptcha.com/siteverify",
 		"recaptcha": "https://www.google.com/recaptcha/api/siteverify",
 		"turnstile": "https://challenges.cloudflare.com/turnstile/v0/siteverify",
 	}
@@ -50,7 +52,6 @@ var (
 func (c *Client) CompileTemplate() error {
 	var err error
 	if c.Template == "" && c.TemplateFile == "" {
-		c.Valid = false
 		return fmt.Errorf("no captcha template provided, captcha decisions will fallback to %s", c.FallbackRemediation)
 	}
 	if c.TemplateFile != "" {
@@ -62,11 +63,14 @@ func (c *Client) CompileTemplate() error {
 	}
 	c.CompiledTemplate, err = template.New("captcha").Parse(c.Template)
 	if err != nil {
-		c.Valid = false
 		return fmt.Errorf("error compiling captcha template: %s", err.Error())
 	}
 	c.Valid = true
 	return err
+}
+
+func (c *Client) Debug(message string) {
+	logger.Debug(fmt.Sprintf("captchaClient: %s", message))
 }
 
 func (c *Client) New(siteKey, secretKey, provider, template, templateFile, fallback string, gracePeriod int64) error {
@@ -87,12 +91,32 @@ func (c *Client) New(siteKey, secretKey, provider, template, templateFile, fallb
 	return c.CompileTemplate()
 }
 
-func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
 	if !c.Valid && c.FallbackRemediation == "ban" {
-		logger.Debug("captcha is not valid and fallback remediation is set to ban, returning 403")
+		c.Debug("captcha is not valid and fallback remediation is set to ban, returning 403")
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
+	valid, err := c.Validate(r)
+	if err != nil {
+		c.Debug(fmt.Sprintf("error validating captcha: %s", err.Error()))
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if valid {
+		c.Debug("captcha is valid, setting cookie")
+		uri, err := c.Cache.Get(fmt.Sprintf("%s_captcha", remoteIP))
+		c.SetCookie(rw)
+		if err != nil && err.Error() == cache.CacheMiss {
+			c.Debug("no original request URI found in cache")
+			http.Redirect(rw, r, "/", http.StatusFound)
+			return
+		}
+		c.Cache.Delete(fmt.Sprintf("%s_captcha", remoteIP))
+		http.Redirect(rw, r, uri, http.StatusFound)
+		return
+	}
+	c.Cache.Set(fmt.Sprintf("%s_captcha", remoteIP), r.RequestURI, 60*5)
 	c.CompiledTemplate.Execute(rw, map[string]string{
 		"Site_key":     c.SiteKey,
 		"Frontend_js":  FrontendJS[c.Provider],
@@ -106,17 +130,83 @@ type CaptchaResponse struct {
 	//Hostname    string `json:"hostname"`
 }
 
+func (c *Client) CheckCookie(rw http.ResponseWriter, r *http.Request) bool {
+	c.Debug("validating captcha cookie")
+	cookie, err := r.Cookie("crowdsec_captcha")
+	if err != nil {
+		c.Debug(fmt.Sprintf("error getting captcha cookie: %s", err.Error()))
+		return false
+	}
+	_, err = c.validateJWT(cookie.Value)
+	if err != nil {
+		c.Debug(fmt.Sprintf("error validating jwt token: %s", err.Error()))
+		http.SetCookie(rw, &http.Cookie{
+			Name:     "crowdsec_captcha",
+			Value:    "",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
+			Expires:  time.Now().Add(3 * time.Second),
+		})
+		return false
+	}
+	return err == nil
+}
+
+func (c *Client) validateJWT(tokenString string) (*jwt.Token, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		_, ok := token.Method.(*jwt.SigningMethodHMAC)
+		if !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(c.SecretKey), nil
+	})
+	if err != nil {
+		c.Debug(fmt.Sprintf("error from jwt parse %s", err.Error()))
+		return &jwt.Token{}, err
+	}
+	if !token.Valid {
+		return &jwt.Token{}, fmt.Errorf("invalid jwt token")
+	}
+	return token, nil
+}
+
+func (c *Client) generateJWT(exp time.Time) (string, error) {
+	c.Debug("generating jwt token")
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"exp": exp.Unix(),
+	})
+	return token.SignedString([]byte(c.SecretKey))
+}
+
+func (c *Client) SetCookie(rw http.ResponseWriter) {
+	//TODO handle jwt error
+	exp := time.Now().Add(time.Duration(c.GracePeriod) * time.Minute)
+	token, err := c.generateJWT(exp)
+	if err != nil {
+		c.Debug(fmt.Sprintf("error generating jwt token: %s", err.Error()))
+		return
+	}
+	http.SetCookie(rw, &http.Cookie{
+		Name:     "crowdsec_captcha",
+		Value:    token,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  exp,
+	})
+}
+
 func (c *Client) Validate(r *http.Request) (bool, error) {
 	if r.Method != "POST" {
-		logger.Debug(fmt.Sprintf("invalid method %s", r.Method))
-		return false, fmt.Errorf(InvalidMethod)
+		c.Debug(fmt.Sprintf("invalid method: %s", r.Method))
+		return false, nil
 	}
 	var response = r.FormValue(fmt.Sprintf("%s-response", FrontendKey[c.Provider]))
 	if response == "" {
-		logger.Debug("post body missing captcha form value")
-		return false, fmt.Errorf("invalid:missing-response")
+		c.Debug("no captcha response found in request")
+		return false, nil
 	}
-	logger.Debug(fmt.Sprintf("validating captcha with response: %s", response))
 	var body = url.Values{}
 	body.Add("secret", c.SecretKey)
 	body.Add("response", response)
@@ -125,16 +215,14 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		return false, err
 	}
 	defer resp.Body.Close()
-	if resp.Header.Get("Content-Type") != "application/json" {
-		b, _ := io.ReadAll(r.Body)
-		logger.Debug(fmt.Sprintf("status: %s, body: %s", resp.Status, string(b)))
-		return false, fmt.Errorf("invalid:content-type")
+	if resp.Header.Get("content-type") != "application/json" {
+		return false, nil
 	}
 	var captchaResponse CaptchaResponse
 	err = json.NewDecoder(resp.Body).Decode(&captchaResponse)
 	if err != nil {
 		return false, err
 	}
-	logger.Debug(fmt.Sprintf("validating captcha success: %v", captchaResponse.Success))
+	c.Debug(fmt.Sprintf("validating captcha success: %v", captchaResponse.Success))
 	return captchaResponse.Success, nil
 }
