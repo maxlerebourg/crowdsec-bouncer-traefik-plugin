@@ -130,7 +130,7 @@ func Test_handleNoStreamCache(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := handleNoStreamCache(tt.args.bouncer, tt.args.remoteIP); (err != nil) != tt.wantErr {
+			if _, err := handleNoStreamCache(tt.args.bouncer, tt.args.remoteIP); (err != nil) != tt.wantErr {
 				t.Errorf("handleNoStreamCache() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	cacheBannedValue   = "t"
-	cacheNoBannedValue = "f"
+	BannedValue   = "t"
+	CaptchaValue  = "c"
+	NoBannedValue = "f"
 )
 
 // CacheMiss error string when cache is miss.
@@ -27,53 +28,53 @@ var (
 
 type localCache struct{}
 
-func (localCache) getDecision(clientIP string) (bool, error) {
-	banned, isCached := cache.Get(clientIP)
-	bannedString, isValid := banned.(string)
-	if isCached && isValid && len(bannedString) > 0 {
-		return bannedString == cacheBannedValue, nil
+func (localCache) get(clientIP string) (string, error) {
+	value, isCached := cache.Get(clientIP)
+	valueString, isValid := value.(string)
+	if isCached && isValid && len(valueString) > 0 {
+		return valueString, nil
 	}
-	return false, fmt.Errorf(CacheMiss)
+	return NoBannedValue, fmt.Errorf(CacheMiss)
 }
 
-func (localCache) setDecision(clientIP string, value string, duration int64) {
+func (localCache) set(clientIP string, value string, duration int64) {
 	cache.Set(clientIP, value, duration)
 }
 
-func (localCache) deleteDecision(clientIP string) {
+func (localCache) delete(clientIP string) {
 	cache.Del(clientIP)
 }
 
 type redisCache struct{}
 
-func (redisCache) getDecision(clientIP string) (bool, error) {
+func (redisCache) get(clientIP string) (string, error) {
 	banned, err := redis.Get(clientIP)
 	bannedString := string(banned)
 	if err == nil && len(bannedString) > 0 {
-		return bannedString == cacheBannedValue, nil
+		return bannedString, nil
 	}
 	if err.Error() == simpleredis.RedisMiss {
-		return false, fmt.Errorf(CacheMiss)
+		return NoBannedValue, fmt.Errorf(CacheMiss)
 	}
-	return false, err
+	return NoBannedValue, err
 }
 
-func (redisCache) setDecision(clientIP string, value string, duration int64) {
+func (redisCache) set(clientIP string, value string, duration int64) {
 	if err := redis.Set(clientIP, []byte(value), duration); err != nil {
 		logger.Error(fmt.Sprintf("cache:setDecisionRedisCache %s", err.Error()))
 	}
 }
 
-func (redisCache) deleteDecision(clientIP string) {
+func (redisCache) delete(clientIP string) {
 	if err := redis.Del(clientIP); err != nil {
 		logger.Error(fmt.Sprintf("cache:deleteDecisionRedisCache %s", err.Error()))
 	}
 }
 
 type cacheInterface interface {
-	setDecision(clientIP string, value string, duration int64)
-	getDecision(clientIP string) (bool, error)
-	deleteDecision(clientIP string)
+	set(clientIP string, value string, duration int64)
+	get(clientIP string) (string, error)
+	delete(clientIP string)
 }
 
 // Client Cache client.
@@ -81,38 +82,35 @@ type Client struct {
 	cache cacheInterface
 }
 
+func (c *Client) Debug(message string) {
+	logger.Debug(fmt.Sprintf("cacheClient: %s", message))
+}
+
 // New Initialize cache client.
-func (client *Client) New(isRedis bool, host, pass, database string) {
+func (c *Client) New(isRedis bool, host, pass, database string) {
 	if isRedis {
 		redis.Init(host, pass, database)
-		client.cache = &redisCache{}
+		c.cache = &redisCache{}
 	} else {
-		client.cache = &localCache{}
+		c.cache = &localCache{}
 	}
-	logger.Debug(fmt.Sprintf("cache:New initialized isRedis:%v", isRedis))
+	c.Debug(fmt.Sprintf("New initialized isRedis:%v", isRedis))
 }
 
 // DeleteDecision delete decision in cache.
-func (client *Client) DeleteDecision(clientIP string) {
-	logger.Debug(fmt.Sprintf("cache:DeleteDecision ip:%v", clientIP))
-	client.cache.deleteDecision(clientIP)
+func (c *Client) Delete(key string) {
+	c.Debug(fmt.Sprintf("Delete key:%v", key))
+	c.cache.delete(key)
 }
 
 // GetDecision check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
-func (client *Client) GetDecision(clientIP string) (bool, error) {
-	logger.Debug(fmt.Sprintf("cache:GetDecision ip:%v", clientIP))
-	return client.cache.getDecision(clientIP)
+func (c *Client) Get(clientIP string) (string, error) {
+	c.Debug(fmt.Sprintf("Get key:%v", clientIP))
+	return c.cache.get(clientIP)
 }
 
 // SetDecision update the cache with the IP as key and the value banned / not banned.
-func (client *Client) SetDecision(clientIP string, isBanned bool, duration int64) {
-	logger.Debug(fmt.Sprintf("cache:SetDecision ip:%v isBanned:%v duration:%vs", clientIP, isBanned, duration))
-	var value string
-	if isBanned {
-		value = cacheBannedValue
-	} else {
-		value = cacheNoBannedValue
-	}
-	client.cache.setDecision(clientIP, value, duration)
+func (c *Client) Set(key string, value string, duration int64) {
+	c.cache.set(key, value, duration)
 }
