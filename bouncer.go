@@ -273,6 +273,10 @@ type Login struct {
 }
 
 func handleRemediation(remoteIP, remediation string, bouncer *Bouncer, rw http.ResponseWriter, req *http.Request) {
+	if remediation == cache.CaptchaValue && !bouncer.captchaClient.Valid && bouncer.captchaClient.FallbackRemediation == "ban" {
+		logger.Debug("captcha is not valid and fallback remediation is set to ban, returning 403")
+		remediation = cache.BannedValue
+	}
 	switch remediation {
 	case cache.BannedValue:
 		rw.WriteHeader(http.StatusForbidden)

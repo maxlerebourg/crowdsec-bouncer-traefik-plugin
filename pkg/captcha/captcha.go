@@ -92,11 +92,6 @@ func (c *Client) New(siteKey, secretKey, provider, template, templateFile, fallb
 }
 
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
-	if !c.Valid && c.FallbackRemediation == "ban" {
-		c.Debug("captcha is not valid and fallback remediation is set to ban, returning 403")
-		rw.WriteHeader(http.StatusForbidden)
-		return
-	}
 	valid, err := c.Validate(r)
 	if err != nil {
 		c.Debug(fmt.Sprintf("error validating captcha: %s", err.Error()))
