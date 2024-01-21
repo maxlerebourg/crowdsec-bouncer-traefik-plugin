@@ -511,7 +511,6 @@ func appsecQuery(bouncer *Bouncer, IP string, httpReq *http.Request) error {
 			logger.Error(fmt.Sprintf("appsecQuery:closeBody %s", err.Error()))
 		}
 	}()
-	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
 		return fmt.Errorf("appsecQuery:readBody %w", err)
