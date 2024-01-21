@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -227,7 +226,7 @@ logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 			} else {
 				bouncer.next.ServeHTTP(rw, req)
 			}
-			handleNextServeHttp(bouncer, remoteIP, rw, req)
+			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			return
 		}
 	}
@@ -235,7 +234,7 @@ logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
-			handleNextServeHttp(bouncer, remoteIP, rw, req)
+			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
 			logger.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
 			rw.WriteHeader(http.StatusForbidden)
@@ -246,7 +245,7 @@ logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:true %s", remoteIP, err.Error()))
 			rw.WriteHeader(http.StatusForbidden)
 		} else {
-			handleNextServeHttp(bouncer, remoteIP, rw, req)
+			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		}
 	}
 }
@@ -279,11 +278,11 @@ type Login struct {
 	Expire string `json:"expire"`
 }
 
-func handleNextServeHttp(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
+func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
 	if bouncer.appsecEnabled {
 		err := appsecQuery(bouncer, remoteIP, req)
 		if err != nil {
-			logger.Debug(fmt.Sprintf("handleNextServeHttp ip:%s isWaf:true %s", remoteIP, err.Error()))
+			logger.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
 			rw.WriteHeader(http.StatusForbidden)
 			return
 		}
@@ -470,7 +469,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	return body, nil
 }
 
-func appsecQuery(bouncer *Bouncer, IP string, httpReq *http.Request) error {
+func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	routeURL := url.URL{
 		Scheme:   bouncer.appsecScheme,
 		Host:     bouncer.appsecHost,
@@ -478,11 +477,11 @@ func appsecQuery(bouncer *Bouncer, IP string, httpReq *http.Request) error {
 	}
 	var req *http.Request
 	if httpReq.Body != nil && httpReq.ContentLength > 0 {
-		bodyBytes, err := ioutil.ReadAll(httpReq.Body)
+		bodyBytes, err := io.ReadAll(httpReq.Body)
 		if err != nil {
 			return fmt.Errorf("appsecQuery:GetBody %w", err)
 		}
-		httpReq.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		httpReq.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		req, _ = http.NewRequest(http.MethodPost, routeURL.String(), bytes.NewBuffer(bodyBytes))
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
@@ -494,7 +493,7 @@ func appsecQuery(bouncer *Bouncer, IP string, httpReq *http.Request) error {
 		}
 	}
 	req.Header.Add(crowdsecAppsecHeader, bouncer.crowdsecKey)
-	req.Header.Add(crowdsecAppsecIPHeader, IP)
+	req.Header.Add(crowdsecAppsecIPHeader, ip)
 	req.Header.Add(crowdsecAppsecVerbHeader, httpReq.Method)
 	req.Header.Add(crowdsecAppsecHostHeader, httpReq.Host)
 	req.Header.Add(crowdsecAppsecURIHeader, httpReq.URL.Path)
