@@ -471,9 +471,9 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	routeURL := url.URL{
-		Scheme:   bouncer.appsecScheme,
-		Host:     bouncer.appsecHost,
-		Path:     "/",
+		Scheme: bouncer.appsecScheme,
+		Host:   bouncer.appsecHost,
+		Path:   "/",
 	}
 	var req *http.Request
 	if httpReq.Body != nil && httpReq.ContentLength > 0 {
