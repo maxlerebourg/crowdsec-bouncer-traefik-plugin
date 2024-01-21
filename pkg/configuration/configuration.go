@@ -32,6 +32,9 @@ type Config struct {
 	Enabled                                  bool     `json:"enabled,omitempty"`
 	LogLevel                                 string   `json:"logLevel,omitempty"`
 	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
+	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
+	CrowdsecAppsecScheme                     string   `json:"crowdsecAppsecScheme,omitempty"`
+	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
 	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
@@ -51,7 +54,7 @@ type Config struct {
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
-	ForwardedHeadersCustomName               string   `json:"forwardedheaderscustomheader,omitempty"`
+	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomHeader,omitempty"`
 	ForwardedHeadersTrustedIPs               []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                         []string `json:"clientTrustedIps,omitempty"`
 	RedisCacheEnabled                        bool     `json:"redisCacheEnabled,omitempty"`
@@ -76,6 +79,9 @@ func New() *Config {
 		Enabled:                       false,
 		LogLevel:                      "INFO",
 		CrowdsecMode:                  LiveMode,
+		CrowdsecAppsecEnabled:         false,
+		CrowdsecAppsecScheme:          HTTP,
+		CrowdsecAppsecHost:            "crowdsec:7422",
 		CrowdsecLapiScheme:            HTTP,
 		CrowdsecLapiHost:              "crowdsec:8080",
 		CrowdsecLapiKey:               "",
@@ -149,13 +155,12 @@ func ValidateParams(config *Config) error {
 		return nil
 	}
 
-	// This only check that the format of the URL scheme:// is correct and do not make requests
-	testURL := url.URL{
-		Scheme: config.CrowdsecLapiScheme,
-		Host:   config.CrowdsecLapiHost,
+	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost); err != nil {
+		return err
 	}
-	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
-		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecLapiHost: '%v://%v' must be an URL", config.CrowdsecLapiScheme, config.CrowdsecLapiHost)
+
+	if err := validateURL("CrowdsecAppsec", config.CrowdsecAppsecScheme, config.CrowdsecAppsecHost); err != nil {
+		return err
 	}
 
 	lapiKey, err := GetVariable(config, "CrowdsecLapiKey")
@@ -187,6 +192,15 @@ func ValidateParams(config *Config) error {
 		}
 	}
 
+	return nil
+}
+
+func validateURL(variable, scheme, host string) error {
+	// This only check that the format of the URL scheme://host is correct and do not make requests
+	testURL := url.URL{Scheme: scheme,Host: host}
+	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
+		return fmt.Errorf("%sScheme://%sHost: '%v://%v' must be an URL", variable, scheme, host)
+	}
 	return nil
 }
 

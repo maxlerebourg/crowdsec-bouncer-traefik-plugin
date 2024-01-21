@@ -50,13 +50,24 @@ Only one instance of the plugin is *possible*.
 - Enabled
   - bool
   - default: false
-  - enable the plugin
+  - Enable the plugin
 - LogLevel
   - string
   - default: `INFO`, expected values are: `INFO`, `DEBUG`
 - CrowdsecMode
   - string
   - default: `live`, expected values are: `none`, `live`, `stream`, `alone`
+- CrowdsecAppsecEnabled
+  - bool
+  - default: false
+  - Enable Crowdsec Appsec Server (WAF) 
+- CrowdsecAppsecScheme
+  - string
+  - default: `http`, expected values are: `http`, `https`
+- CrowdsecAppsecHost
+  - string
+  - default: "crowdsec:7422"
+  - Crowdsec Appsec Server available on which host and port.
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected values are: `http`, `https`

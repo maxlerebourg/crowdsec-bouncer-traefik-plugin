@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -22,13 +23,19 @@ import (
 )
 
 const (
-	crowdsecLapiHeader      = "X-Api-Key"
-	crowdsecCapiHeader      = "Authorization"
-	crowdsecLapiRoute       = "v1/decisions"
-	crowdsecLapiStreamRoute = "v1/decisions/stream"
-	crowdsecCapiLogin       = "v2/watchers/login"
-	crowdsecCapiStreamRoute = "v2/decisions/stream"
-	cacheTimeoutKey         = "updated"
+	crowdsecAppsecIPHeader   = "X-Crowdsec-Appsec-Ip"
+	crowdsecAppsecURIHeader  = "X-Crowdsec-Appsec-Uri"
+	crowdsecAppsecHostHeader = "X-Crowdsec-Appsec-Host"
+	crowdsecAppsecVerbHeader = "X-Crowdsec-Appsec-Verb"
+	crowdsecAppsecHeader     = "X-Crowdsec-Appsec-Api-Key"
+	crowdsecLapiHeader       = "X-Api-Key"
+	crowdsecLapiRoute        = "v1/decisions"
+	crowdsecLapiStreamRoute  = "v1/decisions/stream"
+	crowdsecCapiHost         = "api.crowdsec.net"
+	crowdsecCapiHeader       = "Authorization"
+	crowdsecCapiLoginRoute   = "v2/watchers/login"
+	crowdsecCapiStreamRoute  = "v2/decisions/stream"
+	cacheTimeoutKey          = "updated"
 )
 
 //nolint:gochecknoglobals
@@ -50,6 +57,9 @@ type Bouncer struct {
 	template *template.Template
 
 	enabled                bool
+	appsecEnabled          bool
+	appsecScheme           string
+	appsecHost             string
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
@@ -86,9 +96,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	if config.CrowdsecMode == configuration.AloneMode {
 		config.CrowdsecCapiMachineID, _ = configuration.GetVariable(config, "CrowdsecCapiMachineID")
 		config.CrowdsecCapiPassword, _ = configuration.GetVariable(config, "CrowdsecCapiPassword")
-		config.CrowdsecLapiHost = "api.crowdsec.net"
+		config.CrowdsecLapiHost = crowdsecCapiHost
 		config.CrowdsecLapiScheme = "https"
-		config.UpdateIntervalSeconds = 7200
+		config.UpdateIntervalSeconds = 7200 // 2 hours
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
 		crowdsecHeader = crowdsecCapiHeader
 	} else {
@@ -114,6 +124,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 
 		enabled:                config.Enabled,
 		crowdsecMode:           config.CrowdsecMode,
+		appsecEnabled:          config.CrowdsecAppsecEnabled,
+		appsecScheme:           config.CrowdsecAppsecScheme,
+		appsecHost:             config.CrowdsecAppsecHost,
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
 		crowdsecKey:            config.CrowdsecLapiKey,
@@ -190,7 +203,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
-	logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
+logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 	if isTrusted {
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -214,6 +227,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			} else {
 				bouncer.next.ServeHTTP(rw, req)
 			}
+			handleNextServeHttp(bouncer, remoteIP, rw, req)
 			return
 		}
 	}
@@ -221,7 +235,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
-			bouncer.next.ServeHTTP(rw, req)
+			handleNextServeHttp(bouncer, remoteIP, rw, req)
 		} else {
 			logger.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
 			rw.WriteHeader(http.StatusForbidden)
@@ -232,8 +246,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:true %s", remoteIP, err.Error()))
 			rw.WriteHeader(http.StatusForbidden)
 		} else {
-			logger.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:false", remoteIP))
-			bouncer.next.ServeHTTP(rw, req)
+			handleNextServeHttp(bouncer, remoteIP, rw, req)
 		}
 	}
 }
@@ -264,6 +277,18 @@ type Login struct {
 	Code   int    `json:"code"`
 	Token  string `json:"token"`
 	Expire string `json:"expire"`
+}
+
+func handleNextServeHttp(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
+	if bouncer.appsecEnabled {
+		err := appsecQuery(bouncer, remoteIP, req)
+		if err != nil {
+			logger.Debug(fmt.Sprintf("handleNextServeHttp ip:%s isWaf:true %s", remoteIP, err.Error()))
+			rw.WriteHeader(http.StatusForbidden)
+			return
+		}
+	}
+	bouncer.next.ServeHTTP(rw, req)
 }
 
 func handleStreamTicker(bouncer *Bouncer) {
@@ -342,7 +367,7 @@ func getToken(bouncer *Bouncer) error {
 	loginURL := url.URL{
 		Scheme: bouncer.crowdsecScheme,
 		Host:   bouncer.crowdsecHost,
-		Path:   crowdsecCapiLogin,
+		Path:   crowdsecCapiLoginRoute,
 	}
 	body, err := crowdsecQuery(bouncer, loginURL.String(), true)
 	if err != nil {
@@ -443,4 +468,53 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 		return nil, fmt.Errorf("crowdsecQuery:readBody %w", err)
 	}
 	return body, nil
+}
+
+func appsecQuery(bouncer *Bouncer, IP string, httpReq *http.Request) error {
+	routeURL := url.URL{
+		Scheme:   bouncer.appsecScheme,
+		Host:     bouncer.appsecHost,
+		Path:     "/",
+	}
+	var req *http.Request
+	if httpReq.Body != nil && httpReq.ContentLength > 0 {
+		bodyBytes, err := ioutil.ReadAll(httpReq.Body)
+		if err != nil {
+			return fmt.Errorf("appsecQuery:GetBody %w", err)
+		}
+		httpReq.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		req, _ = http.NewRequest(http.MethodPost, routeURL.String(), bytes.NewBuffer(bodyBytes))
+	} else {
+		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
+	}
+
+	for key, headers := range httpReq.Header {
+		for _, value := range headers {
+			req.Header.Add(key, value)
+		}
+	}
+	req.Header.Add(crowdsecAppsecHeader, bouncer.crowdsecKey)
+	req.Header.Add(crowdsecAppsecIPHeader, IP)
+	req.Header.Add(crowdsecAppsecVerbHeader, httpReq.Method)
+	req.Header.Add(crowdsecAppsecHostHeader, httpReq.Host)
+	req.Header.Add(crowdsecAppsecURIHeader, httpReq.URL.Path)
+
+	res, err := bouncer.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("appsecQuery %w", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
+	}
+	defer func() {
+		if err = res.Body.Close(); err != nil {
+			logger.Error(fmt.Sprintf("appsecQuery:closeBody %s", err.Error()))
+		}
+	}()
+	body, err := io.ReadAll(res.Body)
+
+	if err != nil {
+		return fmt.Errorf("appsecQuery:readBody %w", err)
+	}
+	return nil
 }
