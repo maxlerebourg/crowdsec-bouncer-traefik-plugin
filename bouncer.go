@@ -202,7 +202,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
-logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
+	logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 	if isTrusted {
 		bouncer.next.ServeHTTP(rw, req)
 		return

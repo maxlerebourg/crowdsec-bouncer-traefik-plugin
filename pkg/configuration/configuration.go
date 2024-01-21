@@ -197,7 +197,7 @@ func ValidateParams(config *Config) error {
 
 func validateURL(variable, scheme, host string) error {
 	// This only check that the format of the URL scheme://host is correct and do not make requests
-	testURL := url.URL{Scheme: scheme,Host: host}
+	testURL := url.URL{Scheme: scheme, Host: host}
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
 		return fmt.Errorf("%sScheme://%sHost: '%v://%v' must be an URL", variable, variable, scheme, host)
 	}
