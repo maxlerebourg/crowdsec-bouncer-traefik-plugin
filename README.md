@@ -60,11 +60,15 @@ Only one instance of the plugin is *possible*.
 - CrowdsecAppsecEnabled
   - bool
   - default: false
-  - Enable Crowdsec Appsec Server (WAF) 
+  - Enable Crowdsec Appsec Server (WAF).
 - CrowdsecAppsecHost
   - string
   - default: "crowdsec:7422"
   - Crowdsec Appsec Server available on which host and port. The scheme will be handled by the CrowdsecLapiScheme var.
+- CrowdsecAppsecFailureBlock
+  - bool
+  - default: true
+  - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected values are: `http`, `https`

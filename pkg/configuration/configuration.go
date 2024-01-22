@@ -19,12 +19,12 @@ import (
 
 // Enums for crowdsec mode.
 const (
-	AloneMode   = "alone"
-	StreamMode  = "stream"
-	LiveMode    = "live"
-	NoneMode    = "none"
-	HTTPS       = "https"
-	HTTP        = "http"
+	AloneMode  = "alone"
+	StreamMode = "stream"
+	LiveMode   = "live"
+	NoneMode   = "none"
+	HTTPS      = "https"
+	HTTP       = "http"
 )
 
 // Config the plugin configuration.
