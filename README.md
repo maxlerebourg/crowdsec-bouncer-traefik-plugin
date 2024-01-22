@@ -61,13 +61,10 @@ Only one instance of the plugin is *possible*.
   - bool
   - default: false
   - Enable Crowdsec Appsec Server (WAF) 
-- CrowdsecAppsecScheme
-  - string
-  - default: `http`, expected values are: `http`, `https`
 - CrowdsecAppsecHost
   - string
   - default: "crowdsec:7422"
-  - Crowdsec Appsec Server available on which host and port.
+  - Crowdsec Appsec Server available on which host and port. The scheme will be handled by the CrowdsecLapiScheme var.
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected values are: `http`, `https`

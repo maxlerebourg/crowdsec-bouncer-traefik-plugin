@@ -19,12 +19,12 @@ import (
 
 // Enums for crowdsec mode.
 const (
-	AloneMode  = "alone"
-	StreamMode = "stream"
-	LiveMode   = "live"
-	NoneMode   = "none"
-	HTTPS      = "https"
-	HTTP       = "http"
+	AloneMode   = "alone"
+	StreamMode  = "stream"
+	LiveMode    = "live"
+	NoneMode    = "none"
+	HTTPS       = "https"
+	HTTP        = "http"
 )
 
 // Config the plugin configuration.
@@ -33,8 +33,8 @@ type Config struct {
 	LogLevel                                 string   `json:"logLevel,omitempty"`
 	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
 	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
-	CrowdsecAppsecScheme                     string   `json:"crowdsecAppsecScheme,omitempty"`
 	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
+	CrowdsecAppsecFailureBlock               bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
 	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
@@ -80,8 +80,8 @@ func New() *Config {
 		LogLevel:                      "INFO",
 		CrowdsecMode:                  LiveMode,
 		CrowdsecAppsecEnabled:         false,
-		CrowdsecAppsecScheme:          HTTP,
 		CrowdsecAppsecHost:            "crowdsec:7422",
+		CrowdsecAppsecFailureBlock:    true,
 		CrowdsecLapiScheme:            HTTP,
 		CrowdsecLapiHost:              "crowdsec:8080",
 		CrowdsecLapiKey:               "",
@@ -159,7 +159,7 @@ func ValidateParams(config *Config) error {
 		return err
 	}
 
-	if err := validateURL("CrowdsecAppsec", config.CrowdsecAppsecScheme, config.CrowdsecAppsecHost); err != nil {
+	if err := validateURL("CrowdsecAppsec", config.CrowdsecLapiScheme, config.CrowdsecAppsecHost); err != nil {
 		return err
 	}
 
@@ -199,7 +199,7 @@ func validateURL(variable, scheme, host string) error {
 	// This only check that the format of the URL scheme://host is correct and do not make requests
 	testURL := url.URL{Scheme: scheme, Host: host}
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
-		return fmt.Errorf("%sScheme://%sHost: '%v://%v' must be an URL", variable, variable, scheme, host)
+		return fmt.Errorf("CrowdsecLapiScheme://%sHost: '%v://%v' must be an URL", variable, scheme, host)
 	}
 	return nil
 }

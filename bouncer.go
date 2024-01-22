@@ -57,8 +57,8 @@ type Bouncer struct {
 
 	enabled                bool
 	appsecEnabled          bool
-	appsecScheme           string
 	appsecHost             string
+	appsecFailureBlock     bool
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
@@ -124,8 +124,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		enabled:                config.Enabled,
 		crowdsecMode:           config.CrowdsecMode,
 		appsecEnabled:          config.CrowdsecAppsecEnabled,
-		appsecScheme:           config.CrowdsecAppsecScheme,
 		appsecHost:             config.CrowdsecAppsecHost,
+		appsecFailureBlock:     config.CrowdsecAppsecFailureBlock,
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
 		crowdsecKey:            config.CrowdsecLapiKey,
@@ -447,6 +447,11 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)
 	}
+	defer func() {
+		if err = res.Body.Close(); err != nil {
+			logger.Error(fmt.Sprintf("crowdsecQuery:closeBody %s", err.Error()))
+		}
+	}()
 	if res.StatusCode == http.StatusUnauthorized && bouncer.crowdsecMode == configuration.AloneMode {
 		if errToken := getToken(bouncer); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
@@ -456,11 +461,6 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("crowdsecQuery url:%s, statusCode:%d", stringURL, res.StatusCode)
 	}
-	defer func() {
-		if err = res.Body.Close(); err != nil {
-			logger.Error(fmt.Sprintf("crowdsecQuery:closeBody %s", err.Error()))
-		}
-	}()
 	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
@@ -471,7 +471,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	routeURL := url.URL{
-		Scheme: bouncer.appsecScheme,
+		Scheme: bouncer.crowdsecScheme,
 		Host:   bouncer.appsecHost,
 		Path:   "/",
 	}
@@ -492,24 +492,31 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 			req.Header.Add(key, value)
 		}
 	}
-	req.Header.Add(crowdsecAppsecHeader, bouncer.crowdsecKey)
-	req.Header.Add(crowdsecAppsecIPHeader, ip)
-	req.Header.Add(crowdsecAppsecVerbHeader, httpReq.Method)
-	req.Header.Add(crowdsecAppsecHostHeader, httpReq.Host)
-	req.Header.Add(crowdsecAppsecURIHeader, httpReq.URL.Path)
+	req.Header.Set(crowdsecAppsecHeader, bouncer.crowdsecKey)
+	req.Header.Set(crowdsecAppsecIPHeader, ip)
+	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
+	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
+	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.Path)
 
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("appsecQuery %w", err)
-	}
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
 			logger.Error(fmt.Sprintf("appsecQuery:closeBody %s", err.Error()))
 		}
 	}()
+	if res.StatusCode == http.StatusInternalServerError {
+		logger.Debug("crowdsecQuery statusCode:500")
+		if (bouncer.appsecFailureBlock) {
+			return fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
+		}
+		return nil
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
+	}
 
 	if err != nil {
 		return fmt.Errorf("appsecQuery:readBody %w", err)
