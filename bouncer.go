@@ -224,9 +224,8 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			if isBanned {
 				rw.WriteHeader(http.StatusForbidden)
 			} else {
-				bouncer.next.ServeHTTP(rw, req)
+				handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			}
-			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			return
 		}
 	}
@@ -509,7 +508,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	}()
 	if res.StatusCode == http.StatusInternalServerError {
 		logger.Debug("crowdsecQuery statusCode:500")
-		if (bouncer.appsecFailureBlock) {
+		if bouncer.appsecFailureBlock {
 			return fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
 		}
 		return nil
