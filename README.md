@@ -6,6 +6,8 @@
 
 # Crowdsec Bouncer Traefik plugin
 
+> New! This plugin now supports [AppSec](https://doc.crowdsec.net/docs/next/appsec/intro/) feature including virtual patching and capabilities support for your legacy ModSecurity rules.
+
 This plugin aims to implement a Crowdsec Bouncer in a Traefik plugin.
 
 > [CrowdSec](https://www.crowdsec.net/) is an open-source and collaborative IPS (Intrusion Prevention System) and a security suite.
@@ -16,6 +18,16 @@ The purpose is to enable Traefik to authorize or block requests from IPs based o
 The Crowdsec utility will provide the community blocklist which contains highly reported and validated IPs banned from the Crowdsec network.
 
 When used with Crowdsec it will leverage the local API which will analyze Traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns used against your website.
+
+Appsec feature is supported from plugin version 1.2.0 and Crowdsec 1.6.0.
+
+The AppSec Component offers:
+
+- Low-effort virtual patching capabilities.
+- Support for your legacy ModSecurity rules.
+- Combining classic WAF benefits with advanced CrowdSec features for otherwise difficult advanced behavior detection.
+More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
+
 
 There are 4 operating modes (CrowdsecMode) for this plugin:
 
@@ -50,13 +62,25 @@ Only one instance of the plugin is *possible*.
 - Enabled
   - bool
   - default: false
-  - enable the plugin
+  - Enable the plugin
 - LogLevel
   - string
   - default: `INFO`, expected values are: `INFO`, `DEBUG`
 - CrowdsecMode
   - string
   - default: `live`, expected values are: `none`, `live`, `stream`, `alone`
+- CrowdsecAppsecEnabled
+  - bool
+  - default: false
+  - Enable Crowdsec Appsec Server (WAF).
+- CrowdsecAppsecHost
+  - string
+  - default: "crowdsec:7422"
+  - Crowdsec Appsec Server available on which host and port. The scheme will be handled by the CrowdsecLapiScheme var.
+- CrowdsecAppsecFailureBlock
+  - bool
+  - default: true
+  - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected values are: `http`, `https`
@@ -179,6 +203,9 @@ http:
           defaultDecisionSeconds: 60
           httpTimeoutSeconds: 10
           crowdsecMode: live
+          crowdsecAppsecEnabled: false
+          crowdsecAppsecHost: crowdsec:7422
+          crowdsecAppsecFailureBlock: true
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
           crowdsecLapiHost: crowdsec:8080
@@ -308,6 +335,10 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 #### 6. Using Crowdsec and Traefik in Kubernetes [examples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/kubernetes/README.md)
 
 #### 7. Using Traefik in standalone mode without Crowdsec [examples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/standalone-mode/README.md)
+
+
+#### 8. Using Traefik with AppSec feature enabled [examples/appsec-enabled/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/appsec-enabled/README.md)
+
 
 ### Local Mode
 
