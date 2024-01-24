@@ -20,7 +20,7 @@ services:
       - logs-local:/var/log/traefik
       - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
-      - 80:80
+      - 8000:80
       - 8080:8080
     depends_on:
       - crowdsec
@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.router-foo.rule=Path(`/foo`)"
+      - "traefik.http.routers.router-foo.rule=PathPrefix(`/foo`)"
       - "traefik.http.routers.router-foo.entrypoints=web"
       - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
@@ -44,19 +44,21 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.router-bar.rule=Path(`/bar`)"
+      - "traefik.http.routers.router-bar.rule=PathPrefix(`/bar`)"
       - "traefik.http.routers.router-bar.entrypoints=web"
       - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker"
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecappsecenabled=true"
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.5.3
+    image: crowdsecurity/crowdsec:dev
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
-      COLLECTIONS: crowdsecurity/traefik
+      COLLECTIONS: crowdsecurity/traefik crowdsecurity/appsec-virtual-patching
       CUSTOM_HOSTNAME: crowdsec
       BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5=
     volumes:
@@ -66,6 +68,7 @@ services:
       - crowdsec-config-local:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
+
 volumes:
   logs-local:
   crowdsec-db-local:
