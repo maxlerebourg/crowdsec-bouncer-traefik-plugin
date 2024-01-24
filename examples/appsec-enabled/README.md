@@ -12,13 +12,15 @@ The Traefik instance just needs to know where appsec engine is located
       - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
 ```
 We can try to query normally the whoami server:
-
-Add your IP to the ban list
 ```bash
-docker exec crowdsec cscli decisions add --ip 10.0.10.30 -d 10m
+curl http://localhost:8000/foo
 ```
-You should get a 403 on http://localhost/foo/rpc2 but http://localhost/foo should respond with a normal 200.
 
+And then we verify that a malicious request will be blocked: 
+```bash
+curl http://localhost:8000/foo/rpc2
+```
+You should get a 403 on http://localhost:8000/foo/rpc2
 
 To play the demo environment run:
 ```bash

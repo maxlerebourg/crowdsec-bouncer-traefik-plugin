@@ -337,7 +337,7 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 #### 7. Using Traefik in standalone mode without Crowdsec [examples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/standalone-mode/README.md)
 
 
-#### 7. Using Traefik with AppSec feature enabled [examples/appsec-enabled/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/appsec-enabled/README.md)
+#### 8. Using Traefik with AppSec feature enabled [examples/appsec-enabled/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/appsec-enabled/README.md)
 
 
 ### Local Mode
