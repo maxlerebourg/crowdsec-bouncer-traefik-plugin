@@ -36,7 +36,8 @@ There are 4 operating modes (CrowdsecMode) for this plugin:
 | none | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. All request call the Crowdsec LAPI |
 | live | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual.    The bouncer can leverage use of a local cache in order to reduce the number of requests made to the Crowdsec LAPI. It will keep in cache the status for  each IP that makes queries. |
 | stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI. |
-| alone | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any localy banned IP, but can work without a crowdsec service. |
+| alone | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any locally banned IP, but can work without a crowdsec service. |
+| appsec | Disable Crowdsec IP checking but apply Crowdsec Appsec checking. This mode is intended to be used when Crowdsec IP checking is applied at the Firewall Level. |
 
 The `streaming mode` is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between Traefik and Crowdsec. Every request that happens hits the cache for quick decisions.
 
@@ -68,11 +69,11 @@ Only one instance of the plugin is *possible*.
   - default: `INFO`, expected values are: `INFO`, `DEBUG`
 - CrowdsecMode
   - string
-  - default: `live`, expected values are: `none`, `live`, `stream`, `alone`
+  - default: `live`, expected values are: `none`, `live`, `stream`, `alone` or `appsec`
 - CrowdsecAppsecEnabled
   - bool
   - default: false
-  - Enable Crowdsec Appsec Server (WAF).
+  - Enable Crowdsec Appsec Server (WAF), don't forget to enable it in `appsec` mode.
 - CrowdsecAppsecHost
   - string
   - default: "crowdsec:7422"
