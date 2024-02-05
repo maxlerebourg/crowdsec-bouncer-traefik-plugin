@@ -55,7 +55,7 @@ type Config struct {
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
-	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomHeader,omitempty"`
+	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomName,omitempty"`
 	ForwardedHeadersTrustedIPs               []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                         []string `json:"clientTrustedIps,omitempty"`
 	RedisCacheEnabled                        bool     `json:"redisCacheEnabled,omitempty"`
