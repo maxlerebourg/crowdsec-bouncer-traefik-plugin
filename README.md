@@ -69,11 +69,11 @@ Only one instance of the plugin is *possible*.
   - default: `INFO`, expected values are: `INFO`, `DEBUG`
 - CrowdsecMode
   - string
-  - default: `live`, expected values are: `none`, `live`, `stream`, `alone` or `appsec`
+  - default: `live`, expected values are: `none`, `live`, `stream`, `alone`, `appsec`
 - CrowdsecAppsecEnabled
   - bool
   - default: false
-  - Enable Crowdsec Appsec Server (WAF), don't forget to enable it in `appsec` mode.
+  - Enable Crowdsec Appsec Server (WAF).
 - CrowdsecAppsecHost
   - string
   - default: "crowdsec:7422"
