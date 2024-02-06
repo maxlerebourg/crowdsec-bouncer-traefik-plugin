@@ -153,6 +153,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		},
 		cacheClient: &cache.Client{},
 	}
+	if config.CrowdsecMode == configuration.AppsecMode {
+		return bouncer, nil
+	}
 	config.RedisCachePassword, _ = configuration.GetVariable(config, "RedisCachePassword")
 	bouncer.cacheClient.New(
 		config.RedisCacheEnabled,
@@ -205,6 +208,11 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	logger.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 	if isTrusted {
 		bouncer.next.ServeHTTP(rw, req)
+		return
+	}
+
+	if bouncer.crowdsecMode == configuration.AppsecMode {
+		handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		return
 	}
 

@@ -23,6 +23,7 @@ const (
 	StreamMode = "stream"
 	LiveMode   = "live"
 	NoneMode   = "none"
+	AppsecMode = "appsec"
 	HTTPS      = "https"
 	HTTP       = "http"
 )
@@ -264,8 +265,8 @@ func validateParamsRequired(config *Config) error {
 			return fmt.Errorf("%v: cannot be less than 1", key)
 		}
 	}
-	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode}, config.CrowdsecMode) {
-		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live', 'stream' or 'alone'")
+	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
+		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live', 'stream', 'alone' or 'appsec'")
 	}
 	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
 		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
