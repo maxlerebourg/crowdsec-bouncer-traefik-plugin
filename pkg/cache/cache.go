@@ -48,7 +48,7 @@ type redisCache struct{
 	log *logger.Log
 }
 
-func (*redisCache) getDecision(clientIP string) (bool, error) {
+func (redisCache) getDecision(clientIP string) (bool, error) {
 	banned, err := redis.Get(clientIP)
 	bannedString := string(banned)
 	if err == nil && len(bannedString) > 0 {
@@ -60,13 +60,13 @@ func (*redisCache) getDecision(clientIP string) (bool, error) {
 	return false, err
 }
 
-func (rc *redisCache) setDecision(clientIP string, value string, duration int64) {
+func (rc redisCache) setDecision(clientIP string, value string, duration int64) {
 	if err := redis.Set(clientIP, []byte(value), duration); err != nil {
 		rc.log.Error(fmt.Sprintf("cache:setDecisionRedisCache %s", err.Error()))
 	}
 }
 
-func (rc *redisCache) deleteDecision(clientIP string) {
+func (rc redisCache) deleteDecision(clientIP string) {
 	if err := redis.Del(clientIP); err != nil {
 		rc.log.Error(fmt.Sprintf("cache:deleteDecisionRedisCache %s", err.Error()))
 	}
@@ -84,7 +84,7 @@ type Client struct {
 	log   *logger.Log
 }
 
-// New Initialize cache client.
+// Init Initialize cache client.
 func (c *Client) Init(log *logger.Log, isRedis bool, host, pass, database string) {
 	c.log = log
 	if isRedis {

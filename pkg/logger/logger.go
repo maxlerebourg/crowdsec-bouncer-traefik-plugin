@@ -8,14 +8,14 @@ import (
 	"os"
 )
 
-// Log the logger struct
+// Log Logger struct.
 type Log struct {
 	logError *log.Logger
 	logInfo  *log.Logger
 	logDebug *log.Logger
 }
 
-// Init Set Default log level to info in case log level to defined.
+// New Set Default log level to info in case log level to defined.
 func New(logLevel string) *Log {
 	logError := log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logInfo  := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)

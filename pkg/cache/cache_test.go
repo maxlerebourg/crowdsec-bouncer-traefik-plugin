@@ -4,6 +4,8 @@ package cache
 
 import (
 	"testing"
+
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func Test_GetDecision(t *testing.T) {
