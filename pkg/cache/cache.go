@@ -27,7 +27,7 @@ var (
 
 type localCache struct{}
 
-func (*localCache) getDecision(clientIP string) (bool, error) {
+func (localCache) getDecision(clientIP string) (bool, error) {
 	banned, isCached := cache.Get(clientIP)
 	bannedString, isValid := banned.(string)
 	if isCached && isValid && len(bannedString) > 0 {
@@ -36,11 +36,11 @@ func (*localCache) getDecision(clientIP string) (bool, error) {
 	return false, fmt.Errorf(CacheMiss)
 }
 
-func (*localCache) setDecision(clientIP string, value string, duration int64) {
+func (localCache) setDecision(clientIP string, value string, duration int64) {
 	cache.Set(clientIP, value, duration)
 }
 
-func (*localCache) deleteDecision(clientIP string) {
+func (localCache) deleteDecision(clientIP string) {
 	cache.Del(clientIP)
 }
 

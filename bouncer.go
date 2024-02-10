@@ -138,6 +138,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
 		crowdsecStreamRoute:    crowdsecStreamRoute,
 		crowdsecHeader:         crowdsecHeader,
+		log:                    log,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -153,7 +154,6 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
 		cacheClient: &cache.Client{},
-		log: log,
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		return bouncer, nil
