@@ -4,12 +4,14 @@ package cache
 
 import (
 	"testing"
+
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func Test_GetDecision(t *testing.T) {
 	IPInCache := "10.0.0.10"
 	IPNotInCache := "10.0.0.20"
-	client := &Client{cache: &localCache{}}
+	client := &Client{cache: &localCache{}, log: &logger.Log{}}
 	client.SetDecision(IPInCache, true, 10)
 	type args struct {
 		clientIP string
@@ -45,7 +47,7 @@ func Test_GetDecision(t *testing.T) {
 }
 
 func Test_SetDecision(t *testing.T) {
-	client := &Client{cache: &localCache{}}
+	client := &Client{cache: &localCache{}, log: &logger.Log{}}
 	IPInCache := "10.0.0.11"
 	type args struct {
 		clientIP string
@@ -76,7 +78,7 @@ func Test_SetDecision(t *testing.T) {
 func Test_DeleteDecision(t *testing.T) {
 	IPInCache := "10.0.0.12"
 	IPNotInCache := "10.0.0.22"
-	client := &Client{cache: &localCache{}}
+	client := &Client{cache: &localCache{}, log: &logger.Log{}}
 	client.SetDecision(IPInCache, true, 10)
 	type args struct {
 		clientIP string
