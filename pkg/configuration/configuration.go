@@ -273,6 +273,8 @@ func validateParamsRequired(config *Config) error {
 }
 
 // GetTLSConfigCrowdsec get TLS config from Config.
+//
+//nolint:nestif
 func GetTLSConfigCrowdsec(config *Config, log *logger.Log) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
