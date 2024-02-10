@@ -19,7 +19,7 @@ import (
 
 // Enums for crowdsec mode.
 const (
-		AloneMode  = "alone"
+	AloneMode  = "alone"
 	StreamMode = "stream"
 	LiveMode   = "live"
 	NoneMode   = "none"

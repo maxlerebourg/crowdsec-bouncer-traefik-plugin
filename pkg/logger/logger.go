@@ -18,7 +18,7 @@ type Log struct {
 // New Set Default log level to info in case log level to defined.
 func New(logLevel string) *Log {
 	logError := log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	logInfo  := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
+	logInfo := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logError.SetOutput(os.Stderr)
 	logInfo.SetOutput(os.Stdout)
