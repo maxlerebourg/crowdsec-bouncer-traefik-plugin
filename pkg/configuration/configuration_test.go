@@ -4,8 +4,6 @@ import (
 	"crypto/tls"
 	"reflect"
 	"testing"
-
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func getMinimalConfig() *Config {
@@ -155,7 +153,7 @@ func Test_validateParamsIPs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateParamsIPs(&logger.Log{}, tt.args.listIP, tt.args.key); (err != nil) != tt.wantErr {
+			if err := validateParamsIPs(tt.args.listIP, tt.args.key); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsIPs() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
