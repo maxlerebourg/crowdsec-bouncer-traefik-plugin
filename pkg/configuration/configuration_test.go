@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"reflect"
 	"testing"
+
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func getMinimalConfig() *Config {
