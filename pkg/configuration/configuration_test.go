@@ -231,7 +231,7 @@ func Test_GetTLSConfigCrowdsec(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetTLSConfigCrowdsec(tt.args.config)
+			got, err := GetTLSConfigCrowdsec(tt.args.config, &logger.Log{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getTLSConfigCrowdsec() error = %v, wantErr %v", err, tt.wantErr)
 				return
