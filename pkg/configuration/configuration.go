@@ -235,11 +235,9 @@ func validateParamsTLS(config *Config) error {
 
 func validateParamsIPs(listIP []string, key string) error {
 	if len(listIP) > 0 {
-		if _, err := ip.NewChecker(listIP); err != nil {
+		if _, err := ip.NewChecker(&logger.Log{}, listIP); err != nil {
 			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
 		}
-	} else {
-		logger.Debug(fmt.Sprintf("No IP provided for %s", key))
 	}
 	return nil
 }
@@ -275,16 +273,16 @@ func validateParamsRequired(config *Config) error {
 }
 
 // GetTLSConfigCrowdsec get TLS config from Config.
-func GetTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
+func GetTLSConfigCrowdsec(config *Config, log *logger.Log) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	//nolint:gocritic
 	if config.CrowdsecLapiScheme != HTTPS {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme https:no")
+		log.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme https:no")
 		return tlsConfig, nil
 	} else if config.CrowdsecLapiTLSInsecureVerify {
-		logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify tlsInsecure:true")
 		tlsConfig.InsecureSkipVerify = true
+		log.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify tlsInsecure:true")
 		// If we return here and still want to use client auth this won't work
 		// return tlsConfig, nil
 	} else {
@@ -292,12 +290,13 @@ func GetTLSConfigCrowdsec(config *Config) (*tls.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		cert := []byte(certAuthority)
-		if !tlsConfig.RootCAs.AppendCertsFromPEM(cert) {
-			logger.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority read cert failed")
-			// here we return because if CrowdsecLapiTLSInsecureVerify is false
-			// and CA not load, we can't communicate with https
-			return nil, fmt.Errorf("getTLSConfigCrowdsec:cannot load CA and verify cert is enabled")
+		if len(certAuthority) > 0 {
+			if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuthority)) {
+				// here we return because if CrowdsecLapiTLSInsecureVerify is false
+				// and CA not load, we can't communicate with https
+				return nil, fmt.Errorf("getTLSConfigCrowdsec:cannot load CA and verify cert is enabled")
+			}
+			log.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority CA added successfully")
 		}
 	}
 
