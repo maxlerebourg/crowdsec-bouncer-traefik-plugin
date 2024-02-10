@@ -33,16 +33,16 @@ func New(logLevel string) *Log {
 }
 
 // Info log to Stdout.
-func (l Log) Info(str string) {
+func (l *Log) Info(str string) {
 	l.logInfo.Printf(str)
 }
 
 // Debug log to Stdout.
-func (l Log) Debug(str string) {
+func (l *Log) Debug(str string) {
 	l.logDebug.Printf(str)
 }
 
 // Error log to Stderr.
-func (l Log) Error(str string) {
+func (l *Log) Error(str string) {
 	l.logError.Printf(str)
 }

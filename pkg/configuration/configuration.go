@@ -19,7 +19,7 @@ import (
 
 // Enums for crowdsec mode.
 const (
-	AloneMode  = "alone"
+		AloneMode  = "alone"
 	StreamMode = "stream"
 	LiveMode   = "live"
 	NoneMode   = "none"
@@ -235,7 +235,7 @@ func validateParamsTLS(config *Config) error {
 
 func validateParamsIPs(listIP []string, key string) error {
 	if len(listIP) > 0 {
-		if _, err := ip.NewChecker(&logger.Log{}, listIP); err != nil {
+		if _, err := ip.NewChecker(logger.New("INFO"), listIP); err != nil {
 			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
 		}
 	}
