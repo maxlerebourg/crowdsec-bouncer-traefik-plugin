@@ -44,7 +44,7 @@ func (localCache) deleteDecision(clientIP string) {
 	cache.Del(clientIP)
 }
 
-type redisCache struct{
+type redisCache struct {
 	log *logger.Log
 }
 
