@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"reflect"
 	"testing"
+
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func getMinimalConfig() *Config {
@@ -147,7 +149,7 @@ func Test_validateParamsIPs(t *testing.T) {
 		{name: "Not validate localhost", args: args{listIP: []string{0: "localhost"}}, wantErr: true},
 		{name: "Not validate a weird ip", args: args{listIP: []string{0: "0.0.0.0/89"}}, wantErr: true},
 		{name: "Not validate a weird ip 2", args: args{listIP: []string{0: "0.0.0.256/12"}}, wantErr: true},
-		{name: "Validate an ip not trimed", args: args{listIP: []string{0: " 0.0.0.0/0"}}, wantErr: false},
+		{name: "Validate an ip not trimmed", args: args{listIP: []string{0: " 0.0.0.0/0"}}, wantErr: false},
 		{name: "Validate an ip", args: args{listIP: []string{0: "0.0.0.0/12"}}, wantErr: false},
 		{name: "Validate an ip list", args: args{listIP: []string{0: "0.0.0.0/0", 1: "1.1.1.1/1"}}, wantErr: false},
 	}
@@ -231,7 +233,7 @@ func Test_GetTLSConfigCrowdsec(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetTLSConfigCrowdsec(tt.args.config)
+			got, err := GetTLSConfigCrowdsec(tt.args.config, logger.New("INFO"))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getTLSConfigCrowdsec() error = %v, wantErr %v", err, tt.wantErr)
 				return
