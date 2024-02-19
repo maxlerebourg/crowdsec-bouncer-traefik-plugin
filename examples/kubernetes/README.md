@@ -11,6 +11,19 @@ Install Docker Desktop
 In settings, click on `Kubernetes` menu, and click `Enable Kubernetes`, then `Apply and Restart`.  
 In case of any issue, you can reset the cluster from this menu and the button `Reset Kubernetes Cluster`.
 
+
+##### Install Kubernetes on Minikube
+
+Install Minikube
+
+```bash
+curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 \
+  && chmod +x minikube
+sudo mkdir -p /usr/local/bin/
+sudo install minikube /usr/local/bin/
+minikube start
+``` 
+
 ##### Install Traefik
 
 [getting-started/install-traefik/#use-the-helm-chart](https://doc.traefik.io/traefik/getting-started/install-traefik/#use-the-helm-chart)
@@ -19,10 +32,12 @@ In case of any issue, you can reset the cluster from this menu and the button `R
 helm repo add traefik https://traefik.github.io/charts
 helm repo update
 kubectl create ns traefik
-helm upgrade --install --namespace=traefik \
+helm upgrade --version v26.1.0 --install --namespace=traefik \
     --values=./traefik/values.yml \
     traefik traefik/traefik
 ```
+
+_A [bug](https://github.com/traefik/traefik-helm-chart/commit/e7ce1b410c858642069033305eb6362f26689f16) has been fixed in chart 26.1.0 that could prevent plugin to be loaded_
 
 #### View the Traefik dashboard
 
