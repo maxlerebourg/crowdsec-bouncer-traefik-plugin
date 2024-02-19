@@ -6,7 +6,6 @@
 
 Install Docker Desktop
 
-
 [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
 
 In settings, click on `Kubernetes` menu, and click `Enable Kubernetes`, then `Apply and Restart`.  

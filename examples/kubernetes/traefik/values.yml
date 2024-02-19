@@ -10,16 +10,8 @@ logs:
       headers: 
         defaultmode: keep
 
-# experimental:
-#   plugins:
-#     enabled: true
-
 experimental:
   plugins:
     bouncer:
       moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
       version: "v1.2.0"
-
-# additionalArguments:
-#   - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-#   - "--experimental.plugins.bouncer.version=v1.2.0"
