@@ -19,13 +19,16 @@ import (
 
 // Enums for crowdsec mode.
 const (
-	AloneMode  = "alone"
-	StreamMode = "stream"
-	LiveMode   = "live"
-	NoneMode   = "none"
-	AppsecMode = "appsec"
-	HTTPS      = "https"
-	HTTP       = "http"
+	AloneMode         = "alone"
+	StreamMode        = "stream"
+	LiveMode          = "live"
+	NoneMode          = "none"
+	AppsecMode        = "appsec"
+	HTTPS             = "https"
+	HTTP              = "http"
+	HcaptchaProvider  = "hcaptcha"
+	RecaptchaProvider = "recaptcha"
+	TurnstileProvider = "turnstile"
 )
 
 // Config the plugin configuration.
@@ -63,6 +66,13 @@ type Config struct {
 	RedisCachePassword                       string   `json:"redisCachePassword,omitempty"`
 	RedisCachePasswordFile                   string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                       string   `json:"redisCacheDatabase,omitempty"`
+	CaptchaHtmlFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
+	CaptchaProvider                          string   `json:"captchaProvider,omitempty"`
+	CaptchaSiteKey                           string   `json:"captchaSiteKey,omitempty"`
+	CaptchaSiteKeyFile                       string   `json:"captchaSiteKeyFile,omitempty"`
+	CaptchaSecretKey                         string   `json:"captchaSecretKey,omitempty"`
+	CaptchaSecretKeyFile                     string   `json:"captchaSecretKeyFile,omitempty"`
+	CaptchaGracePeriodSeconds                int64    `json:"captchaGracePeriodSeconds,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -90,6 +100,11 @@ func New() *Config {
 		UpdateIntervalSeconds:         60,
 		DefaultDecisionSeconds:        60,
 		HTTPTimeoutSeconds:            10,
+		CaptchaProvider:               "",
+		CaptchaSiteKey:                "",
+		CaptchaSecretKey:              "",
+		CaptchaHtmlFilePath:           "/captcha.html",
+		CaptchaGracePeriodSeconds:     1800,
 		ForwardedHeadersCustomName:    "X-Forwarded-For",
 		ForwardedHeadersTrustedIPs:    []string{},
 		ClientTrustedIPs:              []string{},
@@ -154,6 +169,15 @@ func ValidateParams(config *Config) error {
 			return err
 		}
 		return nil
+	}
+
+	if config.CaptchaProvider != "" {
+		if _, err := GetVariable(config, "CaptchaSiteKey"); err != nil {
+			return err
+		}
+		if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
+			return err
+		}
 	}
 
 	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost); err != nil {
@@ -254,9 +278,10 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt := map[string]int64{
-		"UpdateIntervalSeconds":  config.UpdateIntervalSeconds,
-		"DefaultDecisionSeconds": config.DefaultDecisionSeconds,
-		"HTTPTimeoutSeconds":     config.HTTPTimeoutSeconds,
+		"UpdateIntervalSeconds":     config.UpdateIntervalSeconds,
+		"DefaultDecisionSeconds":    config.DefaultDecisionSeconds,
+		"HTTPTimeoutSeconds":        config.HTTPTimeoutSeconds,
+		"CaptchaGracePeriodSeconds": config.CaptchaGracePeriodSeconds,
 	}
 	for key, val := range requiredInt {
 		if val < 1 {
@@ -268,6 +293,9 @@ func validateParamsRequired(config *Config) error {
 	}
 	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
 		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
+	}
+	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider}, config.CaptchaProvider) {
+		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'hcaptcha', 'recaptcha' or 'turnstile'")
 	}
 	return nil
 }
