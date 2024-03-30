@@ -34,7 +34,7 @@ type infoProvider struct {
 }
 
 var (
-	// nolint:gochecknoglobals
+	//nolint:gochecknoglobals
 	captcha = map[string]infoProvider{
 		configuration.HcaptchaProvider: {
 			js:       "https://hcaptcha.com/1/api.js",

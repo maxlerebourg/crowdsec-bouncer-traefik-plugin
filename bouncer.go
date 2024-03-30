@@ -171,7 +171,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	)
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
-	bouncer.captchaClient.New(
+	err = bouncer.captchaClient.New(
 		log,
 		bouncer.cacheClient,
 		&http.Client{
@@ -184,6 +184,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		config.CaptchaHTMLFilePath,
 		config.CaptchaGracePeriodSeconds,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
@@ -312,10 +315,9 @@ func handleErrorServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw htt
 		if bouncer.captchaClient.Check(remoteIP) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			return
-		} else {
-			bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
-			return
 		}
+		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
+		return
 	}
 	rw.WriteHeader(http.StatusForbidden)
 }
