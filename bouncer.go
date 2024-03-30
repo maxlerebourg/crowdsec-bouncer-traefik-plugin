@@ -181,7 +181,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		config.CaptchaProvider,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
-		config.CaptchaHtmlFilePath,
+		config.CaptchaHTMLFilePath,
 		config.CaptchaGracePeriodSeconds,
 	)
 

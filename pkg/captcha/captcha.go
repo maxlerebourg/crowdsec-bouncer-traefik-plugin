@@ -27,15 +27,15 @@ type Client struct {
 	log                *logger.Log
 }
 
-// CaptchaProvider Define js, key and URL to validate.
-type CaptchaProvider struct {
+type infoProvider struct {
 	js       string
 	key      string
 	validate string
 }
 
 var (
-	captcha = map[string]CaptchaProvider{
+	// nolint:gochecknoglobals
+	captcha = map[string]infoProvider{
 		configuration.HcaptchaProvider: {
 			js:       "https://hcaptcha.com/1/api.js",
 			key:      "h-captcha",
@@ -57,8 +57,9 @@ var (
 func compileTemplate(path string) (*template.Template, error) {
 	var err error
 	if path == "" {
-		return nil, fmt.Errorf("No captcha template provided")
+		return nil, fmt.Errorf("no captcha template provided")
 	}
+	//nolint:gosec
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -66,7 +67,7 @@ func compileTemplate(path string) (*template.Template, error) {
 	html := string(b)
 	compiledTemplate, err := template.New("captcha").Parse(html)
 	if err != nil {
-		return nil, fmt.Errorf("Impossible to compile captcha template: %s", err.Error())
+		return nil, fmt.Errorf("impossible to compile captcha template: %w", err)
 	}
 	return compiledTemplate, nil
 }
@@ -106,11 +107,14 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
-	c.htmlPage.Execute(rw, map[string]string{
+	err = c.htmlPage.Execute(rw, map[string]string{
 		"SiteKey":     c.siteKey,
 		"FrontendJS":  captcha[c.provider].js,
 		"FrontendKey": captcha[c.provider].key,
 	})
+	if err != nil {
+		c.log.Info("captcha:ServeHTTP Can't serve HTML")
+	}
 }
 
 // Check Check if the captcha is already done.
@@ -121,8 +125,7 @@ func (c *Client) Check(remoteIP string) bool {
 	return passed
 }
 
-// CaptchaResponse Body returned from captcha provider API.
-type CaptchaResponse struct {
+type responseProvider struct {
 	Success bool `json:"success"`
 }
 
@@ -140,16 +143,20 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	var body = url.Values{}
 	body.Add("secret", c.secretKey)
 	body.Add("response", response)
-	resp, err := c.httpClient.PostForm(captcha[c.provider].validate, body)
+	res, err := c.httpClient.PostForm(captcha[c.provider].validate, body)
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
-	if resp.Header.Get("content-type") != "application/json" {
+	defer func() {
+		if err = res.Body.Close(); err != nil {
+			c.log.Error(fmt.Sprintf("captcha:Validate %s", err.Error()))
+		}
+	}()
+	if res.Header.Get("content-type") != "application/json" {
 		return false, nil
 	}
-	var captchaResponse CaptchaResponse
-	err = json.NewDecoder(resp.Body).Decode(&captchaResponse)
+	var captchaResponse responseProvider
+	err = json.NewDecoder(res.Body).Decode(&captchaResponse)
 	if err != nil {
 		return false, err
 	}

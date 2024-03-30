@@ -18,7 +18,7 @@ const (
 	NoBannedValue = "f"
 	// CaptchaValue Need captcha string.
 	CaptchaValue = "c"
-	// CaptchaValue Need captcha string.
+	// CaptchaDoneValue Captcha done string.
 	CaptchaDoneValue = "d"
 	// CacheMiss error string when cache is miss.
 	CacheMiss = "cache:miss"

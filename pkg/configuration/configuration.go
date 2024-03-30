@@ -66,7 +66,7 @@ type Config struct {
 	RedisCachePassword                       string   `json:"redisCachePassword,omitempty"`
 	RedisCachePasswordFile                   string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                       string   `json:"redisCacheDatabase,omitempty"`
-	CaptchaHtmlFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
+	CaptchaHTMLFilePath                      string   `json:"CaptchaHTMLFilePath,omitempty"`
 	CaptchaProvider                          string   `json:"captchaProvider,omitempty"`
 	CaptchaSiteKey                           string   `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                       string   `json:"captchaSiteKeyFile,omitempty"`
@@ -103,7 +103,7 @@ func New() *Config {
 		CaptchaProvider:               "",
 		CaptchaSiteKey:                "",
 		CaptchaSecretKey:              "",
-		CaptchaHtmlFilePath:           "/captcha.html",
+		CaptchaHTMLFilePath:           "/captcha.html",
 		CaptchaGracePeriodSeconds:     1800,
 		ForwardedHeadersCustomName:    "X-Forwarded-For",
 		ForwardedHeadersTrustedIPs:    []string{},
