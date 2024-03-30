@@ -117,7 +117,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 }
 
-// Check Check if the captcha is already done.
+// Check Verify if the captcha is already done.
 func (c *Client) Check(remoteIP string) bool {
 	value, _ := c.cacheClient.Get(fmt.Sprintf("%s_captcha", remoteIP))
 	passed := value == cache.CaptchaDoneValue
