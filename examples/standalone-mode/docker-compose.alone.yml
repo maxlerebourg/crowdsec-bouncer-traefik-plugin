@@ -30,16 +30,16 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.router-foo.rule=Path(`/foo`)"
       - "traefik.http.routers.router-foo.entrypoints=web"
-      - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
+      - "traefik.http.routers.router-foo.middlewares=crowdsec@docker" 
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
 
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
-      # - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdsecmode=alone"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecCapiMachineId=logincacacalfkrjebfreifgzfblezgyfoerxsqxsqxsqxsr"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.CrowdsecCapiPassword=Password2"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/sshd,crowdsecurity/asterisk_bf,crowdsecurity/asterisk_user_enum,crowdsecurity/base-http-scenarios"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      # - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=alone"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CrowdsecCapiMachineId=logincacacalfkrjebfreifgzfblezgyfoerxsqxsqxsqxsr"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CrowdsecCapiPassword=Password2"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/sshd,crowdsecurity/asterisk_bf,crowdsecurity/asterisk_user_enum,crowdsecurity/base-http-scenarios"
 
 volumes:
   logs-local:

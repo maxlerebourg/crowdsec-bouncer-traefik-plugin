@@ -33,11 +33,9 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.router-foo.rule=PathPrefix(`/foo`)"
       - "traefik.http.routers.router-foo.entrypoints=web"
-      - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
+      - "traefik.http.routers.router-foo.middlewares=crowdsec@docker" 
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
-
+      
   whoami2:
     image: traefik/whoami
     container_name: "simple-service-bar"
@@ -46,12 +44,12 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.router-bar.rule=PathPrefix(`/bar`)"
       - "traefik.http.routers.router-bar.entrypoints=web"
-      - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker"
+      - "traefik.http.routers.router-bar.middlewares=crowdsec@docker"
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecappsecenabled=true"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
 
   crowdsec:
     image: crowdsecurity/crowdsec:dev
