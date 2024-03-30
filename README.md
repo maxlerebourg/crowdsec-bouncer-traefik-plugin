@@ -268,6 +268,11 @@ http:
             ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
             -----END RSA PRIVATE KEY-----
           crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
+          captchaProvider: hcaptcha
+          captchaSiteKey: FIXME
+          captchaSecretKey: FIXME
+          captchaGracePeriodSeconds: 1800
+          captchaHTMLFilePath: /captcha.html"
 ```
 
 #### Fill variable with value of file

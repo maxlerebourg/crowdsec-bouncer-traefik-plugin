@@ -63,6 +63,7 @@ services:
       CUSTOM_HOSTNAME: crowdsec
       BOUNCER_KEY_TRAEFIK_DEV: 40796d93c2958f9e58345514e67740e5
     volumes:
+      - './profiles.yaml:/etc/crowdsec/profiles.yaml:ro'
       - './acquis.yaml:/etc/crowdsec/acquis.yaml:ro'
       - logs-captcha-enabled:/var/log/traefik:ro
       - crowdsec-db-captcha-enabled:/var/lib/crowdsec/data/
