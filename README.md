@@ -158,6 +158,24 @@ Only one instance of the plugin is *possible*.
 - CrowdsecCapiScenarios
   - []string
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
+- CaptchaProvider
+  - string
+  - Provider to validate the captcha
+- CaptchaSiteKey
+  - string
+  - Site key for the captcha provider
+- CaptchaSecretKey
+  - string
+  - Site secret key for the captcha provider
+- CaptchaHTMLFilePath
+  - string
+  - default: /captcha.html
+  - Path where the captcha template is stored
+- CaptchaGracePeriodSeconds
+  - int64
+  - default: 1800
+  - Period after validation of a captcha before a new validation is required if crowdsec decision is still valid
+
 
 ### Configuration
 
@@ -318,9 +336,10 @@ Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bounc
 ```bash
 docker compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
-docker exec crowdsec cscli decisions remove --ip 10.0.0.10
+docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha # this will return a captcha challenge 
 ```
 
+```
 ### Examples
 
 #### 1. Behind another proxy service (ex: clouflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)

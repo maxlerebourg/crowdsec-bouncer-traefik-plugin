@@ -49,7 +49,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSiteKey=FIXME"
       # Define captcha secret key
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=FIXME"
-      # Define captcha secret key
+      # Define captcha grade period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
       # Define captcha HTML file path
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
