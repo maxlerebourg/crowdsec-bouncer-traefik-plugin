@@ -271,7 +271,7 @@ You can generate a crowdsec API key for the LAPI.
 You can follow the documentation here: [docs.crowdsec.net/docs/user_guides/lapi_mgmt](https://docs.crowdsec.net/docs/user_guides/lapi_mgmt)
 
 ```bash
-docker-compose -f docker-compose-local.yml up -d crowdsec
+docker compose -f docker-compose-local.yml up -d crowdsec
 docker exec crowdsec cscli bouncers add crowdsecBouncer
 ```
 
@@ -295,7 +295,7 @@ Note:
 
 You can then run all the containers:
 ```bash
-docker-compose up -d
+docker composeup -d
 ```
 
 #### Use certificates to authenticate with CrowdSec
@@ -316,7 +316,7 @@ Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bounc
 #### Manually add an IP to the blocklist (for testing purposes)
 
 ```bash
-docker-compose up -d crowdsec
+docker compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 ```
@@ -337,9 +337,9 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 
 #### 7. Using Traefik in standalone mode without Crowdsec [examples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/standalone-mode/README.md)
 
-
 #### 8. Using Traefik with AppSec feature enabled [examples/appsec-enabled/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/appsec-enabled/README.md)
 
+#### 9. Using Traefik with Captcha remediation feature enabled [examples/captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/captcha/README.md)
 
 ### Local Mode
 
@@ -369,7 +369,7 @@ For local development, a `docker-compose.local.yml` is provided which reproduces
 This works once you have generated and filled your *LAPI-KEY* (crowdsecLapiKey), if not read above for informations.
 
 ```bash
-docker-compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.local.yml up -d
 ```
 Equivalent to
 ```bash

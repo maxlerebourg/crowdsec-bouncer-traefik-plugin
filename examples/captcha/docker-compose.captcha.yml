@@ -18,6 +18,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-captcha-enabled:/var/log/traefik
+      - './captcha.html:/captcha.html'
       - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 8000:80
@@ -45,11 +46,13 @@ services:
       # Choose captcha provider
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=hcaptcha"
       # Define captcha site key
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSiteKey=94476319-6b8e-44a8-9d13-4ef1de9b3001"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSiteKey=FIXME"
       # Define captcha secret key
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=ES_eac317320a9f494d83c5e0267f2284ed"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=FIXME"
       # Define captcha secret key
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
+      # Define captcha HTML file path
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.0

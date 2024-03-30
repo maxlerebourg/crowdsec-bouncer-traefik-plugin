@@ -1,8 +1,6 @@
-version: "3.8"
-
 services:
   traefik:
-    image: "traefik:v2.10.4"
+    image: "traefik:v2.11.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -59,7 +57,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.5.3
+    image: crowdsecurity/crowdsec:v1.6.0
     container_name: "crowdsec"
     restart: unless-stopped
     environment:

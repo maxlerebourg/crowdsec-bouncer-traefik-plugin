@@ -15,11 +15,15 @@ We can try to query normally the whoami server:
 curl http://localhost:8000/foo
 ```
 
-And then we verify that a malicious request will be blocked: 
+We can try to ban ourself
+
 ```bash
-curl http://localhost:8000/foo/rpc2
+docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type captcha
 ```
-You should get a 403 on http://localhost:8000/foo/rpc2
+
+We will see in the browser the captcha validation page:
+
+![alt text](image_captcha_validation.png)
 
 To play the demo environment run:
 ```bash
