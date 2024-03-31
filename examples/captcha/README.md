@@ -103,8 +103,6 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Nothing, all good!
     create participant Webserver
     TraefikPlugin-->>Webserver: Forwarding this HTTP Request from User
-    destroy TraefikPlugin
-    destroy PluginCache
     Webserver-->>User: HTTP Response
 ```
 
