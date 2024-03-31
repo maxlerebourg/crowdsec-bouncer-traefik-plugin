@@ -32,7 +32,7 @@ Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) an
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.  
 
-On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the exemple captcha for more informations and configuration intructions.  
+On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
  - [hcaptcha](https://www.hcaptcha.com/)
  - [recaptcha](https://www.google.com/recaptcha/about/)
@@ -193,7 +193,7 @@ For each plugin, the Traefik static configuration must define the module name (a
 
 The following declaration (given here in YAML) defines a plugin:
 > Note that you don't need to copy all thoses settings but only the ones you want to use.  
-> See the exemples for advanced usage.
+> See the examples for advanced usage.
 
 ```yaml
 # Static configuration
