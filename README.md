@@ -183,8 +183,8 @@ Only one instance of the plugin is *possible*.
   - Path where the captcha template is stored
 - CaptchaGracePeriodSeconds
   - int64
-  - default: 1800
-  - Period after validation of a captcha before a new validation is required if crowdsec decision is still valid
+  - default: 1800 (= 30 minutes)
+  - Period after validation of a captcha before a new validation is required if Crowdsec decision is still valid
 
 
 ### Configuration
@@ -284,7 +284,7 @@ http:
           captchaSiteKey: FIXME
           captchaSecretKey: FIXME
           captchaGracePeriodSeconds: 1800
-          captchaHTMLFilePath: /captcha.html"
+          captchaHTMLFilePath: /captcha.html
 ```
 
 #### Fill variable with value of file
@@ -330,7 +330,7 @@ Note:
 
 You can then run all the containers:
 ```bash
-docker composeup -d
+docker compose up -d
 ```
 
 #### Use certificates to authenticate with CrowdSec
@@ -353,7 +353,9 @@ Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bounc
 ```bash
 docker compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
-docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha # this will return a captcha challenge  
+docker exec crowdsec cscli decisions remove --ip 10.0.0.10
+docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m -t captcha # this will return a captcha challenge  
+docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 ```
 
 ### Examples
