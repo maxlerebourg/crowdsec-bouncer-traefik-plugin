@@ -32,10 +32,10 @@ Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) an
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403)  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.  
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still makes a decision to verify the user behavior. See the exemple captcha for more informations and configuration intructions.  
-The following captcha provider are supported now:
- - hcaptcha
- - recatcha
- - turnstile
+The following captcha providers are supported now:
+ - [hcaptcha](https://www.hcaptcha.com/)
+ - [recaptcha](https://www.google.com/recaptcha/about/)
+ - [turnstile](https://www.cloudflare.com/fr-fr/products/turnstile/)
 
 
 There are 4 operating modes (CrowdsecMode) for this plugin:
