@@ -39,9 +39,27 @@ It is not directly accessible from Traefik even when importing the plugin, so [d
 ```
 ### Crowdsec configuration
 
-Crowdsec by default will expose 
+Crowdsec by default will take the ban action on suspicious activity detected in logs.  
+To instruct Crowdsec to use captcha remediation, change the `/etc/crowdsec/profiles.yaml`.   
 
+2 modes are supported:
+- Always return a captcha decision
+- Return a captcha decision the first X times and then a ban decision.
 
+The second mode could be used to prevent repeated malicious activity.
+More information is available on configuring Crowdsec in the [official documentation](https://docs.crowdsec.net/docs/next/profiles/captcha_profile/).
+
+```yaml
+  ...
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.6.0
+    volumes:
+      # For captcha and ban mixed decision
+      - './profiles.yaml:/etc/crowdsec/profiles.yaml:ro' 
+      # For captcha only remediation
+      # - './profiles_captcha_only.yaml:/etc/crowdsec/profiles.yaml:ro'
+  ...
+```
 ## Exemple navigation
 We can try to query normally the whoami server:
 ```bash
@@ -70,4 +88,6 @@ make run_captcha
 ```bash
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type ban
 ```
+
+## Captcha Workflow
 

@@ -1,7 +1,7 @@
 name: captcha_remediation
 filters:
-  - Alert.Remediation == true && Alert.GetScope() == "Ip" && Alert.GetScenario() contains "http" && GetDecisionsSinceCount(Alert.GetValue(), "24h") <= 3
-## Same as above but only 3 captcha decision per 24 hours before ban
+  - Alert.Remediation == true && Alert.GetScope() == "Ip" && Alert.GetScenario() contains "http"
+## Any scenario with http in its name will trigger a captcha challenge
 decisions:
  - type: captcha
    duration: 4h
