@@ -28,6 +28,15 @@ The AppSec Component offers:
 - Combining classic WAF benefits with advanced CrowdSec features for otherwise difficult advanced behavior detection.
 More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
+Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) and supported by the plugin can be either `ban` or `captcha`.  
+For the `ban` remediation the user will be blocked in Traefik (HTTP 403)  
+For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.  
+On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still makes a decision to verify the user behavior. See the exemple captcha for more informations and configuration intructions.  
+The following captcha provider are supported now:
+ - hcaptcha
+ - recatcha
+ - turnstile
+
 
 There are 4 operating modes (CrowdsecMode) for this plugin:
 
@@ -92,7 +101,7 @@ Only one instance of the plugin is *possible*.
 - CrowdsecLapiKey
   - string
   - default: ""
-  - Crowdsec LAPI key for the bouncer : **must be unique by service**. 
+  - Crowdsec LAPI key for the bouncer. 
 - CrowdsecLapiTlsInsecureVerify
   - bool
   - default: false
@@ -160,7 +169,7 @@ Only one instance of the plugin is *possible*.
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
 - CaptchaProvider
   - string
-  - Provider to validate the captcha
+  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider
@@ -182,6 +191,8 @@ Only one instance of the plugin is *possible*.
 For each plugin, the Traefik static configuration must define the module name (as is usual for Go packages).
 
 The following declaration (given here in YAML) defines a plugin:
+> Note that you don't need to copy all thoses settings but only the ones you want to use.  
+> See the examples for advanced usage.
 
 ```yaml
 # Static configuration
