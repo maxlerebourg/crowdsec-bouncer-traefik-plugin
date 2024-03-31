@@ -93,7 +93,7 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type ban
 
 > Context: The user has no decision attached to his IP
 
-```
+```mermaid
 sequenceDiagram
     participant User
     participant TraefikPlugin
@@ -103,7 +103,7 @@ sequenceDiagram
 
 > Context: The user has a captcha decision attached to his IP
 
-```
+```mermaid
 sequenceDiagram
     participant User
     participant TraefikPlugin
@@ -115,7 +115,7 @@ sequenceDiagram
 
 > Context: The user has a ban decision attached to his IP
 
-```
+```mermaid
 sequenceDiagram
     participant User
     participant TraefikPlugin
