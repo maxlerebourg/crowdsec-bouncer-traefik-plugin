@@ -6,8 +6,8 @@ This plugins support the `ban` and `captcha` remediation.
 
 ### Traefik configuration
 
-The minimal configuration is defined below.
-For now 3 captcha providers are supported:
+The minimal configuration is defined below.  
+For now 3 captcha providers are supported:  
  - [hcaptcha](https://www.hcaptcha.com/)
  - [recaptcha](https://www.google.com/recaptcha/about/)
  - [turnstile](https://www.cloudflare.com/fr-fr/products/turnstile/)
@@ -26,7 +26,7 @@ For now 3 captcha providers are supported:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
 ```
 
-The captcha HTML file must be present in the Traefik container (bind mounted or added during a custom build)
+The captcha HTML file must be present in the Traefik container (bind mounted or added during a custom build).  
 It is not directly accessible from Traefik even when importing the plugin, so [download](https://raw.githubusercontent.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/master/captcha.html) it locally to expose it to Traefik.
 
 ```yaml 
@@ -93,14 +93,17 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type ban
 
 > Context: The user has no decision attached to his IP
 
+```
 sequenceDiagram
     participant User
     participant TraefikPlugin
     User->>TraefikPlugin: Can I access that webpage
     TraefikPlugin-->>User: No decisions found, OK HTTP 200 webpage
+```
 
 > Context: The user has a captcha decision attached to his IP
 
+```
 sequenceDiagram
     participant User
     participant TraefikPlugin
@@ -108,11 +111,14 @@ sequenceDiagram
     TraefikPlugin->>User: Please complete that Captcha before
     User->>TraefikPlugin: Done can I access now ?
     TraefikPlugin->>User: Captcha verified, OK HTTP 200 webpage
+```
 
 > Context: The user has a ban decision attached to his IP
 
+```
 sequenceDiagram
     participant User
     participant TraefikPlugin
     User->>TraefikPlugin: Can I access that webpage
     TraefikPlugin->>User: No, HTTP 403
+```
