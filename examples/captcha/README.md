@@ -91,3 +91,28 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type ban
 
 ## Captcha Workflow
 
+> Context: The user has no decision attached to his IP
+
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    TraefikPlugin-->>User: No decisions found, OK HTTP 200 webpage
+
+> Context: The user has a captcha decision attached to his IP
+
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    TraefikPlugin->>User: Please complete that Captcha before
+    User->>TraefikPlugin: Done can I access now ?
+    TraefikPlugin->>User: Captcha verified, OK HTTP 200 webpage
+
+> Context: The user has a ban decision attached to his IP
+
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    TraefikPlugin->>User: No, HTTP 403
