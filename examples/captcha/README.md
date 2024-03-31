@@ -124,6 +124,9 @@ sequenceDiagram
     Destroy ProviderCaptcha    
     ProviderCaptcha-->>TraefikPlugin: Yes
     TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Done
+    Destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
