@@ -49,7 +49,7 @@ services:
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       # Definitin of the middleware
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      # crowdseclapikey must be unique to the middleware attached to the service
+      # crowdseclapikey is the key to authenticate to crowdsec
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY-1="
       # enable AppSec real time check
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
