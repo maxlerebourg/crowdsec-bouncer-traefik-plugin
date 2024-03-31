@@ -97,12 +97,14 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type ban
 sequenceDiagram
     participant User
     participant TraefikPlugin
-    participant Cache
+    participant PluginCache
     User->>TraefikPlugin: Can I access that webpage
-    TraefikPlugin-->>Cache: Does the user has crowdsec decision ?
-    Cache-->>TraefikPlugin: Nothing, all good!
+    TraefikPlugin-->>PluginCache: Does the user has a crowdsec decision ?
+    PluginCache-->>TraefikPlugin: Nothing, all good!
     create participant Webserver
     TraefikPlugin-->>Webserver: Forwarding this HTTP Request from User
+    destroy TraefikPlugin
+    destroy PluginCache
     Webserver-->>User: HTTP Response
 ```
 
