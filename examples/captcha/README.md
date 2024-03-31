@@ -97,13 +97,14 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type ban
 sequenceDiagram
     participant User
     participant TraefikPlugin
-    participant PluginCache
     User->>TraefikPlugin: Can I access that webpage
-    TraefikPlugin-->>PluginCache: Does the user has a crowdsec decision ?
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the user IP has a crowdsec decision ?
+    Destroy PluginCache
     PluginCache-->>TraefikPlugin: Nothing, all good!
-    create participant Webserver
-    TraefikPlugin-->>Webserver: Forwarding this HTTP Request from User
-    Webserver-->>User: HTTP Response
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
 ```
 
 > Context: The user has a captcha decision attached to his IP
@@ -113,9 +114,18 @@ sequenceDiagram
     participant User
     participant TraefikPlugin
     User->>TraefikPlugin: Can I access that webpage
-    TraefikPlugin->>User: Please complete that Captcha before
-    User->>TraefikPlugin: Done can I access now ?
-    TraefikPlugin->>User: Captcha verified, OK HTTP 200 webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a Crowdsec Decision ?
+    PluginCache-->>TraefikPlugin: Yes a Catpcha Decision
+    TraefikPlugin->>User: Please complete this captcha
+    User->>TraefikPlugin: Fine, done!
+    create participant ProviderCaptcha
+    TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
+    Destroy ProviderCaptcha    
+    ProviderCaptcha-->>TraefikPlugin: Yes
+    TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
 ```
 
 > Context: The user has a ban decision attached to his IP
@@ -125,5 +135,9 @@ sequenceDiagram
     participant User
     participant TraefikPlugin
     User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a Crowdsec Decision ?
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Yes a ban Decision
     TraefikPlugin->>User: No, HTTP 403
 ```
