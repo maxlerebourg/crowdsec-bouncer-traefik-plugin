@@ -119,7 +119,6 @@ func Test_Delete(t *testing.T) {
 			if tt.valueErr != "" && tt.valueErr != err.Error() {
 				t.Errorf("Delete() err = %v, want %v", err.Error(), tt.valueErr)
 			}
-
 		})
 	}
 }
