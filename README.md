@@ -29,9 +29,10 @@ The AppSec Component offers:
 More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
 Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) and supported by the plugin can be either `ban` or `captcha`.  
-For the `ban` remediation the user will be blocked in Traefik (HTTP 403)  
+For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.  
-On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still makes a decision to verify the user behavior. See the exemple captcha for more informations and configuration intructions.  
+
+On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the exemple captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
  - [hcaptcha](https://www.hcaptcha.com/)
  - [recaptcha](https://www.google.com/recaptcha/about/)
@@ -192,7 +193,7 @@ For each plugin, the Traefik static configuration must define the module name (a
 
 The following declaration (given here in YAML) defines a plugin:
 > Note that you don't need to copy all thoses settings but only the ones you want to use.  
-> See the examples for advanced usage.
+> See the exemples for advanced usage.
 
 ```yaml
 # Static configuration
@@ -352,10 +353,9 @@ Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bounc
 ```bash
 docker compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
-docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha # this will return a captcha challenge 
+docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha # this will return a captcha challenge  
 ```
 
-```
 ### Examples
 
 #### 1. Behind another proxy service (ex: clouflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)

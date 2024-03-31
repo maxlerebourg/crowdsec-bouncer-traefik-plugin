@@ -46,7 +46,7 @@ We can try to ban ourself
 docker exec crowdsec cscli decisions add --ip 10.0.0.20 -d 4h --type captcha
 ```
 
-![image decision captcha](image_decision_catpcha.png)
+![image decision captcha](image_decision_captcha.png)
 
 We will see in the browser the captcha validation page:
 
@@ -57,7 +57,7 @@ To play the demo environment run:
 make run_captcha
 ```
 
-> Note, if we are banned with a "ban" decision from crowdsec a captcha will not be asked and you will have to wait for the decision to expire.  
+> Note, if we are banned with a "ban" decision from crowdsec a captcha will not be asked and you will have to wait for the decision to expire or remove it manually.  
 
 ```bash
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type ban
