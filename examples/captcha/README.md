@@ -97,8 +97,13 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m --type ban
 sequenceDiagram
     participant User
     participant TraefikPlugin
+    participant Cache
     User->>TraefikPlugin: Can I access that webpage
-    TraefikPlugin-->>User: No decisions found, OK HTTP 200 webpage
+    TraefikPlugin-->>Cache: Does the user has crowdsec decision ?
+    Cache-->>TraefikPlugin: Nothing, all good!
+    create participant Webserver
+    TraefikPlugin-->>Webserver: Forwarding this HTTP Request from User
+    Webserver-->>User: HTTP Response
 ```
 
 > Context: The user has a captcha decision attached to his IP
