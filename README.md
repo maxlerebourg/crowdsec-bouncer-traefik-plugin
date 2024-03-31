@@ -353,7 +353,7 @@ Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bounc
 ```bash
 docker compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
-docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha # this will return a captcha challenge  
+docker exec crowdsec cscli decisions add --ip 10.0.0.10 -t captcha # this will return a captcha challenge  
 ```
 
 ### Examples

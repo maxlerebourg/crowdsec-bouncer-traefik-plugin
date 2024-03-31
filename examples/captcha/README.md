@@ -4,6 +4,8 @@
 Crowdsec support 3 remediations solutions `ban`, `captcha`, and `throttle`.  
 This plugins support the `ban` and `captcha` remediation.  
 
+### Traefik configuration
+
 The minimal configuration is defined below.
 For now 3 captcha providers are supported:
  - [hcaptcha](https://www.hcaptcha.com/)
@@ -19,14 +21,15 @@ For now 3 captcha providers are supported:
       # Define captcha secret key
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=FIXME"
       # Define captcha grade period seconds
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
       # Define captcha HTML file path
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
 ```
 
 The captcha HTML file must be present in the Traefik container (bind mounted or added during a custom build)
+It is not directly accessible from Traefik even when importing the plugin, so [download](https://raw.githubusercontent.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/master/captcha.html) it locally to expose it to Traefik.
 
-```yaml
+```yaml 
   ...
   traefik:
     image: "traefik:v2.11.0"
@@ -34,6 +37,11 @@ The captcha HTML file must be present in the Traefik container (bind mounted or 
       - './captcha.html:/captcha.html'
   ...
 ```
+### Crowdsec configuration
+
+Crowdsec by default will expose 
+
+
 ## Exemple navigation
 We can try to query normally the whoami server:
 ```bash
