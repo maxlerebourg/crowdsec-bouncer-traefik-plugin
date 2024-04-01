@@ -1,8 +1,6 @@
-version: "3.8"
-
 services:
   traefik:
-    image: "traefik:v2.10.7"
+    image: "traefik:v2.11.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -14,12 +12,13 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
 
-      - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.2.0"
-      # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      # - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      # - "--experimental.plugins.bouncer.version=v1.2.0"
+      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - logs-appsec-enabled:/var/log/traefik
+      - logs-captcha-enabled:/var/log/traefik
+      - './captcha.html:/captcha.html'
       - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 8000:80
@@ -43,12 +42,17 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      # Enable AppSec
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
-      # Define AppSec host and port informations
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
-
-  
+     
+      # Choose captcha provider
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=hcaptcha"
+      # Define captcha site key
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSiteKey=FIXME"
+      # Define captcha secret key
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=FIXME"
+      # Define captcha grade period seconds
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
+      # Define captcha HTML file path
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.0
@@ -59,14 +63,18 @@ services:
       CUSTOM_HOSTNAME: crowdsec
       BOUNCER_KEY_TRAEFIK_DEV: 40796d93c2958f9e58345514e67740e5
     volumes:
-      - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - logs-appsec-enabled:/var/log/traefik:ro
-      - crowdsec-db-appsec-enabled:/var/lib/crowdsec/data/
-      - crowdsec-config-appsec-enabled:/etc/crowdsec/
+      # For captcha and ban mixed decision
+      - './profiles.yaml:/etc/crowdsec/profiles.yaml:ro' 
+      # For captcha only remediation
+      # - './profiles_captcha_only.yaml:/etc/crowdsec/profiles.yaml:ro'
+      - './acquis.yaml:/etc/crowdsec/acquis.yaml:ro'
+      - logs-captcha-enabled:/var/log/traefik:ro
+      - crowdsec-db-captcha-enabled:/var/lib/crowdsec/data/
+      - crowdsec-config-captcha-enabled:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
   
 volumes:
-  logs-appsec-enabled:
-  crowdsec-db-appsec-enabled:
-  crowdsec-config-appsec-enabled:
+  logs-captcha-enabled:
+  crowdsec-db-captcha-enabled:
+  crowdsec-config-captcha-enabled:

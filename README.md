@@ -28,6 +28,16 @@ The AppSec Component offers:
 - Combining classic WAF benefits with advanced CrowdSec features for otherwise difficult advanced behavior detection.
 More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
+Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) and supported by the plugin can be either `ban` or `captcha`.  
+For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
+For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.  
+
+On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
+The following captcha providers are supported now:
+ - [hcaptcha](https://www.hcaptcha.com/)
+ - [recaptcha](https://www.google.com/recaptcha/about/)
+ - [turnstile](https://www.cloudflare.com/fr-fr/products/turnstile/)
+
 
 There are 4 operating modes (CrowdsecMode) for this plugin:
 
@@ -92,7 +102,7 @@ Only one instance of the plugin is *possible*.
 - CrowdsecLapiKey
   - string
   - default: ""
-  - Crowdsec LAPI key for the bouncer : **must be unique by service**. 
+  - Crowdsec LAPI key for the bouncer. 
 - CrowdsecLapiTlsInsecureVerify
   - bool
   - default: false
@@ -158,12 +168,32 @@ Only one instance of the plugin is *possible*.
 - CrowdsecCapiScenarios
   - []string
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
+- CaptchaProvider
+  - string
+  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`
+- CaptchaSiteKey
+  - string
+  - Site key for the captcha provider
+- CaptchaSecretKey
+  - string
+  - Site secret key for the captcha provider
+- CaptchaHTMLFilePath
+  - string
+  - default: /captcha.html
+  - Path where the captcha template is stored
+- CaptchaGracePeriodSeconds
+  - int64
+  - default: 1800 (= 30 minutes)
+  - Period after validation of a captcha before a new validation is required if Crowdsec decision is still valid
+
 
 ### Configuration
 
 For each plugin, the Traefik static configuration must define the module name (as is usual for Go packages).
 
 The following declaration (given here in YAML) defines a plugin:
+> Note that you don't need to copy all thoses settings but only the ones you want to use.  
+> See the examples for advanced usage.
 
 ```yaml
 # Static configuration
@@ -250,6 +280,11 @@ http:
             ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
             -----END RSA PRIVATE KEY-----
           crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
+          captchaProvider: hcaptcha
+          captchaSiteKey: FIXME
+          captchaSecretKey: FIXME
+          captchaGracePeriodSeconds: 1800
+          captchaHTMLFilePath: /captcha.html
 ```
 
 #### Fill variable with value of file
@@ -271,7 +306,7 @@ You can generate a crowdsec API key for the LAPI.
 You can follow the documentation here: [docs.crowdsec.net/docs/user_guides/lapi_mgmt](https://docs.crowdsec.net/docs/user_guides/lapi_mgmt)
 
 ```bash
-docker-compose -f docker-compose-local.yml up -d crowdsec
+docker compose -f docker-compose-local.yml up -d crowdsec
 docker exec crowdsec cscli bouncers add crowdsecBouncer
 ```
 
@@ -295,7 +330,7 @@ Note:
 
 You can then run all the containers:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 #### Use certificates to authenticate with CrowdSec
@@ -316,9 +351,11 @@ Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bounc
 #### Manually add an IP to the blocklist (for testing purposes)
 
 ```bash
-docker-compose up -d crowdsec
+docker compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10
+docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m -t captcha # this will return a captcha challenge  
+docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 ```
 
 ### Examples
@@ -337,9 +374,9 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10
 
 #### 7. Using Traefik in standalone mode without Crowdsec [examples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/standalone-mode/README.md)
 
-
 #### 8. Using Traefik with AppSec feature enabled [examples/appsec-enabled/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/appsec-enabled/README.md)
 
+#### 9. Using Traefik with Captcha remediation feature enabled [examples/captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/captcha/README.md)
 
 ### Local Mode
 
@@ -369,7 +406,7 @@ For local development, a `docker-compose.local.yml` is provided which reproduces
 This works once you have generated and filled your *LAPI-KEY* (crowdsecLapiKey), if not read above for informations.
 
 ```bash
-docker-compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.local.yml up -d
 ```
 Equivalent to
 ```bash
