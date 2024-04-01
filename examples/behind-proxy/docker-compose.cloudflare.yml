@@ -54,7 +54,7 @@ services:
       # Definition of the router
       - "traefik.http.routers.router-foo.rule=Path(`/foo`)"
       - "traefik.http.routers.router-foo.entrypoints=web"
-      - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
+      - "traefik.http.routers.router-foo.middlewares=crowdsec@docker" 
       # Definition of the service
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       # Definition of the middleware
@@ -73,15 +73,11 @@ services:
       # Definition of the router
       - "traefik.http.routers.router-bar.rule=Path(`/bar`)"
       - "traefik.http.routers.router-bar.entrypoints=web"
-      - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker" 
+      - "traefik.http.routers.router-bar.middlewares=crowdsec@docker" 
       # Definition of the service
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       # Definition of the middleware
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=live"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
   
 
   crowdsec:

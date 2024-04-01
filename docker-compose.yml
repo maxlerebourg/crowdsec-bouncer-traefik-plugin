@@ -1,8 +1,6 @@
-version: "3.8"
-
 services:
   traefik:
-    image: "traefik:v2.10.4"
+    image: "traefik:v2.11.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -33,16 +31,9 @@ services:
       # Definition of the router
       - "traefik.http.routers.router-foo.rule=Path(`/foo`)"
       - "traefik.http.routers.router-foo.entrypoints=web"
-      - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker"
+      - "traefik.http.routers.router-foo.middlewares=crowdsec@docker"
       # Definition of the service
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
-      # Definition of the middleware
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.enabled=true"
-      # crowdseclapikey must be unique to the middleware attached to the service
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY-1="
-      
-      # forwardedheaderstrustedips should be the IP of the proxy that is in front of traefik (if any)
-      - "traefik.http.middlewares.crowdsec-foo.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
   
   whoami2:
     image: traefik/whoami
@@ -53,20 +44,20 @@ services:
       # Definition of the router
       - "traefik.http.routers.router-bar.rule=Path(`/bar`)"
       - "traefik.http.routers.router-bar.entrypoints=web"
-      - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker"
+      - "traefik.http.routers.router-bar.middlewares=crowdsec@docker"
       # Definition of the service
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       # Definitin of the middleware
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.enabled=true"
-      # crowdseclapikey must be unique to the middleware attached to the service
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY-1="
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      # crowdseclapikey is the key to authenticate to crowdsec
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY-1="
       # enable AppSec real time check
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
       # forwardedheaderstrustedips should be the IP of the proxy that is in front of traefik (if any)
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.5.3
+    image: crowdsecurity/crowdsec:v1.6.0
     container_name: "crowdsec"
     restart: unless-stopped
     environment:

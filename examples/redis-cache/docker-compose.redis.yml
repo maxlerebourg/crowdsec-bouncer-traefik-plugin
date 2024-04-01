@@ -39,7 +39,7 @@ services:
   #     # Definition of the router
   #     - "traefik.http.routers.router-foo.rule=Path(`/redis-insecure`)"
   #     - "traefik.http.routers.router-foo.entrypoints=web"
-  #     - "traefik.http.routers.router-foo.middlewares=crowdsec-foo@docker" 
+  #     - "traefik.http.routers.router-foo.middlewares=crowdsec@docker" 
   #     # Definition of the service
   #     - "traefik.http.services.service-foo.loadbalancer.server.port=80"
   #     # Definition of the middleware
@@ -59,7 +59,7 @@ services:
       # Definition of the router
       - "traefik.http.routers.router-bar.rule=Path(`/redis-secure`)"
       - "traefik.http.routers.router-bar.entrypoints=web"
-      - "traefik.http.routers.router-bar.middlewares=crowdsec-bar@docker" 
+      - "traefik.http.routers.router-bar.middlewares=crowdsec@docker" 
       # Definition of the service
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       # Definition of the middleware

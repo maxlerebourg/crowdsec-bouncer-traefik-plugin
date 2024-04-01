@@ -43,6 +43,9 @@ run_tlsauth:
 run_appsec:
 	docker compose -f examples/appsec-enabled/docker-compose.appsec-enabled.yml up -d
 
+run_captcha:
+	docker compose -f examples/captcha/docker-compose.captcha.yml up -d
+
 run:
 	docker compose -f docker-compose.yml up -d --remove-orphans
 
