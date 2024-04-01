@@ -144,3 +144,18 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Yes a ban Decision
     TraefikPlugin->>User: No, HTTP 403
 ```
+
+## Captcha Configuration:
+
+- Recaptcha
+
+Choose v2 (challenge) and configure the domain to protect:  
+![Recaptcha image](image_recaptcha.png)
+
+- Turnstile
+
+TODO
+
+- Hcatpcha
+
+TODO

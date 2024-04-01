@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -152,7 +153,8 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 			c.log.Error(fmt.Sprintf("captcha:Validate %s", err.Error()))
 		}
 	}()
-	if res.Header.Get("content-type") != "application/json" {
+	if !strings.Contains(res.Header.Get("content-type"), "application/json") {
+		c.log.Debug("captcha:Validate responseType:noJson")
 		return false, nil
 	}
 	var captchaResponse responseProvider
