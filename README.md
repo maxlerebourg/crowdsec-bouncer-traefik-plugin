@@ -185,7 +185,10 @@ Only one instance of the plugin is *possible*.
   - int64
   - default: 1800 (= 30 minutes)
   - Period after validation of a captcha before a new validation is required if Crowdsec decision is still valid
-
+- BanHTMLFilePath
+  - string
+  - default: ban.html
+  - Path where the ban html file is stored
 
 ### Configuration
 
@@ -285,6 +288,7 @@ http:
           captchaSecretKey: FIXME
           captchaGracePeriodSeconds: 1800
           captchaHTMLFilePath: /captcha.html
+          banHTMLFilePath: ban.html
 ```
 
 #### Fill variable with value of file

@@ -72,6 +72,7 @@ type Bouncer struct {
 	customHeader           string
 	crowdsecStreamRoute    string
 	crowdsecHeader         string
+	banHTMLFilePath        string
 	clientPoolStrategy     *ip.PoolStrategy
 	serverPoolStrategy     *ip.PoolStrategy
 	httpClient             *http.Client
@@ -155,8 +156,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 			},
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
-		cacheClient:   &cache.Client{},
-		captchaClient: &captcha.Client{},
+		cacheClient:     &cache.Client{},
+		captchaClient:   &captcha.Client{},
+		banHTMLFilePath: config.BanHTMLFilePath,
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		return bouncer, nil
@@ -219,13 +221,13 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
-		rw.WriteHeader(http.StatusForbidden)
+		respondForbidden(bouncer, req, rw)
 		return
 	}
 	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
-		rw.WriteHeader(http.StatusForbidden)
+		respondForbidden(bouncer, req, rw)
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
@@ -248,7 +250,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
 			if cacheErrString != cache.CacheMiss {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
-				rw.WriteHeader(http.StatusForbidden)
+				respondForbidden(bouncer, req, rw)
 				return
 			}
 		} else {
@@ -268,7 +270,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
-			rw.WriteHeader(http.StatusForbidden)
+			respondForbidden(bouncer, req, rw)
 		}
 	} else {
 		value, err := handleNoStreamCache(bouncer, remoteIP)
@@ -319,14 +321,14 @@ func handleErrorServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw htt
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
-	rw.WriteHeader(http.StatusForbidden)
+	respondForbidden(bouncer, req, rw)
 }
 
 func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
 	if bouncer.appsecEnabled {
 		if err := appsecQuery(bouncer, remoteIP, req); err != nil {
 			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
-			rw.WriteHeader(http.StatusForbidden)
+			respondForbidden(bouncer, req, rw)
 			return
 		}
 	}
@@ -590,4 +592,11 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 		return fmt.Errorf("appsecQuery:readBody %w", err)
 	}
 	return nil
+}
+
+func respondForbidden(bouncer *Bouncer, req *http.Request, rw http.ResponseWriter) {
+	rw.WriteHeader(http.StatusForbidden)
+	if bouncer.banHTMLFilePath != "" {
+		http.ServeFile(rw, req, bouncer.banHTMLFilePath)
+	}
 }
