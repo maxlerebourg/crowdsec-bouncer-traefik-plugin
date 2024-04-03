@@ -143,6 +143,7 @@ sequenceDiagram
     participant TraefikPlugin
     participant CrowdsecLAPI
     TraefikPlugin->>CrowdsecLAPI: What are the current decisions
+    Destroy CrowdsecLAPI
     CrowdsecLAPI->>TraefikPlugin: Here is the list
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Store this list
@@ -192,6 +193,7 @@ sequenceDiagram
     participant TraefikPlugin
     participant CrowdsecCAPI
     TraefikPlugin->>CrowdsecCAPI: What are the current decisions from CAPI
+    Destroy CrowdsecCAPI
     CrowdsecCAPI->>TraefikPlugin: Here is the list
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Store this list
