@@ -600,10 +600,3 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	}
 	return nil
 }
-
-func respondForbidden(bouncer *Bouncer, req *http.Request, rw http.ResponseWriter) {
-	rw.WriteHeader(http.StatusForbidden)
-	if bouncer.banHTMLFilePath != "" {
-		http.ServeFile(rw, req, bouncer.banHTMLFilePath)
-	}
-}
