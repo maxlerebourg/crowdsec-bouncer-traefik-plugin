@@ -164,7 +164,6 @@ func GetHTMLTemplate(path string) (*template.Template, error) {
 	return compiledTemplate, nil
 }
 
-
 // ValidateParams validate all the param gave by user.
 //
 //nolint:gocyclo,gocognit
