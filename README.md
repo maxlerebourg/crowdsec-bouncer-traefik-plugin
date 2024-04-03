@@ -55,9 +55,9 @@ The cache can be local to Traefik using the filesystem, or a separate Redis inst
 
 Below are Mermaid diagrams detailling how each mode work:  
 
-<details><summary>Mode `None` Workflow</summary>
+<details><summary>Mode none workflow</summary>
 
-A Ban decision exists in CrowdsecLAPI
+> A Ban decision exists in CrowdsecLAPI
 
 ```mermaid
 sequenceDiagram
@@ -71,7 +71,7 @@ sequenceDiagram
     TraefikPlugin->>User: No, HTTP 403
 ```
 
-No decision in CrowdsecLAPI
+> No decision in CrowdsecLAPI
 
 ```mermaid
 sequenceDiagram
@@ -89,9 +89,9 @@ sequenceDiagram
 
 </details>
 
-<details><summary>Mode `live` Workflow</summary>
+<details><summary>Mode live workflow</summary>
 
-A Ban decision exists in CrowdsecLAPI but not in cache
+> A Ban decision exists in CrowdsecLAPI but not in cache
 
 ```mermaid
 sequenceDiagram
@@ -111,7 +111,7 @@ sequenceDiagram
     TraefikPlugin->>User: No, HTTP 403
 ```
 
-No decision in cache
+> No decision in cache
 
 ```mermaid
 sequenceDiagram
@@ -134,9 +134,9 @@ sequenceDiagram
 
 </details>
 
-<details><summary>Mode `stream` Workflow</summary>
+<details><summary>Mode stream workflow</summary>
 
-Cache Synchronization every UpdateIntervalSeconds
+> Cache Synchronization every UpdateIntervalSeconds
 
 ```mermaid
 sequenceDiagram
@@ -150,7 +150,7 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Done
 ```
 
-A Ban decision exists in cache
+> A Ban decision exists in cache
 
 ```mermaid
 sequenceDiagram
@@ -165,7 +165,7 @@ sequenceDiagram
     TraefikPlugin->>User: No, HTTP 403
 ```
 
-No decision in cache
+> No decision in cache
 
 ```mermaid
 sequenceDiagram
@@ -183,9 +183,9 @@ sequenceDiagram
 
 </details>
 
-<details><summary>Mode `alone` Workflow</summary>
+<details><summary>Mode alone Workflow</summary>
 
-Cache Synchronization every 2 hours to the Crowdsec Central API
+> Cache Synchronization every 2 hours to the Crowdsec Central API
 
 ```mermaid
 sequenceDiagram
@@ -199,7 +199,7 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Done
 ```
 
-A Ban decision exists in cache
+> A Ban decision exists in cache
 
 ```mermaid
 sequenceDiagram
@@ -214,7 +214,7 @@ sequenceDiagram
     TraefikPlugin->>User: No, HTTP 403
 ```
 
-No decision in cache
+> No decision in cache
 
 ```mermaid
 sequenceDiagram
@@ -232,9 +232,9 @@ sequenceDiagram
 
 </details>
 
-<details><summary>Mode `appsec` Workflow</summary>
+<details><summary>Mode appsec workflow</summary>
 
-The request is detected as malicious
+> The request is detected as malicious
 
 ```mermaid
 sequenceDiagram
@@ -249,7 +249,7 @@ sequenceDiagram
     TraefikPlugin->>User: No, HTTP 403
 ```
 
-The request is not detected as malicious
+> The request is not detected as malicious
 
 ```mermaid
 sequenceDiagram
@@ -267,7 +267,7 @@ sequenceDiagram
 
 </details>
 
-<details><summary>Captcha decision Workflow</summary>
+<details><summary>Captcha decision workflow</summary>
 
 ```mermaid
 sequenceDiagram
