@@ -53,7 +53,39 @@ The `streaming mode` is recommended for performance, decisions are updated every
 
 The cache can be local to Traefik using the filesystem, or a separate Redis instance.  
 
-<details><summary>Clean IP workflow</summary>
+Below are Mermaid diagrams detailling how each mode work:  
+
+<details><summary>Mode None Workflow</summary>
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant CrowdsecLAPI
+    TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a Crowdsec Decision ?
+    Destroy CrowdsecLAPI
+    CrowdsecLAPI-->>TraefikPlugin: Yes a ban Decision
+    TraefikPlugin->>User: No, HTTP 403
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant CrowdsecLAPI
+    TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
+    Destroy CrowdsecLAPI
+    CrowdsecLAPI-->>TraefikPlugin: Nothing, all good!
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
+
+</details>
+
+<details><summary>Clean IP Workflow</summary>
 
 ```mermaid
 sequenceDiagram
@@ -68,9 +100,10 @@ sequenceDiagram
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
+
 </details>
 
-##### Ban decision workflow
+<details><summary>Ban decision Workflow</summary>
 
 ```mermaid
 sequenceDiagram
@@ -83,8 +116,9 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Yes a ban Decision
     TraefikPlugin->>User: No, HTTP 403
 ```
+</details>
 
-##### Captcha decision workflow
+<details><summary>Captcha decision Workflow</summary>
 
 ```mermaid
 sequenceDiagram
@@ -107,6 +141,8 @@ sequenceDiagram
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
+
+</details>
 
 ## Usage
 
