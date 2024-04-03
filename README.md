@@ -39,7 +39,7 @@ The following captcha providers are supported now:
  - [turnstile](https://www.cloudflare.com/fr-fr/products/turnstile/)
 
 
-There are 4 operating modes (CrowdsecMode) for this plugin:
+There are 5 operating modes (CrowdsecMode) for this plugin:
 
 | Mode | Description |
 |------|------|
@@ -53,6 +53,60 @@ The `streaming mode` is recommended for performance, decisions are updated every
 
 The cache can be local to Traefik using the filesystem, or a separate Redis instance.  
 
+<details><summary>Clean IP workflow</summary>
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Nothing, all good!
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
+</details>
+
+##### Ban decision workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a Crowdsec Decision ?
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Yes a ban Decision
+    TraefikPlugin->>User: No, HTTP 403
+```
+
+##### Captcha decision workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a Crowdsec Decision ?
+    PluginCache-->>TraefikPlugin: Yes a Catpcha Decision
+    TraefikPlugin->>User: Please complete this captcha
+    User->>TraefikPlugin: Fine, done!
+    create participant ProviderCaptcha
+    TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
+    Destroy ProviderCaptcha    
+    ProviderCaptcha-->>TraefikPlugin: Yes
+    TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Done
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
 
 ## Usage
 
