@@ -162,8 +162,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 			},
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
-		cacheClient:     &cache.Client{},
-		captchaClient:   &captcha.Client{},
+		cacheClient:   &cache.Client{},
+		captchaClient: &captcha.Client{},
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		return bouncer, nil
