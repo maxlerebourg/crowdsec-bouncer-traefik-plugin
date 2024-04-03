@@ -22,7 +22,7 @@ type Client struct {
 	siteKey            string
 	secretKey          string
 	gracePeriodSeconds int64
-	htmlPage           *template.Template
+	captchaTemplate    *template.Template
 	cacheClient        *cache.Client
 	httpClient         *http.Client
 	log                *logger.Log
@@ -55,26 +55,8 @@ var (
 	}
 )
 
-func compileTemplate(path string) (*template.Template, error) {
-	var err error
-	if path == "" {
-		return nil, fmt.Errorf("no captcha template provided")
-	}
-	//nolint:gosec
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	html := string(b)
-	compiledTemplate, err := template.New("captcha").Parse(html)
-	if err != nil {
-		return nil, fmt.Errorf("impossible to compile captcha template: %w", err)
-	}
-	return compiledTemplate, nil
-}
-
 // New Initialize captcha client.
-func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, htmlPagePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -82,11 +64,8 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.provider = provider
-	html, err := compileTemplate(htmlPagePath)
-	if err != nil {
-		return err
-	}
-	c.htmlPage = html
+	html, _ := configuration.GetHTMLTemplate(captchaTemplatePath)
+	c.captchaTemplate = html
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
 	c.httpClient = httpClient
@@ -108,13 +87,13 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
-	err = c.htmlPage.Execute(rw, map[string]string{
+	err = c.captchaTemplate.Execute(rw, map[string]string{
 		"SiteKey":     c.siteKey,
 		"FrontendJS":  captcha[c.provider].js,
 		"FrontendKey": captcha[c.provider].key,
 	})
 	if err != nil {
-		c.log.Info("captcha:ServeHTTP Can't serve HTML")
+		c.log.Info(fmt.Sprintf("captcha:ServeHTTP captchaTemplateServe %s", err.Error()))
 	}
 }
 

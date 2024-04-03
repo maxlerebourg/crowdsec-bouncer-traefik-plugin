@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 	"os"
@@ -66,8 +67,8 @@ type Config struct {
 	RedisCachePassword                       string   `json:"redisCachePassword,omitempty"`
 	RedisCachePasswordFile                   string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                       string   `json:"redisCacheDatabase,omitempty"`
-	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
 	BanHTMLFilePath                          string   `json:"banHtmlFilePath,omitempty"`
+	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
 	CaptchaProvider                          string   `json:"captchaProvider,omitempty"`
 	CaptchaSiteKey                           string   `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                       string   `json:"captchaSiteKeyFile,omitempty"`
@@ -104,9 +105,9 @@ func New() *Config {
 		CaptchaProvider:               "",
 		CaptchaSiteKey:                "",
 		CaptchaSecretKey:              "",
-		CaptchaHTMLFilePath:           "/captcha.html",
-		BanHTMLFilePath:               "ban.html",
 		CaptchaGracePeriodSeconds:     1800,
+		CaptchaHTMLFilePath:           "/captcha.html",
+		BanHTMLFilePath:               "",
 		ForwardedHeadersCustomName:    "X-Forwarded-For",
 		ForwardedHeadersTrustedIPs:    []string{},
 		ClientTrustedIPs:              []string{},
@@ -144,6 +145,26 @@ func GetVariable(config *Config, key string) (string, error) {
 	return strings.TrimSpace(value), nil
 }
 
+// GetHTMLTemplate get compiled HTML template.
+func GetHTMLTemplate(path string) (*template.Template, error) {
+	var err error
+	if path == "" {
+		return nil, fmt.Errorf("no html template provided")
+	}
+	//nolint:gosec
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	html := string(b)
+	compiledTemplate, err := template.New("html").Parse(html)
+	if err != nil {
+		return nil, fmt.Errorf("impossible to compile html template: %w", err)
+	}
+	return compiledTemplate, nil
+}
+
+
 // ValidateParams validate all the param gave by user.
 //
 //nolint:gocyclo,gocognit
@@ -178,6 +199,14 @@ func ValidateParams(config *Config) error {
 			return err
 		}
 		if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
+			return err
+		}
+		if _, err := GetHTMLTemplate(config.CaptchaHTMLFilePath); err != nil {
+			return err
+		}
+	}
+	if config.BanHTMLFilePath != "" {
+		if _, err := GetHTMLTemplate(config.BanHTMLFilePath); err != nil {
 			return err
 		}
 	}
