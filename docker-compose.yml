@@ -12,9 +12,11 @@ services:
       - "--entrypoints.web.address=:80"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.1.15"
+      - "--experimental.plugins.bouncer.version=v1.3.0-beta1"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      # - './ban.html:/ban.html:ro'
+      # - './captcha.html:/captcha.html:ro'
       - "logs:/var/log/traefik"
     ports:
       - 8000:80
@@ -34,7 +36,7 @@ services:
       - "traefik.http.routers.router-foo.middlewares=crowdsec@docker"
       # Definition of the service
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
-  
+
   whoami2:
     image: traefik/whoami
     container_name: "simple-service-bar"

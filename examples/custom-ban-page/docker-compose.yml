@@ -4,7 +4,7 @@ services:
     container_name: "traefik"
     restart: unless-stopped
     command:
-      - "--log.level=DEBUG"
+      # - "--log.level=DEBUG"
       - "--accesslog"
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--api.insecure=true"
@@ -12,62 +12,56 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
 
+      # - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      # - "--experimental.plugins.bouncer.version=v1.2.0"
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - logs-local:/var/log/traefik
-      - './ban.html:/ban.html:ro'
-      - './captcha.html:/captcha.html:ro'
-      - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - logs-custom-ban-page-enabled:/var/log/traefik
+      - './ban.html:/ban.html'
+      - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 8000:80
       - 8080:8080
     depends_on:
       - crowdsec
 
-  whoami-foo:
+  whoami1:
     image: traefik/whoami
     container_name: "simple-service-foo"
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
+      # Definition of the router
       - "traefik.http.routers.router-foo.rule=PathPrefix(`/foo`)"
       - "traefik.http.routers.router-foo.entrypoints=web"
       - "traefik.http.routers.router-foo.middlewares=crowdsec@docker"
+      # Definition of the service
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
-
-  whoami2:
-    image: traefik/whoami
-    container_name: "simple-service-bar"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.router-bar.rule=PathPrefix(`/bar`)"
-      - "traefik.http.routers.router-bar.entrypoints=web"
-      - "traefik.http.routers.router-bar.middlewares=crowdsec@docker"
-      - "traefik.http.services.service-bar.loadbalancer.server.port=80"
+      # Definition of the middleware
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
+      # Define ban HTML file path
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.banHtmlFilePath=/ban.html"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.0
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
-      COLLECTIONS: crowdsecurity/traefik crowdsecurity/appsec-virtual-patching
+      COLLECTIONS: crowdsecurity/traefik
       CUSTOM_HOSTNAME: crowdsec
-      BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5=
+      BOUNCER_KEY_TRAEFIK_DEV: 40796d93c2958f9e58345514e67740e5
     volumes:
-      - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - logs-local:/var/log/traefik:ro
-      - crowdsec-db-local:/var/lib/crowdsec/data/
-      - crowdsec-config-local:/etc/crowdsec/
+      - './acquis.yaml:/etc/crowdsec/acquis.yaml:ro'
+      - logs-custom-ban-page-enabled:/var/log/traefik:ro
+      - crowdsec-db-custom-ban-page-enabled:/var/lib/crowdsec/data/
+      - crowdsec-config-custom-ban-page-enabled:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
 
 volumes:
-  logs-local:
-  crowdsec-db-local:
-  crowdsec-config-local:
+  logs-custom-ban-page-enabled:
+  crowdsec-db-custom-ban-page-enabled:
+  crowdsec-config-custom-ban-page-enabled:

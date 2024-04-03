@@ -46,6 +46,9 @@ run_appsec:
 run_captcha:
 	docker compose -f examples/captcha/docker-compose.captcha.yml up -d
 
+run_custom_ban_page:
+	docker compose -f examples/custom-ban-page/docker-compose.yml up -d
+
 run:
 	docker compose -f docker-compose.yml up -d --remove-orphans
 
