@@ -177,14 +177,14 @@ Only one instance of the plugin is *possible*.
 - CaptchaSecretKey
   - string
   - Site secret key for the captcha provider
-- CaptchaHTMLFilePath
-  - string
-  - default: /captcha.html
-  - Path where the captcha template is stored
 - CaptchaGracePeriodSeconds
   - int64
   - default: 1800 (= 30 minutes)
   - Period after validation of a captcha before a new validation is required if Crowdsec decision is still valid
+- CaptchaHTMLFilePath
+  - string
+  - default: /captcha.html
+  - Path where the captcha template is stored
 - BanHTMLFilePath
   - string
   - default: ""
