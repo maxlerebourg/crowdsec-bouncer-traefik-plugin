@@ -67,8 +67,8 @@ type Config struct {
 	RedisCachePassword                       string   `json:"redisCachePassword,omitempty"`
 	RedisCachePasswordFile                   string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                       string   `json:"redisCacheDatabase,omitempty"`
-	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
 	BanHTMLFilePath                          string   `json:"banHtmlFilePath,omitempty"`
+	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
 	CaptchaProvider                          string   `json:"captchaProvider,omitempty"`
 	CaptchaSiteKey                           string   `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                       string   `json:"captchaSiteKeyFile,omitempty"`
