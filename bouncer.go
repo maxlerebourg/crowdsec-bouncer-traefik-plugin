@@ -8,7 +8,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	htmlTemplate "html/template"
 	"io"
 	"net/http"
 	"net/url"
@@ -73,7 +72,7 @@ type Bouncer struct {
 	customHeader           string
 	crowdsecStreamRoute    string
 	crowdsecHeader         string
-	banTemplate            *htmlTemplate.Template
+	banTemplateString      string
 	clientPoolStrategy     *ip.PoolStrategy
 	serverPoolStrategy     *ip.PoolStrategy
 	httpClient             *http.Client
@@ -120,9 +119,17 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		}
 		config.CrowdsecLapiKey = apiKey
 	}
-	var banTemplate *htmlTemplate.Template
+
+	var banTemplateString string
 	if config.BanHTMLFilePath != "" {
-		banTemplate, _ = configuration.GetHTMLTemplate(config.BanHTMLFilePath)
+		var buf bytes.Buffer
+		banTemplate, _ := configuration.GetHTMLTemplate(config.BanHTMLFilePath)
+		err = banTemplate.Execute(&buf, nil)
+		if err != nil {
+			log.Error(fmt.Sprintf("New:banTemplate is bad formatted %s", err.Error()))
+			return nil, err
+		}
+		banTemplateString = buf.String()
 	}
 
 	bouncer := &Bouncer{
@@ -144,10 +151,10 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		updateInterval:         config.UpdateIntervalSeconds,
 		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
+		banTemplateString:      banTemplateString,
 		crowdsecStreamRoute:    crowdsecStreamRoute,
 		crowdsecHeader:         crowdsecHeader,
 		log:                    log,
-		banTemplate:            banTemplate,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -318,11 +325,9 @@ type Login struct {
 
 func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 	rw.WriteHeader(http.StatusForbidden)
-	if bouncer.banTemplate != nil {
-		err := bouncer.banTemplate.Execute(rw, map[string]string{"caca": "caca"})
-		if err != nil {
-			bouncer.log.Info(fmt.Sprintf("handleBanServeHTTP banTemplateServe %s", err.Error()))
-		}
+	if bouncer.banTemplateString != "" {
+		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(rw, bouncer.banTemplateString)
 	}
 }
 
