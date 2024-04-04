@@ -39,12 +39,12 @@ The following captcha providers are supported now:
  - [turnstile](https://www.cloudflare.com/fr-fr/products/turnstile/)
 
 
-There are 4 operating modes (CrowdsecMode) for this plugin:
+There are 5 operating modes (CrowdsecMode) for this plugin:
 
 | Mode | Description |
 |------|------|
 | none | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. All request call the Crowdsec LAPI |
-| live | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual.    The bouncer can leverage use of a local cache in order to reduce the number of requests made to the Crowdsec LAPI. It will keep in cache the status for  each IP that makes queries. |
+| live | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual.    The bouncer can leverage use of a local cache in order to reduce the number of requests made to the Crowdsec LAPI. It will keep in cache the status for each IP that makes queries. |
 | stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI. |
 | alone | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any locally banned IP, but can work without a crowdsec service. |
 | appsec | Disable Crowdsec IP checking but apply Crowdsec Appsec checking. This mode is intended to be used when Crowdsec IP checking is applied at the Firewall Level. |
@@ -53,6 +53,247 @@ The `streaming mode` is recommended for performance, decisions are updated every
 
 The cache can be local to Traefik using the filesystem, or a separate Redis instance.  
 
+Below are Mermaid diagrams detailling how each mode work:  
+
+<details><summary>Mode none workflow</summary>
+
+> A Ban decision exists in CrowdsecLAPI
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant CrowdsecLAPI
+    TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a Crowdsec Decision ?
+    Destroy CrowdsecLAPI
+    CrowdsecLAPI-->>TraefikPlugin: Yes a ban Decision
+    TraefikPlugin->>User: No, HTTP 403
+```
+
+> No decision in CrowdsecLAPI
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant CrowdsecLAPI
+    TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
+    Destroy CrowdsecLAPI
+    CrowdsecLAPI-->>TraefikPlugin: Nothing, all good!
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
+
+</details>
+
+<details><summary>Mode live workflow</summary>
+
+> A Ban decision exists in CrowdsecLAPI but not in cache
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
+    PluginCache-->>TraefikPlugin: Nothing, all good!
+    create participant CrowdsecLAPI
+    TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
+    Destroy CrowdsecLAPI
+    CrowdsecLAPI-->>TraefikPlugin: Yes a ban Decision
+    TraefikPlugin-->>PluginCache: Store the information for this IP for DefaultDecisionSeconds
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Done
+    TraefikPlugin->>User: No, HTTP 403
+```
+
+> No decision in cache
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
+    PluginCache-->>TraefikPlugin: Nothing, all good!
+    create participant CrowdsecLAPI
+    TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
+    Destroy CrowdsecLAPI
+    CrowdsecLAPI-->>TraefikPlugin: Nothing, all good!
+    TraefikPlugin-->>PluginCache: Store the information for this IP for DefaultDecisionSeconds
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Done
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
+
+</details>
+
+<details><summary>Mode stream workflow</summary>
+
+> Cache Synchronization every UpdateIntervalSeconds
+
+```mermaid
+sequenceDiagram
+    participant TraefikPlugin
+    participant CrowdsecLAPI
+    TraefikPlugin->>CrowdsecLAPI: What are the current decisions
+    Destroy CrowdsecLAPI
+    CrowdsecLAPI->>TraefikPlugin: Here is the list
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Store this list
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Done
+```
+
+> A Ban decision exists in cache
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Yes a ban decision
+    Destroy TraefikPlugin
+    TraefikPlugin->>User: No, HTTP 403
+```
+
+> No decision in cache
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Nothing, all good!
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
+
+</details>
+
+<details><summary>Mode alone Workflow</summary>
+
+> Cache Synchronization every 2 hours to the Crowdsec Central API
+
+```mermaid
+sequenceDiagram
+    participant TraefikPlugin
+    participant CrowdsecCAPI
+    TraefikPlugin->>CrowdsecCAPI: What are the current decisions from CAPI
+    Destroy CrowdsecCAPI
+    CrowdsecCAPI->>TraefikPlugin: Here is the list
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Store this list
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Done
+```
+
+> A Ban decision exists in cache
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Yes a ban decision
+    Destroy TraefikPlugin
+    TraefikPlugin->>User: No, HTTP 403
+```
+
+> No decision in cache
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Nothing, all good!
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
+
+</details>
+
+<details><summary>Mode appsec workflow</summary>
+
+> The request is detected as malicious
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant CrowdsecAppSec
+    TraefikPlugin-->>CrowdsecAppSec: Is this request malicious ?
+    Destroy CrowdsecAppSec
+    CrowdsecAppSec-->>TraefikPlugin: Yes I think so
+    Destroy TraefikPlugin
+    TraefikPlugin->>User: No, HTTP 403
+```
+
+> The request is not detected as malicious
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant CrowdsecAppSec
+    TraefikPlugin-->>CrowdsecAppSec: Is this request malicious ?
+    Destroy CrowdsecAppSec
+    CrowdsecAppSec-->>TraefikPlugin: No I don't think so
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
+
+</details>
+
+<details><summary>Captcha decision workflow</summary>
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TraefikPlugin
+    User->>TraefikPlugin: Can I access that webpage
+    create participant PluginCache
+    TraefikPlugin-->>PluginCache: Does the User IP has a Crowdsec Decision ?
+    PluginCache-->>TraefikPlugin: Yes a Catpcha Decision
+    TraefikPlugin->>User: Please complete this captcha
+    User->>TraefikPlugin: Fine, done!
+    create participant ProviderCaptcha
+    TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
+    Destroy ProviderCaptcha    
+    ProviderCaptcha-->>TraefikPlugin: Yes
+    TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
+    Destroy PluginCache
+    PluginCache-->>TraefikPlugin: Done
+    Destroy TraefikPlugin
+    TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
+    Webserver->>User: HTTP Response
+```
+
+</details>
 
 ## Usage
 
