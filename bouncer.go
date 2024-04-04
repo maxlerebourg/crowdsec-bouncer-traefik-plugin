@@ -119,9 +119,10 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		}
 		config.CrowdsecLapiKey = apiKey
 	}
+
 	var banTemplateString string
 	if config.BanHTMLFilePath != "" {
-    var buf bytes.Buffer
+		var buf bytes.Buffer
 		banTemplate, _ := configuration.GetHTMLTemplate(config.BanHTMLFilePath)
 		err = banTemplate.Execute(&buf, nil)
 		if err != nil {
@@ -168,8 +169,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 			},
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
-		cacheClient:     &cache.Client{},
-		captchaClient:   &captcha.Client{},
+		cacheClient:   &cache.Client{},
+		captchaClient: &captcha.Client{},
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		return bouncer, nil
@@ -326,7 +327,7 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 	rw.WriteHeader(http.StatusForbidden)
 	if bouncer.banTemplateString != "" {
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-    fmt.Fprint(rw, bouncer.banTemplateString)
+		fmt.Fprint(rw, bouncer.banTemplateString)
 	}
 }
 
