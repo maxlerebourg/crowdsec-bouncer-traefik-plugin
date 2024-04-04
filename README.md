@@ -418,15 +418,18 @@ Only one instance of the plugin is *possible*.
 - CaptchaSecretKey
   - string
   - Site secret key for the captcha provider
-- CaptchaHTMLFilePath
-  - string
-  - default: /captcha.html
-  - Path where the captcha template is stored
 - CaptchaGracePeriodSeconds
   - int64
   - default: 1800 (= 30 minutes)
   - Period after validation of a captcha before a new validation is required if Crowdsec decision is still valid
-
+- CaptchaHTMLFilePath
+  - string
+  - default: /captcha.html
+  - Path where the captcha template is stored
+- BanHTMLFilePath
+  - string
+  - default: ""
+  - Path where the ban html file is stored (default empty ""=disabled)
 
 ### Configuration
 
@@ -526,6 +529,7 @@ http:
           captchaSecretKey: FIXME
           captchaGracePeriodSeconds: 1800
           captchaHTMLFilePath: /captcha.html
+          banHTMLFilePath: ban.html
 ```
 
 #### Fill variable with value of file
@@ -618,6 +622,8 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 #### 8. Using Traefik with AppSec feature enabled [examples/appsec-enabled/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/appsec-enabled/README.md)
 
 #### 9. Using Traefik with Captcha remediation feature enabled [examples/captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/captcha/README.md)
+
+#### 10. Using Traefik with Custom Ban HTML Page [examples/custom-ban-page/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-ban-page/README.md)
 
 ### Local Mode
 
