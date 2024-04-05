@@ -10,7 +10,7 @@ This can be usefull as some browser (Firefox for instance) return a 403 blank we
 ```yaml
   labels:
       # Define ban HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/ban.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.banHtmlFilePath=/ban.html"
 ```
 
 The ban HTML file must be present in the Traefik container (bind mounted or added during a custom build).  

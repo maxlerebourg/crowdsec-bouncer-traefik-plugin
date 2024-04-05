@@ -529,7 +529,7 @@ http:
           captchaSecretKey: FIXME
           captchaGracePeriodSeconds: 1800
           captchaHTMLFilePath: /captcha.html
-          banHTMLFilePath: ban.html
+          banHTMLFilePath: /ban.html
 ```
 
 #### Fill variable with value of file

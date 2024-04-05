@@ -13,7 +13,7 @@ services:
       - "--entrypoints.web.address=:80"
 
       # - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      # - "--experimental.plugins.bouncer.version=v1.2.0"
+      # - "--experimental.plugins.bouncer.version=v1.3.0-beta3"
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
