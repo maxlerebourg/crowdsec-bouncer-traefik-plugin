@@ -28,6 +28,7 @@ const (
 	crowdsecAppsecHostHeader = "X-Crowdsec-Appsec-Host"
 	crowdsecAppsecVerbHeader = "X-Crowdsec-Appsec-Verb"
 	crowdsecAppsecHeader     = "X-Crowdsec-Appsec-Api-Key"
+	crowdsecAppsecUserAgent  = "X-Crowdsec-Appsec-User-Agent"
 	crowdsecLapiHeader       = "X-Api-Key"
 	crowdsecLapiRoute        = "v1/decisions"
 	crowdsecLapiStreamRoute  = "v1/decisions/stream"
@@ -587,6 +588,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
 	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
 	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.Path)
+	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
 
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
