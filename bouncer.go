@@ -587,7 +587,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	req.Header.Set(crowdsecAppsecIPHeader, ip)
 	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
 	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
-	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.Path)
+	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
 	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
 
 	res, err := bouncer.httpClient.Do(req)
