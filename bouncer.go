@@ -283,10 +283,11 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
+		//nolint:gocritic
 		if isCrowdsecStreamHealthy {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else if bouncer.nbFailedStreamUpdate < bouncer.maxFailedStreamUpdate || bouncer.maxFailedStreamUpdate == -1 {
-			bouncer.nbFailedStreamUpdate = bouncer.nbFailedStreamUpdate + 1
+			bouncer.nbFailedStreamUpdate++
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
