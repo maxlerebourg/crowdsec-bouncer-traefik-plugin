@@ -69,6 +69,8 @@ type Bouncer struct {
 	crowdsecPassword       string
 	crowdsecScenarios      []string
 	updateInterval         int64
+	maxFailedStreamUpdate  int64
+	nbFailedStreamUpdate   int64
 	defaultDecisionTimeout int64
 	customHeader           string
 	crowdsecStreamRoute    string
@@ -150,6 +152,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		crowdsecPassword:       config.CrowdsecCapiPassword,
 		crowdsecScenarios:      config.CrowdsecCapiScenarios,
 		updateInterval:         config.UpdateIntervalSeconds,
+		maxFailedStreamUpdate:  config.MaxFailedStreamUpdate,
+		nbFailedStreamUpdate:   0,
 		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
 		banTemplateString:      banTemplateString,
@@ -280,6 +284,9 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
+			handleNextServeHTTP(bouncer, remoteIP, rw, req)
+		} else if bouncer.nbFailedStreamUpdate < bouncer.maxFailedStreamUpdate || bouncer.maxFailedStreamUpdate == -1 {
+			bouncer.nbFailedStreamUpdate = bouncer.nbFailedStreamUpdate + 1
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
@@ -517,6 +524,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
 	isCrowdsecStreamHealthy = true
+	bouncer.nbFailedStreamUpdate = 0
 	return nil
 }
 
