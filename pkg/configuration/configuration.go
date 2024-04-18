@@ -311,7 +311,6 @@ func validateParamsRequired(config *Config) error {
 	}
 	requiredInt := map[string]int64{
 		"UpdateIntervalSeconds":     config.UpdateIntervalSeconds,
-		"MaxFailedStreamUpdate":     config.MaxFailedStreamUpdate,
 		"DefaultDecisionSeconds":    config.DefaultDecisionSeconds,
 		"HTTPTimeoutSeconds":        config.HTTPTimeoutSeconds,
 		"CaptchaGracePeriodSeconds": config.CaptchaGracePeriodSeconds,
@@ -321,6 +320,10 @@ func validateParamsRequired(config *Config) error {
 			return fmt.Errorf("%v: cannot be less than 1", key)
 		}
 	}
+	if config.MaxFailedStreamUpdate < -1 {
+		return fmt.Errorf("MaxFailedStreamUpdate: cannot be less than -1")
+	}
+
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
 		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live', 'stream', 'alone' or 'appsec'")
 	}
