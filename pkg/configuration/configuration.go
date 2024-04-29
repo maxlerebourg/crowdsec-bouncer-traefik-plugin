@@ -57,7 +57,7 @@ type Config struct {
 	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
-	UpdateMaxFailure                         int64    `json:"updateMaxFailure,omitempty"`
+	UpdateMaxFailure                         int      `json:"updateMaxFailure,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomName,omitempty"`

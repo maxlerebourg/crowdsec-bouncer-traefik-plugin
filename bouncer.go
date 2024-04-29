@@ -41,9 +41,9 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isStartup                     = true
-	isCrowdsecStreamHealthy       = true
-	updateFailure           int64 = 0
+	isStartup               = true
+	isCrowdsecStreamHealthy = true
+	updateFailure           = 0
 	ticker                  chan bool
 )
 
@@ -70,7 +70,7 @@ type Bouncer struct {
 	crowdsecPassword       string
 	crowdsecScenarios      []string
 	updateInterval         int64
-	updateMaxFailure       int64
+	updateMaxFailure       int
 	defaultDecisionTimeout int64
 	customHeader           string
 	crowdsecStreamRoute    string
