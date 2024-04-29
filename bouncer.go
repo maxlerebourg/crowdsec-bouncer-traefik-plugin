@@ -43,6 +43,7 @@ const (
 var (
 	isStartup               = true
 	isCrowdsecStreamHealthy = true
+	updateFailure           int64 = 0
 	ticker                  chan bool
 )
 
@@ -69,8 +70,7 @@ type Bouncer struct {
 	crowdsecPassword       string
 	crowdsecScenarios      []string
 	updateInterval         int64
-	maxFailedStreamUpdate  int64
-	nbFailedStreamUpdate   int64
+	updateMaxFailure       int64
 	defaultDecisionTimeout int64
 	customHeader           string
 	crowdsecStreamRoute    string
@@ -152,8 +152,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		crowdsecPassword:       config.CrowdsecCapiPassword,
 		crowdsecScenarios:      config.CrowdsecCapiScenarios,
 		updateInterval:         config.UpdateIntervalSeconds,
-		maxFailedStreamUpdate:  config.MaxFailedStreamUpdate,
-		nbFailedStreamUpdate:   0,
+		updateMaxFailure:       config.UpdateMaxFailure,
 		customHeader:           config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout: config.DefaultDecisionSeconds,
 		banTemplateString:      banTemplateString,
@@ -227,7 +226,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 
 // ServeHTTP principal function of plugin.
 //
-//nolint:nestif,gocyclo
+//nolint:nestif
 func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !bouncer.enabled {
 		bouncer.next.ServeHTTP(rw, req)
@@ -286,11 +285,8 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		//nolint:gocritic
 		if isCrowdsecStreamHealthy {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
-		} else if bouncer.nbFailedStreamUpdate < bouncer.maxFailedStreamUpdate || bouncer.maxFailedStreamUpdate == -1 {
-			bouncer.nbFailedStreamUpdate++
-			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
-			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
+			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
 			handleBanServeHTTP(bouncer, rw)
 		}
 	} else {
@@ -366,10 +362,14 @@ func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWrit
 
 func handleStreamTicker(bouncer *Bouncer) {
 	if err := handleStreamCache(bouncer); err != nil {
-		isCrowdsecStreamHealthy = false
+		updateFailure += 1
+		if updateFailure >= bouncer.updateMaxFailure || bouncer.updateMaxFailure == -1 {
+			isCrowdsecStreamHealthy = false
+		}
 		bouncer.log.Error(err.Error())
 	} else {
 		isCrowdsecStreamHealthy = true
+		updateFailure = 0
 	}
 }
 
@@ -465,7 +465,6 @@ func getToken(bouncer *Bouncer) error {
 	var login Login
 	err = json.Unmarshal(body, &login)
 	if err != nil {
-		isCrowdsecStreamHealthy = false
 		return fmt.Errorf("getToken:parsingBody %w", err)
 	}
 	if login.Code == 200 && len(login.Token) > 0 {
@@ -524,8 +523,6 @@ func handleStreamCache(bouncer *Bouncer) error {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
-	isCrowdsecStreamHealthy = true
-	bouncer.nbFailedStreamUpdate = 0
 	return nil
 }
 
