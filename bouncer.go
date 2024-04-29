@@ -41,8 +41,8 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isStartup               = true
-	isCrowdsecStreamHealthy = true
+	isStartup                     = true
+	isCrowdsecStreamHealthy       = true
 	updateFailure           int64 = 0
 	ticker                  chan bool
 )
@@ -282,7 +282,6 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
-		//nolint:gocritic
 		if isCrowdsecStreamHealthy {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
@@ -362,7 +361,7 @@ func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWrit
 
 func handleStreamTicker(bouncer *Bouncer) {
 	if err := handleStreamCache(bouncer); err != nil {
-		updateFailure += 1
+		updateFailure++
 		if updateFailure >= bouncer.updateMaxFailure || bouncer.updateMaxFailure == -1 {
 			isCrowdsecStreamHealthy = false
 		}
