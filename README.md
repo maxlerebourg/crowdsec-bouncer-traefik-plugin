@@ -399,7 +399,7 @@ Only one instance of the plugin is *possible*.
 - UpdateMaxFailure
   - int64
   - default: 0
-  - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic
+  - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
 - DefaultDecisionSeconds
   - int64
   - default: 60
@@ -481,6 +481,7 @@ http:
           updateIntervalSeconds: 60
           defaultDecisionSeconds: 60
           httpTimeoutSeconds: 10
+          updateMaxFailure: 0
           crowdsecMode: live
           crowdsecAppsecEnabled: false
           crowdsecAppsecHost: crowdsec:7422
