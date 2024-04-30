@@ -360,14 +360,13 @@ func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWrit
 }
 
 func handleStreamTicker(bouncer *Bouncer) {
-	bouncer.log.Debug(fmt.Sprintf("handleStreamTicker:start isCrowdsecStreamHealthy:%t", isCrowdsecStreamHealthy))
 	if err := handleStreamCache(bouncer); err != nil {
-		bouncer.log.Debug(fmt.Sprintf("handleStreamTicker:%d failure to reach crowdsec", updateFailure))
-		if updateFailure >= bouncer.updateMaxFailure && bouncer.updateMaxFailure != -1 {
+		bouncer.log.Debug(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
+		if bouncer.updateMaxFailure != -1 && updateFailure >= bouncer.updateMaxFailure && isCrowdsecStreamHealthy {
 			isCrowdsecStreamHealthy = false
+			bouncer.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", updateFailure, err.Error()))
 		}
 		updateFailure++
-		bouncer.log.Error(err.Error())
 	} else {
 		isCrowdsecStreamHealthy = true
 		updateFailure = 0

@@ -479,9 +479,9 @@ http:
           enabled: false
           logLevel: DEBUG
           updateIntervalSeconds: 60
+          updateMaxFailure: 0
           defaultDecisionSeconds: 60
           httpTimeoutSeconds: 10
-          updateMaxFailure: 0
           crowdsecMode: live
           crowdsecAppsecEnabled: false
           crowdsecAppsecHost: crowdsec:7422
