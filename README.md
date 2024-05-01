@@ -396,6 +396,10 @@ Only one instance of the plugin is *possible*.
   - int64
   - default: 60
   - Used only in `stream` mode, the interval between requests to fetch blacklisted IPs from LAPI
+- UpdateMaxFailure
+  - int64
+  - default: 0
+  - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
 - DefaultDecisionSeconds
   - int64
   - default: 60
@@ -475,6 +479,7 @@ http:
           enabled: false
           logLevel: DEBUG
           updateIntervalSeconds: 60
+          updateMaxFailure: 0
           defaultDecisionSeconds: 60
           httpTimeoutSeconds: 10
           crowdsecMode: live

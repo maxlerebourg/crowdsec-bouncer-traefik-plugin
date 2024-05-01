@@ -57,6 +57,7 @@ type Config struct {
 	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
+	UpdateMaxFailure                         int      `json:"updateMaxFailure,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomName,omitempty"`
@@ -100,6 +101,7 @@ func New() *Config {
 		CrowdsecLapiKey:               "",
 		CrowdsecLapiTLSInsecureVerify: false,
 		UpdateIntervalSeconds:         60,
+		UpdateMaxFailure:              0,
 		DefaultDecisionSeconds:        60,
 		HTTPTimeoutSeconds:            10,
 		CaptchaProvider:               "",
@@ -318,6 +320,10 @@ func validateParamsRequired(config *Config) error {
 			return fmt.Errorf("%v: cannot be less than 1", key)
 		}
 	}
+	if config.UpdateMaxFailure < -1 {
+		return fmt.Errorf("UpdateMaxFailure: cannot be less than -1")
+	}
+
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
 		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live', 'stream', 'alone' or 'appsec'")
 	}
