@@ -32,12 +32,14 @@ minikube start
 helm repo add traefik https://traefik.github.io/charts
 helm repo update
 kubectl create ns traefik
-helm upgrade --version v26.1.0 --install --namespace=traefik \
+helm upgrade --version v28.0.0 --install --namespace=traefik \
     --values=./traefik/values.yml \
     traefik traefik/traefik
 ```
 
 _A [bug](https://github.com/traefik/traefik-helm-chart/commit/e7ce1b410c858642069033305eb6362f26689f16) has been fixed in chart 26.1.0 that could prevent plugin to be loaded_
+
+_v28.0.0 of the Traefik helm chart is only compatible with v3 of Traefik_
 
 #### View the Traefik dashboard
 
