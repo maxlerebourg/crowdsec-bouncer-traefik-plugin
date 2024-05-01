@@ -1,8 +1,6 @@
-version: "3.8"
-
 services:
   traefik:
-    image: "traefik:v2.10.4"
+    image: "traefik:v3.0.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -15,7 +13,7 @@ services:
       - "--entrypoints.web.address=:80"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.1.13"
+      - "--experimental.plugins.bouncer.version=v1.3.0"
       # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -25,10 +23,11 @@ services:
       # - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 
     ports:
-      - 80:80
+      - 8000:80
       - 8080:8080
     depends_on:
       - crowdsec
+      - gencert
 
 # Use HTTPS scheme but with lapikey authentication
   # whoami-foo:
@@ -63,10 +62,10 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=https"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"      
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.5.2
+    image: crowdsecurity/crowdsec:v1.6.1-2
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
@@ -80,11 +79,13 @@ services:
       CERT_FILE: "/etc/crowdsec/certs/server.pem"
       KEY_FILE: "/etc/crowdsec/certs/server-key.pem"
       CACERT_FILE: "/etc/crowdsec/certs/inter.pem"
+      # CLIENT_CERT_FILE: "/etc/crowdsec/certs/bouncer.pem"
+      # CLIENT_CERT_FILE: "/etc/crowdsec/certs/bouncer.pem"
       AGENTS_ALLOWED_OU: "agent-ou"
       BOUNCERS_ALLOWED_OU: "bouncer-ou"
       LEVEL_DEBUG: "true"
       # Disabled because it restart in loop otherwise
-      DISABLE_AGENT: "true"
+      # DISABLE_AGENT: "true"
       # Disabled for the examples
       DISABLE_ONLINE_API: "true"
     volumes:
@@ -97,7 +98,9 @@ services:
       - crowdsec-config-tls-auth:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
-
+    depends_on:
+      - gencert
+  
   gencert:
     build: .
     volumes:

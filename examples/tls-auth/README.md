@@ -72,11 +72,11 @@ The service `whoami-bar` will authenticate with a **client certificate** signed 
 
 Access to a route that communicate via https and authenticate with API-key:
 ```
-curl http://localhost:80/foo
+curl http://localhost:8000/foo
 ```
 Access to a route that communicate via https and authenticate with a client certificate:
 ```
-curl http://localhost:80/bar
+curl http://localhost:8000/bar
 ```
 Access to the traefik dashboard
 ```
@@ -89,5 +89,4 @@ make run_tlsauth
 ```
 
 Note:
-> This example is still in Beta and use a new version of Crowdsec (v1.4.3) at time of writing
-A functionnality has been disabled in Crowdsec in order to make the example work DISABLE_AGENT: "true"
+> Traefik need to be restart if certificates are regenerated after his launch

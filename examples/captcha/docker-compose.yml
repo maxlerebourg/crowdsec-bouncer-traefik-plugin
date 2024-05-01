@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v2.11.0"
+    image: "traefik:v3.0.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -12,14 +12,14 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
 
-      # - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      # - "--experimental.plugins.bouncer.version=v1.2.0"
-      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.plugins.bouncer.version=v1.3.0"
+      # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-captcha-enabled:/var/log/traefik
       - './captcha.html:/captcha.html'
-      - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      # - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 8000:80
       - 8080:8080
@@ -55,7 +55,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.0
+    image: crowdsecurity/crowdsec:v1.6.1-2
     container_name: "crowdsec"
     restart: unless-stopped
     environment:

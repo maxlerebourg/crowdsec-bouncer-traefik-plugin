@@ -32,7 +32,7 @@ It is not directly accessible from Traefik even when importing the plugin, so [d
 ```yaml 
   ...
   traefik:
-    image: "traefik:v2.11.0"
+    image: "traefik:v3.0.0"
     volumes:
       - './captcha.html:/captcha.html'
   ...
@@ -52,7 +52,7 @@ More information is available on configuring Crowdsec in the [official documenta
 ```yaml
   ...
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.0
+    image: crowdsecurity/crowdsec:v1.6.1-2
     volumes:
       # For captcha and ban mixed decision
       - './profiles.yaml:/etc/crowdsec/profiles.yaml:ro' 
