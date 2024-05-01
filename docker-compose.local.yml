@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v2.11.0"
+    image: "traefik:v3.0.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -49,14 +49,15 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.0
+    image: crowdsecurity/crowdsec:v1.6.1-2
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
-      COLLECTIONS: crowdsecurity/traefik crowdsecurity/appsec-virtual-patching
+      COLLECTIONS: crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
       CUSTOM_HOSTNAME: crowdsec
       BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5=
     volumes:

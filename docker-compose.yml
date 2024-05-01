@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v2.11.0"
+    image: "traefik:v3.0.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -12,7 +12,7 @@ services:
       - "--entrypoints.web.address=:80"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.3.0-beta3"
+      - "--experimental.plugins.bouncer.version=v1.3.0"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       # - './ban.html:/ban.html:ro'
@@ -59,11 +59,11 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.0
+    image: crowdsecurity/crowdsec:v1.6.1-2
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
-      COLLECTIONS: crowdsecurity/traefik
+      COLLECTIONS: crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
       CUSTOM_HOSTNAME: crowdsec
       # We need to register one api key per service we will use
       BOUNCER_KEY_TRAEFIK: FIXME-LAPI-KEY-1=
