@@ -89,5 +89,4 @@ make run_tlsauth
 ```
 
 Note:
-> This example is still in Beta and use a new version of Crowdsec (v1.4.3) at time of writing
-A functionnality has been disabled in Crowdsec in order to make the example work DISABLE_AGENT: "true"
+> Traefik need to be restart if certificates are regenerated after his launch

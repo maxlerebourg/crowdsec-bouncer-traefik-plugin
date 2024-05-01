@@ -27,6 +27,7 @@ services:
       - 8080:8080
     depends_on:
       - crowdsec
+      - gencert
 
 # Use HTTPS scheme but with lapikey authentication
   # whoami-foo:
@@ -61,7 +62,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=https"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"      
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.1-2
@@ -84,7 +85,7 @@ services:
       BOUNCERS_ALLOWED_OU: "bouncer-ou"
       LEVEL_DEBUG: "true"
       # Disabled because it restart in loop otherwise
-      DISABLE_AGENT: "true"
+      # DISABLE_AGENT: "true"
       # Disabled for the examples
       DISABLE_ONLINE_API: "true"
     volumes:
@@ -97,6 +98,8 @@ services:
       - crowdsec-config-tls-auth:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
+    depends_on:
+      - gencert
   
   gencert:
     build: .

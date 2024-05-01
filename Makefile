@@ -38,7 +38,7 @@ run_binaryvm:
 	cd examples/binary-vm/ && sudo vagrant up
 
 run_tlsauth:
-	docker compose -f examples/tls-auth/docker-compose.yml down && docker compose -f examples/tls-auth/docker-compose.yml up -d && docker compose -f examples/tls-auth/docker-compose.yml restart && docker compose -f examples/tls-auth/docker-compose.yml logs -f
+	docker compose -f examples/tls-auth/docker-compose.yml up  -d --remove-orphans
 
 run_appsec:
 	docker compose -f examples/appsec-enabled/docker-compose.yml up -d
