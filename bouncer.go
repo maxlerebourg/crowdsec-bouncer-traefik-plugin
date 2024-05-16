@@ -327,6 +327,7 @@ type Login struct {
 	Expire string `json:"expire"`
 }
 
+// To append Headers we need to call rw.WriteHeader after set any header.
 func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 	if bouncer.banTemplateString == "" {
 		rw.WriteHeader(http.StatusForbidden)
