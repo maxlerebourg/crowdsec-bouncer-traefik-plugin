@@ -86,6 +86,8 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
+	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+	rw.WriteHeader(http.StatusOK)
 	err = c.captchaTemplate.Execute(rw, map[string]string{
 		"SiteKey":     c.siteKey,
 		"FrontendJS":  captcha[c.provider].js,
