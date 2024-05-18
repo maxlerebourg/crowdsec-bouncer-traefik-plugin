@@ -122,7 +122,6 @@ func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) redisCmd {
 				}
 				read, _ = reader.ReadLineBytes()
 				return redisCmd{Data: read}
-
 			}
 		}
 	}
