@@ -18,7 +18,7 @@ func TestServeHTTP(t *testing.T) {
 	cfg.CrowdsecLapiKey = "test"
 
 	ctx := context.Background()
-	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
+	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})
 
 	handler, err := New(ctx, next, cfg, "demo-plugin")
 	if err != nil {
@@ -93,7 +93,7 @@ func TestBouncer_ServeHTTP(t *testing.T) {
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			bouncer := &Bouncer{
 				next:                   tt.fields.next,
 				name:                   tt.fields.name,

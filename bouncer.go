@@ -86,7 +86,7 @@ type Bouncer struct {
 }
 
 // New creates the crowdsec bouncer plugin.
-func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
+func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	log := logger.New(config.LogLevel)
 	err := configuration.ValidateParams(config)
 	if err != nil {
