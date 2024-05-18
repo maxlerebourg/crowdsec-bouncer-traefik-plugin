@@ -3,6 +3,7 @@
 package ip
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -45,7 +46,7 @@ func NewChecker(log *logger.Log, trustedIPs []string) (*Checker, error) {
 // Contains checks if provided address is in the trusted IPs.
 func (ip *Checker) Contains(addr string) (bool, error) {
 	if len(addr) == 0 {
-		return false, fmt.Errorf("Contains:noAddress")
+		return false, errors.New("Contains:noAddress")
 	}
 
 	ipAddr, err := parseIP(addr)
