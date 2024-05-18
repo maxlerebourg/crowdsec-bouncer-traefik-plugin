@@ -3,6 +3,7 @@
 package cache
 
 import (
+	"errors"
 	"fmt"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
@@ -38,7 +39,7 @@ func (localCache) get(key string) (string, error) {
 	if isCached && isValid && len(valueString) > 0 {
 		return valueString, nil
 	}
-	return "", fmt.Errorf(CacheMiss)
+	return "", errors.New(CacheMiss)
 }
 
 func (localCache) set(key, value string, duration int64) {
@@ -60,20 +61,20 @@ func (redisCache) get(key string) (string, error) {
 		return valueString, nil
 	}
 	if err.Error() == simpleredis.RedisMiss {
-		return "", fmt.Errorf(CacheMiss)
+		return "", errors.New(CacheMiss)
 	}
 	return "", err
 }
 
 func (rc redisCache) set(key, value string, duration int64) {
 	if err := redis.Set(key, []byte(value), duration); err != nil {
-		rc.log.Error(fmt.Sprintf("cache:setDecisionRedisCache %s", err.Error()))
+		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
 	}
 }
 
 func (rc redisCache) delete(key string) {
 	if err := redis.Del(key); err != nil {
-		rc.log.Error(fmt.Sprintf("cache:deleteDecisionRedisCache %s", err.Error()))
+		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
 	}
 }
 

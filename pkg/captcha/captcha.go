@@ -76,13 +76,13 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
 	valid, err := c.Validate(r)
 	if err != nil {
-		c.log.Debug(fmt.Sprintf("captcha:ServeHTTP:validate %s", err.Error()))
+		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(fmt.Sprintf("%s_captcha", remoteIP), cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
@@ -94,13 +94,13 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		"FrontendKey": captcha[c.provider].key,
 	})
 	if err != nil {
-		c.log.Info(fmt.Sprintf("captcha:ServeHTTP captchaTemplateServe %s", err.Error()))
+		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
 	}
 }
 
 // Check Verify if the captcha is already done.
 func (c *Client) Check(remoteIP string) bool {
-	value, _ := c.cacheClient.Get(fmt.Sprintf("%s_captcha", remoteIP))
+	value, _ := c.cacheClient.Get(remoteIP + "_captcha")
 	passed := value == cache.CaptchaDoneValue
 	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
 	return passed
@@ -113,10 +113,10 @@ type responseProvider struct {
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request) (bool, error) {
 	if r.Method != http.MethodPost {
-		c.log.Debug(fmt.Sprintf("captcha:Validate invalid method: %s", r.Method))
+		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
 	}
-	var response = r.FormValue(fmt.Sprintf("%s-response", captcha[c.provider].key))
+	var response = r.FormValue(captcha[c.provider].key + "%s-response")
 	if response == "" {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
@@ -130,7 +130,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
-			c.log.Error(fmt.Sprintf("captcha:Validate %s", err.Error()))
+			c.log.Error("captcha:Validate " + err.Error())
 		}
 	}()
 	if !strings.Contains(res.Header.Get("content-type"), "application/json") {

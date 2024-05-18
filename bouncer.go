@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,7 +90,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	log := logger.New(config.LogLevel)
 	err := configuration.ValidateParams(config)
 	if err != nil {
-		log.Error(fmt.Sprintf("New:validateParams %s", err.Error()))
+		log.Error("New:validateParams " + err.Error())
 		return nil, err
 	}
 
@@ -112,12 +113,12 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		crowdsecHeader = crowdsecLapiHeader
 		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log)
 		if err != nil {
-			log.Error(fmt.Sprintf("New:getTLSConfigCrowdsec fail to get tlsConfig %s", err.Error()))
+			log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
 			return nil, err
 		}
 		apiKey, errAPIKey := configuration.GetVariable(config, "CrowdsecLapiKey")
 		if errAPIKey != nil && len(tlsConfig.Certificates) == 0 {
-			log.Error(fmt.Sprintf("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup %s", errAPIKey.Error()))
+			log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup " + errAPIKey.Error())
 			return nil, err
 		}
 		config.CrowdsecLapiKey = apiKey
@@ -129,7 +130,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		banTemplate, _ := configuration.GetHTMLTemplate(config.BanHTMLFilePath)
 		err = banTemplate.Execute(&buf, nil)
 		if err != nil {
-			log.Error(fmt.Sprintf("New:banTemplate is bad formatted %s", err.Error()))
+			log.Error("New:banTemplate is bad formatted " + err.Error())
 			return nil, err
 		}
 		banTemplateString = buf.String()
@@ -209,7 +210,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
 			if err := getToken(bouncer); err != nil {
-				bouncer.log.Error(fmt.Sprintf("New:getToken %s", err.Error()))
+				bouncer.log.Error("New:getToken " + err.Error())
 				return nil, err
 			}
 		}
@@ -219,7 +220,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 			handleStreamTicker(bouncer)
 		})
 	}
-	bouncer.log.Debug(fmt.Sprintf("New initialized mode:%s", config.CrowdsecMode))
+	bouncer.log.Debug("New initialized mode:" + config.CrowdsecMode)
 
 	return bouncer, nil
 }
@@ -443,7 +444,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	case "captcha":
 		value = cache.CaptchaValue
 	default:
-		bouncer.log.Debug(fmt.Sprintf("handleStreamCache:unknownType %s", decision.Type))
+		bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
 	}
 	if isLiveMode {
 		durationSecond := int64(duration.Seconds())
@@ -452,7 +453,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		}
 		bouncer.cacheClient.Set(remoteIP, value, durationSecond)
 	}
-	return value, fmt.Errorf("handleNoStreamCache:banned")
+	return value, errors.New("handleNoStreamCache:banned")
 }
 
 func getToken(bouncer *Bouncer) error {
@@ -517,7 +518,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 			case "captcha":
 				value = cache.CaptchaValue
 			default:
-				bouncer.log.Debug(fmt.Sprintf("handleStreamCache:unknownType %s", decision.Type))
+				bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
 			}
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
 		}
@@ -549,7 +550,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
-			bouncer.log.Error(fmt.Sprintf("crowdsecQuery:closeBody %s", err.Error()))
+			bouncer.log.Error("crowdsecQuery:closeBody " + err.Error())
 		}
 	}()
 	if res.StatusCode == http.StatusUnauthorized && bouncer.crowdsecMode == configuration.AloneMode {
@@ -605,7 +606,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
-			bouncer.log.Error(fmt.Sprintf("appsecQuery:closeBody %s", err.Error()))
+			bouncer.log.Error("appsecQuery:closeBody " + err.Error())
 		}
 	}()
 	if res.StatusCode == http.StatusInternalServerError {

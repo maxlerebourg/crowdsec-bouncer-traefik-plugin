@@ -4,6 +4,7 @@ package configuration
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -124,7 +125,7 @@ func New() *Config {
 func GetVariable(config *Config, key string) (string, error) {
 	value := ""
 	object := reflect.Indirect(reflect.ValueOf(config))
-	field := object.FieldByName(fmt.Sprintf("%sFile", key))
+	field := object.FieldByName(key + "File")
 	// Here linter say you should simplify this code, but lets not, performance is important not clarity and complexity
 	fp := field.String()
 	if fp != "" {
@@ -151,7 +152,7 @@ func GetVariable(config *Config, key string) (string, error) {
 func GetHTMLTemplate(path string) (*template.Template, error) {
 	var err error
 	if path == "" {
-		return nil, fmt.Errorf("no html template provided")
+		return nil, errors.New("no html template provided")
 	}
 	//nolint:gosec
 	b, err := os.ReadFile(path)
@@ -234,7 +235,7 @@ func ValidateParams(config *Config) error {
 	}
 	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
 	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
-		return fmt.Errorf("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be all empty")
+		return errors.New("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be all empty")
 	} else if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
 		lapiKey = strings.TrimSpace(lapiKey)
 		if err = validateParamsAPIKey(lapiKey); err != nil {
@@ -279,12 +280,12 @@ func validateParamsTLS(config *Config) error {
 		return err
 	}
 	if certAuth == "" {
-		return fmt.Errorf("CrowdsecLapiTLSCertificateAuthority must be specified when CrowdsecLapiScheme='https' and CrowdsecLapiTLSInsecureVerify=false")
+		return errors.New("CrowdsecLapiTLSCertificateAuthority must be specified when CrowdsecLapiScheme='https' and CrowdsecLapiTLSInsecureVerify=false")
 	}
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuth)) {
-		return fmt.Errorf("failed parsing pem file")
+		return errors.New("failed parsing pem file")
 	}
 	return nil
 }
@@ -321,17 +322,17 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	if config.UpdateMaxFailure < -1 {
-		return fmt.Errorf("UpdateMaxFailure: cannot be less than -1")
+		return errors.New("UpdateMaxFailure: cannot be less than -1")
 	}
 
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
-		return fmt.Errorf("CrowdsecMode: must be one of 'none', 'live', 'stream', 'alone' or 'appsec'")
+		return errors.New("CrowdsecMode: must be one of 'none', 'live', 'stream', 'alone' or 'appsec'")
 	}
 	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
-		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'http' or 'https'")
+		return errors.New("CrowdsecLapiScheme: must be one of 'http' or 'https'")
 	}
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider}, config.CaptchaProvider) {
-		return fmt.Errorf("CrowdsecLapiScheme: must be one of 'hcaptcha', 'recaptcha' or 'turnstile'")
+		return errors.New("CrowdsecLapiScheme: must be one of 'hcaptcha', 'recaptcha' or 'turnstile'")
 	}
 	return nil
 }
@@ -360,7 +361,7 @@ func GetTLSConfigCrowdsec(config *Config, log *logger.Log) (*tls.Config, error) 
 			if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuthority)) {
 				// here we return because if CrowdsecLapiTLSInsecureVerify is false
 				// and CA not load, we can't communicate with https
-				return nil, fmt.Errorf("getTLSConfigCrowdsec:cannot load CA and verify cert is enabled")
+				return nil, errors.New("getTLSConfigCrowdsec:cannot load CA and verify cert is enabled")
 			}
 			log.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority CA added successfully")
 		}
