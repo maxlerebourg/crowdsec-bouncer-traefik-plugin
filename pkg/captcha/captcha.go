@@ -116,7 +116,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
 	}
-	var response = r.FormValue(captcha[c.provider].key + "%s-response")
+	var response = r.FormValue(captcha[c.provider].key + "-response")
 	if response == "" {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
