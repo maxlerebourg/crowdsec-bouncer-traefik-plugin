@@ -36,7 +36,7 @@ On successfull completion, he will be cleaned for a specified period of time bef
 The following captcha providers are supported now:
  - [hcaptcha](https://www.hcaptcha.com/)
  - [recaptcha](https://www.google.com/recaptcha/about/)
- - [turnstile](https://www.cloudflare.com/fr-fr/products/turnstile/)
+ - [turnstile](https://www.cloudflare.com/products/turnstile/)
 
 
 There are 5 operating modes (CrowdsecMode) for this plugin:
