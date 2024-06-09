@@ -41,6 +41,7 @@ type Config struct {
 	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
 	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
 	CrowdsecAppsecFailureBlock               bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
+	CrowdsecAppsecUnreachableBlock           bool     `json:"CrowdsecAppsecUnreachableBlock,omitempty"`
 	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
@@ -91,33 +92,34 @@ func contains(source []string, target string) bool {
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
-		Enabled:                       false,
-		LogLevel:                      "INFO",
-		CrowdsecMode:                  LiveMode,
-		CrowdsecAppsecEnabled:         false,
-		CrowdsecAppsecHost:            "crowdsec:7422",
-		CrowdsecAppsecFailureBlock:    true,
-		CrowdsecLapiScheme:            HTTP,
-		CrowdsecLapiHost:              "crowdsec:8080",
-		CrowdsecLapiKey:               "",
-		CrowdsecLapiTLSInsecureVerify: false,
-		UpdateIntervalSeconds:         60,
-		UpdateMaxFailure:              0,
-		DefaultDecisionSeconds:        60,
-		HTTPTimeoutSeconds:            10,
-		CaptchaProvider:               "",
-		CaptchaSiteKey:                "",
-		CaptchaSecretKey:              "",
-		CaptchaGracePeriodSeconds:     1800,
-		CaptchaHTMLFilePath:           "/captcha.html",
-		BanHTMLFilePath:               "",
+		Enabled:                        false,
+		LogLevel:                       "INFO",
+		CrowdsecMode:                   LiveMode,
+		CrowdsecAppsecEnabled:          false,
+		CrowdsecAppsecHost:             "crowdsec:7422",
+		CrowdsecAppsecFailureBlock:     true,
+		CrowdsecAppsecUnreachableBlock: true,
+		CrowdsecLapiScheme:             HTTP,
+		CrowdsecLapiHost:               "crowdsec:8080",
+		CrowdsecLapiKey:                "",
+		CrowdsecLapiTLSInsecureVerify:  false,
+		UpdateIntervalSeconds:          60,
+		UpdateMaxFailure:               0,
+		DefaultDecisionSeconds:         60,
+		HTTPTimeoutSeconds:             10,
+		CaptchaProvider:                "",
+		CaptchaSiteKey:                 "",
+		CaptchaSecretKey:               "",
+		CaptchaGracePeriodSeconds:      1800,
+		CaptchaHTMLFilePath:            "/captcha.html",
+		BanHTMLFilePath:                "",
 		ForwardedHeadersCustomName:    "X-Forwarded-For",
-		ForwardedHeadersTrustedIPs:    []string{},
-		ClientTrustedIPs:              []string{},
-		RedisCacheEnabled:             false,
-		RedisCacheHost:                "redis:6379",
-		RedisCachePassword:            "",
-		RedisCacheDatabase:            "",
+		ForwardedHeadersTrustedIPs:     []string{},
+		ClientTrustedIPs:               []string{},
+		RedisCacheEnabled:              false,
+		RedisCacheHost:                 "redis:6379",
+		RedisCachePassword:             "",
+		RedisCacheDatabase:             "",
 	}
 }
 
