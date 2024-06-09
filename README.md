@@ -51,7 +51,7 @@ There are 5 operating modes (CrowdsecMode) for this plugin:
 
 The `streaming mode` is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between Traefik and Crowdsec. Every request that happens hits the cache for quick decisions.
 
-The cache can be local to Traefik using the filesystem, or a separate Redis instance.  
+The cache can be local to Traefik in memory or using a separate Redis instance.  
 
 Below are Mermaid diagrams detailling how each mode work:  
 
@@ -375,7 +375,7 @@ Only one instance of the plugin is *possible*.
 - RedisCacheEnabled
   - bool
   - default: false
-  - enable Redis cache instead of filesystem cache
+  - enable Redis cache instead of in-memory cache
 - RedisCacheHost
   - string 
   - default: "redis:6379"
