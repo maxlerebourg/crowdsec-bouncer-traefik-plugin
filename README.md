@@ -333,6 +333,10 @@ Only one instance of the plugin is *possible*.
   - bool
   - default: true
   - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
+- CrowdsecAppsecUnreachableBlock
+  - bool
+  - default: true
+  - Block request when Crowdsec Appsec Server is unreachable.
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected values are: `http`, `https`
@@ -486,6 +490,7 @@ http:
           crowdsecAppsecEnabled: false
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecFailureBlock: true
+          crowdsecAppsecUnreachableBlock: true
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
           crowdsecLapiHost: crowdsec:8080

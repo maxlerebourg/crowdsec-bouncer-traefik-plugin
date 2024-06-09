@@ -63,6 +63,7 @@ type Bouncer struct {
 	appsecEnabled          bool
 	appsecHost             string
 	appsecFailureBlock     bool
+	appsecUnreachableBlock bool
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecKey            string
@@ -146,6 +147,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		appsecEnabled:          config.CrowdsecAppsecEnabled,
 		appsecHost:             config.CrowdsecAppsecHost,
 		appsecFailureBlock:     config.CrowdsecAppsecFailureBlock,
+		appsecUnreachableBlock: config.CrowdsecAppsecUnreachableBlock,
 		crowdsecScheme:         config.CrowdsecLapiScheme,
 		crowdsecHost:           config.CrowdsecLapiHost,
 		crowdsecKey:            config.CrowdsecLapiKey,
@@ -546,7 +548,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("crowdsecQuery url:%s %w", stringURL, err)
+		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
@@ -602,7 +604,11 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("appsecQuery %w", err)
+		bouncer.log.Error("appsecQuery:unreachable")
+		if bouncer.appsecUnreachableBlock {
+			return fmt.Errorf("appsecQuery:unreachable %w", err)
+		}
+		return nil
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
@@ -610,9 +616,9 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 		}
 	}()
 	if res.StatusCode == http.StatusInternalServerError {
-		bouncer.log.Debug("crowdsecQuery statusCode:500")
+		bouncer.log.Info("appsecQuery:failure")
 		if bouncer.appsecFailureBlock {
-			return fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
+			return errors.New("appsecQuery statusCode:500")
 		}
 		return nil
 	}
