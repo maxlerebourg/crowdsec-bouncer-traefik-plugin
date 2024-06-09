@@ -41,7 +41,7 @@ type Config struct {
 	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
 	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
 	CrowdsecAppsecFailureBlock               bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
-	CrowdsecAppsecUnreachableBlock           bool     `json:"CrowdsecAppsecUnreachableBlock,omitempty"`
+	CrowdsecAppsecUnreachableBlock           bool     `json:"crowdsecAppsecUnreachableBlock,omitempty"`
 	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
