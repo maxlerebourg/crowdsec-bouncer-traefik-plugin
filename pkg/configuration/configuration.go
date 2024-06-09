@@ -332,7 +332,7 @@ func validateParamsRequired(config *Config) error {
 		return errors.New("CrowdsecLapiScheme: must be one of 'http' or 'https'")
 	}
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider}, config.CaptchaProvider) {
-		return errors.New("CrowdsecLapiScheme: must be one of 'hcaptcha', 'recaptcha' or 'turnstile'")
+		return errors.New("CaptchaProvider: must be one of 'hcaptcha', 'recaptcha' or 'turnstile'")
 	}
 	return nil
 }
