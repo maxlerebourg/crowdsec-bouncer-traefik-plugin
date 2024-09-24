@@ -368,14 +368,18 @@ Only one instance of the plugin is *possible*.
   - string 
   - default: []
   - List of client IPs to trust, they will bypass any check from the bouncer or cache (useful for LAN or VPN IP)
-- ForwardedHeadersTrustedIPs
-  - []string
-  - default: []
-  - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
+- RemediationHeadersCustomName
+  - string
+  - default: ""
+  - Name of the header you want in response when request are cancelled (possible value of the header `ban` or `captcha`)
 - ForwardedHeadersCustomName
   - string
   - default: "X-Forwarded-For"
   - Name of the header where the real IP of the client should be retrieved
+- ForwardedHeadersTrustedIPs
+  - []string
+  - default: []
+  - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
 - RedisCacheEnabled
   - bool
   - default: false
@@ -508,6 +512,7 @@ http:
           clientTrustedIPs: 
             - 192.168.1.0/24
           forwardedHeadersCustomName: X-Custom-Header
+          remediationHeadersCustomName: cs-remediation
           redisCacheEnabled: false
           redisCacheHost: "redis:6379"
           redisCachePassword: password
