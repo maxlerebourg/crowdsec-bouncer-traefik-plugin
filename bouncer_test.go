@@ -75,7 +75,7 @@ func TestBouncer_ServeHTTP(t *testing.T) {
 		crowdsecMode           string
 		updateInterval         int64
 		defaultDecisionTimeout int64
-		customHeader           string
+		forwardedCustomHeader  string
 		clientPoolStrategy     *ip.PoolStrategy
 		serverPoolStrategy     *ip.PoolStrategy
 		httpClient             *http.Client
@@ -105,7 +105,7 @@ func TestBouncer_ServeHTTP(t *testing.T) {
 				crowdsecMode:           tt.fields.crowdsecMode,
 				updateInterval:         tt.fields.updateInterval,
 				defaultDecisionTimeout: tt.fields.defaultDecisionTimeout,
-				customHeader:           tt.fields.customHeader,
+				forwardedCustomHeader:  tt.fields.forwardedCustomHeader,
 				clientPoolStrategy:     tt.fields.clientPoolStrategy,
 				serverPoolStrategy:     tt.fields.serverPoolStrategy,
 				httpClient:             tt.fields.httpClient,

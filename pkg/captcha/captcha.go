@@ -16,15 +16,16 @@ import (
 
 // Client Captcha client.
 type Client struct {
-	Valid              bool
-	provider           string
-	siteKey            string
-	secretKey          string
-	gracePeriodSeconds int64
-	captchaTemplate    *template.Template
-	cacheClient        *cache.Client
-	httpClient         *http.Client
-	log                *logger.Log
+	Valid                   bool
+	provider                string
+	siteKey                 string
+	secretKey               string
+	remediationCustomHeader string
+	gracePeriodSeconds      int64
+	captchaTemplate         *template.Template
+	cacheClient             *cache.Client
+	httpClient              *http.Client
+	log                     *logger.Log
 }
 
 type infoProvider struct {
@@ -55,7 +56,7 @@ var (
 )
 
 // New Initialize captcha client.
-func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -63,6 +64,7 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.provider = provider
+	c.remediationCustomHeader = remediationCustomHeader
 	html, _ := configuration.GetHTMLTemplate(captchaTemplatePath)
 	c.captchaTemplate = html
 	c.gracePeriodSeconds = gracePeriodSeconds
@@ -87,6 +89,9 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		return
 	}
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if c.remediationCustomHeader != "" {
+		rw.Header().Set(c.remediationCustomHeader, "captcha")
+	}
 	rw.WriteHeader(http.StatusOK)
 	err = c.captchaTemplate.Execute(rw, map[string]string{
 		"SiteKey":     c.siteKey,
