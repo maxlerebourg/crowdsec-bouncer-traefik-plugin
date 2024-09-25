@@ -62,6 +62,7 @@ type Config struct {
 	UpdateMaxFailure                         int      `json:"updateMaxFailure,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
+	RemediationHeadersCustomName             string   `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomName,omitempty"`
 	ForwardedHeadersTrustedIPs               []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                         []string `json:"clientTrustedIps,omitempty"`
@@ -113,6 +114,7 @@ func New() *Config {
 		CaptchaGracePeriodSeconds:      1800,
 		CaptchaHTMLFilePath:            "/captcha.html",
 		BanHTMLFilePath:                "",
+		RemediationHeadersCustomName:   "",
 		ForwardedHeadersCustomName:     "X-Forwarded-For",
 		ForwardedHeadersTrustedIPs:     []string{},
 		ClientTrustedIPs:               []string{},

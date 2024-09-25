@@ -59,31 +59,32 @@ type Bouncer struct {
 	name     string
 	template *template.Template
 
-	enabled                bool
-	appsecEnabled          bool
-	appsecHost             string
-	appsecFailureBlock     bool
-	appsecUnreachableBlock bool
-	crowdsecScheme         string
-	crowdsecHost           string
-	crowdsecKey            string
-	crowdsecMode           string
-	crowdsecMachineID      string
-	crowdsecPassword       string
-	crowdsecScenarios      []string
-	updateInterval         int64
-	updateMaxFailure       int
-	defaultDecisionTimeout int64
-	customHeader           string
-	crowdsecStreamRoute    string
-	crowdsecHeader         string
-	banTemplateString      string
-	clientPoolStrategy     *ip.PoolStrategy
-	serverPoolStrategy     *ip.PoolStrategy
-	httpClient             *http.Client
-	cacheClient            *cache.Client
-	captchaClient          *captcha.Client
-	log                    *logger.Log
+	enabled                 bool
+	appsecEnabled           bool
+	appsecHost              string
+	appsecFailureBlock      bool
+	appsecUnreachableBlock  bool
+	crowdsecScheme          string
+	crowdsecHost            string
+	crowdsecKey             string
+	crowdsecMode            string
+	crowdsecMachineID       string
+	crowdsecPassword        string
+	crowdsecScenarios       []string
+	updateInterval          int64
+	updateMaxFailure        int
+	defaultDecisionTimeout  int64
+	remediationCustomHeader string
+	forwardedCustomHeader   string
+	crowdsecStreamRoute     string
+	crowdsecHeader          string
+	banTemplateString       string
+	clientPoolStrategy      *ip.PoolStrategy
+	serverPoolStrategy      *ip.PoolStrategy
+	httpClient              *http.Client
+	cacheClient             *cache.Client
+	captchaClient           *captcha.Client
+	log                     *logger.Log
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -142,26 +143,27 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
-		enabled:                config.Enabled,
-		crowdsecMode:           config.CrowdsecMode,
-		appsecEnabled:          config.CrowdsecAppsecEnabled,
-		appsecHost:             config.CrowdsecAppsecHost,
-		appsecFailureBlock:     config.CrowdsecAppsecFailureBlock,
-		appsecUnreachableBlock: config.CrowdsecAppsecUnreachableBlock,
-		crowdsecScheme:         config.CrowdsecLapiScheme,
-		crowdsecHost:           config.CrowdsecLapiHost,
-		crowdsecKey:            config.CrowdsecLapiKey,
-		crowdsecMachineID:      config.CrowdsecCapiMachineID,
-		crowdsecPassword:       config.CrowdsecCapiPassword,
-		crowdsecScenarios:      config.CrowdsecCapiScenarios,
-		updateInterval:         config.UpdateIntervalSeconds,
-		updateMaxFailure:       config.UpdateMaxFailure,
-		customHeader:           config.ForwardedHeadersCustomName,
-		defaultDecisionTimeout: config.DefaultDecisionSeconds,
-		banTemplateString:      banTemplateString,
-		crowdsecStreamRoute:    crowdsecStreamRoute,
-		crowdsecHeader:         crowdsecHeader,
-		log:                    log,
+		enabled:                 config.Enabled,
+		crowdsecMode:            config.CrowdsecMode,
+		appsecEnabled:           config.CrowdsecAppsecEnabled,
+		appsecHost:              config.CrowdsecAppsecHost,
+		appsecFailureBlock:      config.CrowdsecAppsecFailureBlock,
+		appsecUnreachableBlock:  config.CrowdsecAppsecUnreachableBlock,
+		crowdsecScheme:          config.CrowdsecLapiScheme,
+		crowdsecHost:            config.CrowdsecLapiHost,
+		crowdsecKey:             config.CrowdsecLapiKey,
+		crowdsecMachineID:       config.CrowdsecCapiMachineID,
+		crowdsecPassword:        config.CrowdsecCapiPassword,
+		crowdsecScenarios:       config.CrowdsecCapiScenarios,
+		updateInterval:          config.UpdateIntervalSeconds,
+		updateMaxFailure:        config.UpdateMaxFailure,
+		remediationCustomHeader: config.RemediationHeadersCustomName,
+		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
+		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
+		banTemplateString:       banTemplateString,
+		crowdsecStreamRoute:     crowdsecStreamRoute,
+		crowdsecHeader:          crowdsecHeader,
+		log:                     log,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -202,6 +204,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CaptchaProvider,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
+		config.RemediationHeadersCustomName,
 		config.CaptchaHTMLFilePath,
 		config.CaptchaGracePeriodSeconds,
 	)
@@ -236,8 +239,8 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Here we check for the trusted IPs in the customHeader
-	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.customHeader)
+	// Here we check for the trusted IPs in the forwardedCustomHeader
+	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.forwardedCustomHeader)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
 		handleBanServeHTTP(bouncer, rw)
@@ -337,6 +340,9 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 		return
 	}
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if bouncer.remediationCustomHeader != "" {
+		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
+	}
 	rw.WriteHeader(http.StatusForbidden)
 	fmt.Fprint(rw, bouncer.banTemplateString)
 }
