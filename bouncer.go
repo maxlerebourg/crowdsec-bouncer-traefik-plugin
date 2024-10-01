@@ -552,6 +552,8 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
 	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
+	req.Header.Add("User-Agent", "Traefik Crowdsec Plugin")
+
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
