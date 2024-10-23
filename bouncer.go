@@ -552,7 +552,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
 	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
-	req.Header.Add("User-Agent", "Crowdsec bouncer Traefik Plugin")
+	req.Header.Add("User-Agent", "Crowdsec bouncer Traefik Plugin/1.3.5")
 
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
