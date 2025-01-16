@@ -329,6 +329,10 @@ Only one instance of the plugin is *possible*.
   - string
   - default: "crowdsec:7422"
   - Crowdsec Appsec Server available on which host and port. The scheme will be handled by the CrowdsecLapiScheme var.
+- CrowdsecAppsecPath
+  - string
+  - default: "/"
+  - Crowdsec Appsec Server availble on this path. Will be appended to CrowdsecAppsecHost.
 - CrowdsecAppsecFailureBlock
   - bool
   - default: true
@@ -493,6 +497,7 @@ http:
           crowdsecMode: live
           crowdsecAppsecEnabled: false
           crowdsecAppsecHost: crowdsec:7422
+          crowdsecAppsecPath: "/"
           crowdsecAppsecFailureBlock: true
           crowdsecAppsecUnreachableBlock: true
           crowdsecLapiKey: privateKey-foo

@@ -62,6 +62,7 @@ type Bouncer struct {
 	enabled                 bool
 	appsecEnabled           bool
 	appsecHost              string
+	appsecPath              string
 	appsecFailureBlock      bool
 	appsecUnreachableBlock  bool
 	crowdsecScheme          string
@@ -147,6 +148,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		crowdsecMode:            config.CrowdsecMode,
 		appsecEnabled:           config.CrowdsecAppsecEnabled,
 		appsecHost:              config.CrowdsecAppsecHost,
+		appsecPath:              config.CrowdsecAppsecPath,
 		appsecFailureBlock:      config.CrowdsecAppsecFailureBlock,
 		appsecUnreachableBlock:  config.CrowdsecAppsecUnreachableBlock,
 		crowdsecScheme:          config.CrowdsecLapiScheme,
@@ -584,7 +586,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	routeURL := url.URL{
 		Scheme: bouncer.crowdsecScheme,
 		Host:   bouncer.appsecHost,
-		Path:   "/",
+		Path:   bouncer.appsecPath,
 	}
 	var req *http.Request
 	if httpReq.Body != nil && httpReq.ContentLength > 0 {
