@@ -42,6 +42,7 @@ type Config struct {
 	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
 	CrowdsecAppsecFailureBlock               bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
 	CrowdsecAppsecUnreachableBlock           bool     `json:"crowdsecAppsecUnreachableBlock,omitempty"`
+	CrowdsecAppsecBodyLimit                  int64    `json:"CrowdsecAppsecBodyLimit,omitempty"`
 	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
@@ -100,6 +101,7 @@ func New() *Config {
 		CrowdsecAppsecHost:             "crowdsec:7422",
 		CrowdsecAppsecFailureBlock:     true,
 		CrowdsecAppsecUnreachableBlock: true,
+		CrowdsecAppsecBodyLimit:        10485760,
 		CrowdsecLapiScheme:             HTTP,
 		CrowdsecLapiHost:               "crowdsec:8080",
 		CrowdsecLapiKey:                "",
@@ -327,6 +329,9 @@ func validateParamsRequired(config *Config) error {
 	}
 	if config.UpdateMaxFailure < -1 {
 		return errors.New("UpdateMaxFailure: cannot be less than -1")
+	}
+	if config.CrowdsecAppsecBodyLimit < 0 {
+		return errors.New("CrowdsecAppsecBodyLimit: cannot be less than 0")
 	}
 
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {

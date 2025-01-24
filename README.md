@@ -310,6 +310,9 @@ make run
 *This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP*
 Only one instance of the plugin is *possible*.
 
+**/!\ Appsec maximum body limit is defaulted to 10MB**
+*By careful when you upgrade to >1.4.x*
+
 ### Variables
 - Enabled
   - bool
@@ -337,6 +340,10 @@ Only one instance of the plugin is *possible*.
   - bool
   - default: true
   - Block request when Crowdsec Appsec Server is unreachable.
+- CrowdsecAppsecBodyLimit
+  - int64
+  - default: 10485760 (= 10MB)
+  - Transmit only the first number of bytes to Crowdsec Appsec Server.
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected values are: `http`, `https`
@@ -495,6 +502,7 @@ http:
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecFailureBlock: true
           crowdsecAppsecUnreachableBlock: true
+          crowdsecAppsecBodyLimit: 10485760
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
           crowdsecLapiHost: crowdsec:8080

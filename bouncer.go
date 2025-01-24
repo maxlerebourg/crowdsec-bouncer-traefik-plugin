@@ -64,6 +64,7 @@ type Bouncer struct {
 	appsecHost              string
 	appsecFailureBlock      bool
 	appsecUnreachableBlock  bool
+	appsecBodyLimit         int64
 	crowdsecScheme          string
 	crowdsecHost            string
 	crowdsecKey             string
@@ -149,6 +150,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		appsecHost:              config.CrowdsecAppsecHost,
 		appsecFailureBlock:      config.CrowdsecAppsecFailureBlock,
 		appsecUnreachableBlock:  config.CrowdsecAppsecUnreachableBlock,
+		appsecBodyLimit:         config.CrowdsecAppsecBodyLimit,
 		crowdsecScheme:          config.CrowdsecLapiScheme,
 		crowdsecHost:            config.CrowdsecLapiHost,
 		crowdsecKey:             config.CrowdsecLapiKey,
@@ -587,12 +589,16 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 		Path:   "/",
 	}
 	var req *http.Request
-	if httpReq.Body != nil && httpReq.ContentLength > 0 {
-		bodyBytes, err := io.ReadAll(httpReq.Body)
+	if bouncer.appsecBodyLimit > 0 && httpReq.Body != nil && httpReq.ContentLength > 0 {
+		var bodyBuffer bytes.Buffer
+    limitedReader := io.LimitReader(httpReq.Body, bouncer.appsecBodyLimit)
+    teeReader := io.TeeReader(limitedReader, &bodyBuffer)
+		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
 			return fmt.Errorf("appsecQuery:GetBody %w", err)
 		}
-		httpReq.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		// Conserve body intact after reading it for other middlewares and service
+		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
 		req, _ = http.NewRequest(http.MethodPost, routeURL.String(), bytes.NewBuffer(bodyBytes))
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
