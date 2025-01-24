@@ -42,7 +42,7 @@ type Config struct {
 	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
 	CrowdsecAppsecFailureBlock               bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
 	CrowdsecAppsecUnreachableBlock           bool     `json:"crowdsecAppsecUnreachableBlock,omitempty"`
-	CrowdsecAppsecBodyLimit                  int64    `json:"CrowdsecAppsecBodyLimit,omitempty"`
+	CrowdsecAppsecBodyLimit                  int64    `json:"crowdsecAppsecBodyLimit,omitempty"`
 	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
