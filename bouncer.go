@@ -591,8 +591,8 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	var req *http.Request
 	if bouncer.appsecBodyLimit > 0 && httpReq.Body != nil && httpReq.ContentLength > 0 {
 		var bodyBuffer bytes.Buffer
-    limitedReader := io.LimitReader(httpReq.Body, bouncer.appsecBodyLimit)
-    teeReader := io.TeeReader(limitedReader, &bodyBuffer)
+		limitedReader := io.LimitReader(httpReq.Body, bouncer.appsecBodyLimit)
+		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
 		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
 			return fmt.Errorf("appsecQuery:GetBody %w", err)
