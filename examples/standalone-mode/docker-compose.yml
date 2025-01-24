@@ -35,8 +35,7 @@ services:
 
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       # - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=alone"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecMode=alone"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CrowdsecCapiMachineId=FIXME"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CrowdsecCapiPassword=FIXME"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseccapiscenarios=crowdsecurity/sshd,crowdsecurity/asterisk_bf,crowdsecurity/asterisk_user_enum,crowdsecurity/base-http-scenarios"
