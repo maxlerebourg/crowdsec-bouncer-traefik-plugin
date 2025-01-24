@@ -332,7 +332,7 @@ Only one instance of the plugin is *possible*.
 - CrowdsecAppsecPath
   - string
   - default: "/"
-  - Crowdsec Appsec Server availble on this path. Will be appended to CrowdsecAppsecHost.
+  - Crowdsec Appsec Server available on this path. Will be appended to CrowdsecAppsecHost. Need to finish with "/".
 - CrowdsecAppsecFailureBlock
   - bool
   - default: true
@@ -348,6 +348,10 @@ Only one instance of the plugin is *possible*.
   - string
   - default: "crowdsec:8080"
   - Crowdsec LAPI available on which host and port.
+- CrowdsecLapiPath
+  - string
+  - default: "/"
+  - Crowdsec Appsec Server available on this path. Will be appended to CrowdsecLapiHost. Need to finish with "/".
 - CrowdsecLapiKey
   - string
   - default: ""
@@ -502,8 +506,9 @@ http:
           crowdsecAppsecUnreachableBlock: true
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
-          crowdsecLapiHost: crowdsec:8080
           crowdsecLapiScheme: http
+          crowdsecLapiHost: crowdsec:8080
+          crowdsecLapiPath: "/"
           crowdsecLapiTLSInsecureVerify: false
           crowdsecCapiMachineId: login
           crowdsecCapiPassword: password
