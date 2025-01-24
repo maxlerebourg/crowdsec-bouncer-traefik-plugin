@@ -263,7 +263,7 @@ func ValidateParams(config *Config) error {
 	return nil
 }
 
-func validateURL(variable, scheme, host, path string, path string) error {
+func validateURL(variable, scheme, host, path string) error {
 	// This only check that the format of the URL scheme://host/path is correct and do not make requests
 	testURL := url.URL{Scheme: scheme, Host: host, Path: path}
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
