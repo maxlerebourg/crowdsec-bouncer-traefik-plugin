@@ -43,6 +43,7 @@ type Config struct {
 	CrowdsecAppsecPath                       string   `json:"crowdsecAppsecPath,omitempty"`
 	CrowdsecAppsecFailureBlock               bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
 	CrowdsecAppsecUnreachableBlock           bool     `json:"crowdsecAppsecUnreachableBlock,omitempty"`
+	CrowdsecAppsecBodyLimit                  int64    `json:"crowdsecAppsecBodyLimit,omitempty"`
 	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiPath                         string   `json:"crowdsecLapiPath,omitempty"`
@@ -103,6 +104,7 @@ func New() *Config {
 		CrowdsecAppsecPath:             "/",
 		CrowdsecAppsecFailureBlock:     true,
 		CrowdsecAppsecUnreachableBlock: true,
+		CrowdsecAppsecBodyLimit:        10485760,
 		CrowdsecLapiScheme:             HTTP,
 		CrowdsecLapiHost:               "crowdsec:8080",
 		CrowdsecLapiPath:               "/",
@@ -261,7 +263,7 @@ func ValidateParams(config *Config) error {
 	return nil
 }
 
-func validateURL(variable, scheme, host, path string, path string) error {
+func validateURL(variable, scheme, host, path string) error {
 	// This only check that the format of the URL scheme://host/path is correct and do not make requests
 	testURL := url.URL{Scheme: scheme, Host: host, Path: path}
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
@@ -331,6 +333,9 @@ func validateParamsRequired(config *Config) error {
 	}
 	if config.UpdateMaxFailure < -1 {
 		return errors.New("UpdateMaxFailure: cannot be less than -1")
+	}
+	if config.CrowdsecAppsecBodyLimit < 0 {
+		return errors.New("CrowdsecAppsecBodyLimit: cannot be less than 0")
 	}
 
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
