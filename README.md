@@ -351,7 +351,7 @@ Only one instance of the plugin is *possible*.
 - CrowdsecLapiPath
   - string
   - default: "/"
-  - Crowdsec Appsec Server available on this path. Will be appended to CrowdsecLapiHost. Need to finish with "/".
+  - Crowdsec LAPI Server available on this path. Will be appended to CrowdsecLapiHost. Need to finish with "/".
 - CrowdsecLapiKey
   - string
   - default: ""
