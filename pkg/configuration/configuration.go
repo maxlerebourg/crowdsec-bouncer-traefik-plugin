@@ -40,11 +40,13 @@ type Config struct {
 	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
 	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
 	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
+	CrowdsecAppsecPath                       string   `json:"crowdsecAppsecPath,omitempty"`
 	CrowdsecAppsecFailureBlock               bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
 	CrowdsecAppsecUnreachableBlock           bool     `json:"crowdsecAppsecUnreachableBlock,omitempty"`
 	CrowdsecAppsecBodyLimit                  int64    `json:"crowdsecAppsecBodyLimit,omitempty"`
 	CrowdsecLapiScheme                       string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                         string   `json:"crowdsecLapiHost,omitempty"`
+	CrowdsecLapiPath                         string   `json:"crowdsecLapiPath,omitempty"`
 	CrowdsecLapiKey                          string   `json:"crowdsecLapiKey,omitempty"`
 	CrowdsecLapiKeyFile                      string   `json:"crowdsecLapiKeyFile,omitempty"`
 	CrowdsecLapiTLSInsecureVerify            bool     `json:"crowdsecLapiTlsInsecureVerify,omitempty"`
@@ -99,11 +101,13 @@ func New() *Config {
 		CrowdsecMode:                   LiveMode,
 		CrowdsecAppsecEnabled:          false,
 		CrowdsecAppsecHost:             "crowdsec:7422",
+		CrowdsecAppsecPath:             "/",
 		CrowdsecAppsecFailureBlock:     true,
 		CrowdsecAppsecUnreachableBlock: true,
 		CrowdsecAppsecBodyLimit:        10485760,
 		CrowdsecLapiScheme:             HTTP,
 		CrowdsecLapiHost:               "crowdsec:8080",
+		CrowdsecLapiPath:               "/",
 		CrowdsecLapiKey:                "",
 		CrowdsecLapiTLSInsecureVerify:  false,
 		UpdateIntervalSeconds:          60,
@@ -219,11 +223,11 @@ func ValidateParams(config *Config) error {
 		}
 	}
 
-	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost); err != nil {
+	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {
 		return err
 	}
 
-	if err := validateURL("CrowdsecAppsec", config.CrowdsecLapiScheme, config.CrowdsecAppsecHost); err != nil {
+	if err := validateURL("CrowdsecAppsec", config.CrowdsecLapiScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath); err != nil {
 		return err
 	}
 
@@ -259,11 +263,11 @@ func ValidateParams(config *Config) error {
 	return nil
 }
 
-func validateURL(variable, scheme, host string) error {
-	// This only check that the format of the URL scheme://host is correct and do not make requests
-	testURL := url.URL{Scheme: scheme, Host: host}
+func validateURL(variable, scheme, host, path string, path string) error {
+	// This only check that the format of the URL scheme://host/path is correct and do not make requests
+	testURL := url.URL{Scheme: scheme, Host: host, Path: path}
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
-		return fmt.Errorf("CrowdsecLapiScheme://%sHost: '%v://%v' must be an URL", variable, scheme, host)
+		return fmt.Errorf("CrowdsecLapiScheme://%sHost: '%v://%v%v' must be a valid URL", variable, scheme, host, path)
 	}
 	return nil
 }

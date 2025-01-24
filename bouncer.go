@@ -62,11 +62,13 @@ type Bouncer struct {
 	enabled                 bool
 	appsecEnabled           bool
 	appsecHost              string
+	appsecPath              string
 	appsecFailureBlock      bool
 	appsecUnreachableBlock  bool
 	appsecBodyLimit         int64
 	crowdsecScheme          string
 	crowdsecHost            string
+	crowdsecPath            string
 	crowdsecKey             string
 	crowdsecMode            string
 	crowdsecMachineID       string
@@ -106,8 +108,10 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	if config.CrowdsecMode == configuration.AloneMode {
 		config.CrowdsecCapiMachineID, _ = configuration.GetVariable(config, "CrowdsecCapiMachineID")
 		config.CrowdsecCapiPassword, _ = configuration.GetVariable(config, "CrowdsecCapiPassword")
+		config.CrowdsecLapiScheme = configuration.HTTPS
 		config.CrowdsecLapiHost = crowdsecCapiHost
-		config.CrowdsecLapiScheme = "https"
+		config.CrowdsecLapiPath = "/"
+		config.CrowdsecAppsecEnabled = false
 		config.UpdateIntervalSeconds = 7200 // 2 hours
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
 		crowdsecHeader = crowdsecCapiHeader
@@ -148,11 +152,13 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		crowdsecMode:            config.CrowdsecMode,
 		appsecEnabled:           config.CrowdsecAppsecEnabled,
 		appsecHost:              config.CrowdsecAppsecHost,
+		appsecPath:              config.CrowdsecAppsecPath,
 		appsecFailureBlock:      config.CrowdsecAppsecFailureBlock,
 		appsecUnreachableBlock:  config.CrowdsecAppsecUnreachableBlock,
 		appsecBodyLimit:         config.CrowdsecAppsecBodyLimit,
 		crowdsecScheme:          config.CrowdsecLapiScheme,
 		crowdsecHost:            config.CrowdsecLapiHost,
+		crowdsecPath:            config.CrowdsecLapiPath,
 		crowdsecKey:             config.CrowdsecLapiKey,
 		crowdsecMachineID:       config.CrowdsecCapiMachineID,
 		crowdsecPassword:        config.CrowdsecCapiPassword,
@@ -410,7 +416,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
-		Path:     crowdsecLapiRoute,
+		Path:     bouncer.crowdsecPath + crowdsecLapiRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String(), false)
@@ -506,7 +512,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
-		Path:     bouncer.crowdsecStreamRoute,
+		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
@@ -586,7 +592,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	routeURL := url.URL{
 		Scheme: bouncer.crowdsecScheme,
 		Host:   bouncer.appsecHost,
-		Path:   "/",
+		Path:   bouncer.appsecPath,
 	}
 	var req *http.Request
 	if bouncer.appsecBodyLimit > 0 && httpReq.Body != nil && httpReq.ContentLength > 0 {
