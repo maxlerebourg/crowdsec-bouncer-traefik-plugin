@@ -71,6 +71,7 @@ linters:
     - wastedassign # is disabled because of generics
     - gofumpt
     - gci
+    - mnd
 
 issues:
   exclude-use-default: false

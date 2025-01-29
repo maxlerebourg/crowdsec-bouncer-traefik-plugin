@@ -179,7 +179,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 			Checker: clientChecker,
 		},
 		httpClient: &http.Client{
-			//nolint:mnd
 			Transport: &http.Transport{
 				MaxIdleConns:    10,
 				IdleConnTimeout: 30 * time.Second,
@@ -207,7 +206,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		log,
 		bouncer.cacheClient,
 		&http.Client{
-			//nolint:mnd
 			Transport: &http.Transport{MaxIdleConns: 10, IdleConnTimeout: 30 * time.Second},
 			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},

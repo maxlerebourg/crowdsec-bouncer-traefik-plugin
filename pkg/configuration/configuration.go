@@ -95,7 +95,6 @@ func contains(source []string, target string) bool {
 
 // New creates the default plugin configuration.
 func New() *Config {
-	//nolint:mnd
 	return &Config{
 		Enabled:                        false,
 		LogLevel:                       "INFO",
