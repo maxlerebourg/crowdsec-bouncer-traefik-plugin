@@ -12,8 +12,8 @@ jobs:
     name: Main Process
     runs-on: ubuntu-latest
     env:
-      GO_VERSION: 1.22
-      GOLANGCI_LINT_VERSION: v1.57.2
+      GO_VERSION: 1.23
+      GOLANGCI_LINT_VERSION: v1.63.4
       YAEGI_VERSION: v0.16.1
       CGO_ENABLED: 0
     defaults:
@@ -24,20 +24,20 @@ jobs:
 
       # https://github.com/marketplace/actions/setup-go-environment
       - name: Set up Go ${{ env.GO_VERSION }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
       # https://github.com/marketplace/actions/checkout
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: go/src/github.com/${{ github.repository }}
           fetch-depth: 0
 
       # https://github.com/marketplace/actions/cache
       - name: Cache Go modules
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}

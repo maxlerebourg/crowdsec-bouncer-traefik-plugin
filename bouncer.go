@@ -126,7 +126,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		apiKey, errAPIKey := configuration.GetVariable(config, "CrowdsecLapiKey")
 		if errAPIKey != nil && len(tlsConfig.Certificates) == 0 {
 			log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup " + errAPIKey.Error())
-			return nil, err
+			return nil, errAPIKey
 		}
 		config.CrowdsecLapiKey = apiKey
 	}
@@ -352,7 +352,10 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
 	rw.WriteHeader(http.StatusForbidden)
-	fmt.Fprint(rw, bouncer.banTemplateString)
+	_, err := fmt.Fprint(rw, bouncer.banTemplateString)
+	if err != nil {
+		bouncer.log.Error("handleBanServeHTTP could not write template to ResponseWriter")
+	}
 }
 
 func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw http.ResponseWriter, req *http.Request) {
