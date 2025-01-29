@@ -34,15 +34,15 @@ func New(logLevel string) *Log {
 
 // Info log to Stdout.
 func (l *Log) Info(str string) {
-	l.logInfo.Printf(str)
+	l.logInfo.Printf("%s", str)
 }
 
 // Debug log to Stdout.
 func (l *Log) Debug(str string) {
-	l.logDebug.Printf(str)
+	l.logDebug.Printf("%s", str)
 }
 
 // Error log to Stderr.
 func (l *Log) Error(str string) {
-	l.logError.Printf(str)
+	l.logError.Printf("%s", str)
 }
