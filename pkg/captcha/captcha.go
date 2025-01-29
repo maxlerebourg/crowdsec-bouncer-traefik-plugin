@@ -138,7 +138,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 			c.log.Error("captcha:Validate " + err.Error())
 		}
 	}()
-	if !strings.Contains(res.Header.Get("content-type"), "application/json") {
+	if !strings.Contains(res.Header.Get("Content-Type"), "application/json") {
 		c.log.Debug("captcha:Validate responseType:noJson")
 		return false, nil
 	}
