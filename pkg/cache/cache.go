@@ -23,6 +23,8 @@ const (
 	CaptchaDoneValue = "d"
 	// CacheMiss error string when cache is miss.
 	CacheMiss = "cache:miss"
+	// CacheUnreachable error string when cache is unreachable.
+	CacheUnreachable = "cache:unreachable"
 )
 
 //nolint:gochecknoglobals
@@ -60,8 +62,12 @@ func (redisCache) get(key string) (string, error) {
 	if err == nil && len(valueString) > 0 {
 		return valueString, nil
 	}
-	if err.Error() == simpleredis.RedisMiss {
+	errRedisMessage := err.Error()
+	if errRedisMessage == simpleredis.RedisMiss {
 		return "", errors.New(CacheMiss)
+	}
+	if errRedisMessage == simpleredis.RedisUnreachable {
+		return "", errors.New(CacheUnreachable)
 	}
 	return "", err
 }

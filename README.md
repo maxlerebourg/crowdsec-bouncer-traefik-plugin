@@ -395,6 +395,10 @@ Only one instance of the plugin is *possible*.
   - []string
   - default: []
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
+- RedisUnreachableBlock
+  - bool
+  - default: true
+  - Block request when Redis is unreachable
 - RedisCacheEnabled
   - bool
   - default: false
@@ -535,6 +539,7 @@ http:
           redisCacheHost: "redis:6379"
           redisCachePassword: password
           redisCacheDatabase: "5"
+          redisCacheUnreachableBlock: true
           crowdsecLapiTLSCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
