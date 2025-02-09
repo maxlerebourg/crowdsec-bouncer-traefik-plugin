@@ -242,7 +242,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 // ServeHTTP principal function of plugin.
 //
-//nolint:nestif
+//nolint:nestif,gocyclo
 func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !bouncer.enabled {
 		bouncer.next.ServeHTTP(rw, req)
@@ -284,7 +284,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", remoteIP))
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
 				return
-			} 
+			}
 			if cacheErrString != cache.CacheMiss {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
 				handleBanServeHTTP(bouncer, rw)
