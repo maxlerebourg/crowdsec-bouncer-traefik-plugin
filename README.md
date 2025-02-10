@@ -395,10 +395,6 @@ Only one instance of the plugin is *possible*.
   - []string
   - default: []
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
-- RedisUnreachableBlock
-  - bool
-  - default: true
-  - Block request when Redis is unreachable
 - RedisCacheEnabled
   - bool
   - default: false
@@ -415,6 +411,10 @@ Only one instance of the plugin is *possible*.
   - string 
   - default: ""
   - Database selection for the Redis service
+- RedisUnreachableBlock
+  - bool
+  - default: true
+  - Block request when Redis is unreachable (if Redis is unreachable, 1-second delay is added to each request)
 - HTTPTimeoutSeconds
   - int64
   - default: 10
