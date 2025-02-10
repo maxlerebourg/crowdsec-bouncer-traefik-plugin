@@ -411,6 +411,10 @@ Only one instance of the plugin is *possible*.
   - string 
   - default: ""
   - Database selection for the Redis service
+- RedisUnreachableBlock
+  - bool
+  - default: true
+  - Block request when Redis is unreachable (if Redis is unreachable, 1-second delay is added to each request)
 - HTTPTimeoutSeconds
   - int64
   - default: 10
@@ -535,6 +539,7 @@ http:
           redisCacheHost: "redis:6379"
           redisCachePassword: password
           redisCacheDatabase: "5"
+          redisCacheUnreachableBlock: true
           crowdsecLapiTLSCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT

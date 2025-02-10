@@ -81,6 +81,7 @@ type Bouncer struct {
 	forwardedCustomHeader   string
 	crowdsecStreamRoute     string
 	crowdsecHeader          string
+	redisUnreachableBlock   bool
 	banTemplateString       string
 	clientPoolStrategy      *ip.PoolStrategy
 	serverPoolStrategy      *ip.PoolStrategy
@@ -168,6 +169,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		remediationCustomHeader: config.RemediationHeadersCustomName,
 		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
+		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		banTemplateString:       banTemplateString,
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
@@ -240,7 +242,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 // ServeHTTP principal function of plugin.
 //
-//nolint:nestif
+//nolint:nestif,gocyclo
 func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !bouncer.enabled {
 		bouncer.next.ServeHTTP(rw, req)
@@ -278,6 +280,11 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if cacheErr != nil {
 			cacheErrString := cacheErr.Error()
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
+			if !bouncer.redisUnreachableBlock && cacheErrString == cache.CacheUnreachable {
+				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", remoteIP))
+				handleNextServeHTTP(bouncer, remoteIP, rw, req)
+				return
+			}
 			if cacheErrString != cache.CacheMiss {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
 				handleBanServeHTTP(bouncer, rw)
