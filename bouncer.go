@@ -59,36 +59,37 @@ type Bouncer struct {
 	name     string
 	template *template.Template
 
-	enabled                 bool
-	appsecEnabled           bool
-	appsecHost              string
-	appsecPath              string
-	appsecFailureBlock      bool
-	appsecUnreachableBlock  bool
-	appsecBodyLimit         int64
-	crowdsecScheme          string
-	crowdsecHost            string
-	crowdsecPath            string
-	crowdsecKey             string
-	crowdsecMode            string
-	crowdsecMachineID       string
-	crowdsecPassword        string
-	crowdsecScenarios       []string
-	updateInterval          int64
-	updateMaxFailure        int
-	defaultDecisionTimeout  int64
-	remediationCustomHeader string
-	forwardedCustomHeader   string
-	crowdsecStreamRoute     string
-	crowdsecHeader          string
-	redisUnreachableBlock   bool
-	banTemplateString       string
-	clientPoolStrategy      *ip.PoolStrategy
-	serverPoolStrategy      *ip.PoolStrategy
-	httpClient              *http.Client
-	cacheClient             *cache.Client
-	captchaClient           *captcha.Client
-	log                     *logger.Log
+	enabled                      bool
+	appsecEnabled                bool
+	appsecHost                   string
+	appsecPath                   string
+	appsecFailureBlock           bool
+	appsecUnreachableBlock       bool
+	appsecBodyLimit              int64
+	crowdsecScheme               string
+	crowdsecHost                 string
+	crowdsecPath                 string
+	crowdsecKey                  string
+	crowdsecMode                 string
+	crowdsecMachineID            string
+	crowdsecPassword             string
+	crowdsecScenarios            []string
+	crowdsecStreamUnhealthyBlock bool
+	updateInterval               int64
+	updateMaxFailure             int
+	defaultDecisionTimeout       int64
+	remediationCustomHeader      string
+	forwardedCustomHeader        string
+	crowdsecStreamRoute          string
+	crowdsecHeader               string
+	redisUnreachableBlock        bool
+	banTemplateString            string
+	clientPoolStrategy           *ip.PoolStrategy
+	serverPoolStrategy           *ip.PoolStrategy
+	httpClient                   *http.Client
+	cacheClient                  *cache.Client
+	captchaClient                *captcha.Client
+	log                          *logger.Log
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -149,31 +150,32 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
-		enabled:                 config.Enabled,
-		crowdsecMode:            config.CrowdsecMode,
-		appsecEnabled:           config.CrowdsecAppsecEnabled,
-		appsecHost:              config.CrowdsecAppsecHost,
-		appsecPath:              config.CrowdsecAppsecPath,
-		appsecFailureBlock:      config.CrowdsecAppsecFailureBlock,
-		appsecUnreachableBlock:  config.CrowdsecAppsecUnreachableBlock,
-		appsecBodyLimit:         config.CrowdsecAppsecBodyLimit,
-		crowdsecScheme:          config.CrowdsecLapiScheme,
-		crowdsecHost:            config.CrowdsecLapiHost,
-		crowdsecPath:            config.CrowdsecLapiPath,
-		crowdsecKey:             config.CrowdsecLapiKey,
-		crowdsecMachineID:       config.CrowdsecCapiMachineID,
-		crowdsecPassword:        config.CrowdsecCapiPassword,
-		crowdsecScenarios:       config.CrowdsecCapiScenarios,
-		updateInterval:          config.UpdateIntervalSeconds,
-		updateMaxFailure:        config.UpdateMaxFailure,
-		remediationCustomHeader: config.RemediationHeadersCustomName,
-		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
-		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
-		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
-		banTemplateString:       banTemplateString,
-		crowdsecStreamRoute:     crowdsecStreamRoute,
-		crowdsecHeader:          crowdsecHeader,
-		log:                     log,
+		enabled:                      config.Enabled,
+		crowdsecMode:                 config.CrowdsecMode,
+		appsecEnabled:                config.CrowdsecAppsecEnabled,
+		appsecHost:                   config.CrowdsecAppsecHost,
+		appsecPath:                   config.CrowdsecAppsecPath,
+		appsecFailureBlock:           config.CrowdsecAppsecFailureBlock,
+		appsecUnreachableBlock:       config.CrowdsecAppsecUnreachableBlock,
+		appsecBodyLimit:              config.CrowdsecAppsecBodyLimit,
+		crowdsecScheme:               config.CrowdsecLapiScheme,
+		crowdsecHost:                 config.CrowdsecLapiHost,
+		crowdsecPath:                 config.CrowdsecLapiPath,
+		crowdsecKey:                  config.CrowdsecLapiKey,
+		crowdsecMachineID:            config.CrowdsecCapiMachineID,
+		crowdsecPassword:             config.CrowdsecCapiPassword,
+		crowdsecScenarios:            config.CrowdsecCapiScenarios,
+		updateInterval:               config.UpdateIntervalSeconds,
+		updateMaxFailure:             config.UpdateMaxFailure,
+		remediationCustomHeader:      config.RemediationHeadersCustomName,
+		forwardedCustomHeader:        config.ForwardedHeadersCustomName,
+		defaultDecisionTimeout:       config.DefaultDecisionSeconds,
+		redisUnreachableBlock:        config.RedisCacheUnreachableBlock,
+		crowdsecStreamUnhealthyBlock: config.CrowdsecLapiStreamUnhealthyBlock,
+		banTemplateString:            banTemplateString,
+		crowdsecStreamRoute:          crowdsecStreamRoute,
+		crowdsecHeader:               crowdsecHeader,
+		log:                          log,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -307,7 +309,11 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
-			handleBanServeHTTP(bouncer, rw)
+			if bouncer.crowdsecStreamUnhealthyBlock {
+				handleBanServeHTTP(bouncer, rw)
+			} else {
+				handleNextServeHTTP(bouncer, remoteIP, rw, req)
+			}
 		}
 	} else {
 		value, err := handleNoStreamCache(bouncer, remoteIP)

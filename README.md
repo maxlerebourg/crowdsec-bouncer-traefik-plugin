@@ -363,6 +363,11 @@ Only one instance of the plugin is *possible*.
   - string
   - default: ""
   - Crowdsec LAPI key for the bouncer. 
+- CrowdsecLapiStreamUnhealthyBlock
+  - bool
+  - default: true
+  - Block requests when Lapi stream is unhealthy
+
 - CrowdsecLapiTlsInsecureVerify
   - bool
   - default: false
@@ -521,6 +526,7 @@ http:
           crowdsecLapiScheme: http
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiPath: "/"
+          crowdsecLapiStreamUnhealthyBlock: true
           crowdsecLapiTLSInsecureVerify: false
           crowdsecCapiMachineId: login
           crowdsecCapiPassword: password
