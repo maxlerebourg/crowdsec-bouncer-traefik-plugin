@@ -28,9 +28,9 @@ const (
 	AppsecMode        = "appsec"
 	HTTPS             = "https"
 	HTTP              = "http"
-	LOG_DEBUG         = "DEBUG"
-	LOG_INFO          = "INFO"
-	LOG_ERROR         = "ERROR"
+	LogDEBUG          = "DEBUG"
+	LogINFO           = "INFO"
+	LogERROR          = "ERROR"
 	HcaptchaProvider  = "hcaptcha"
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
@@ -102,7 +102,7 @@ func contains(source []string, target string) bool {
 func New() *Config {
 	return &Config{
 		Enabled:                        false,
-		LogLevel:                       LOG_INFO,
+		LogLevel:                       LogERROR,
 		LogFilePath:                    "",
 		CrowdsecMode:                   LiveMode,
 		CrowdsecAppsecEnabled:          false,
@@ -268,12 +268,12 @@ func ValidateParams(config *Config) error {
 	}
 
 	// Check logging configuration
-	if !(config.LogLevel == LOG_DEBUG || config.LogLevel == LOG_INFO || config.LogLevel == LOG_ERROR) {
-		return fmt.Errorf("LogLevel should be one of (%s,%s,%s)", LOG_DEBUG, LOG_INFO, LOG_ERROR)
+	if !(config.LogLevel == LogERROR || config.LogLevel == LogINFO || config.LogLevel == LogDEBUG) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s)", LogDEBUG, LogINFO, LogERROR)
 	}
-	_, err = os.OpenFile(config.LogFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
-		return fmt.Errorf("LogFilePath is not writable %s", err)
+		return fmt.Errorf("LogFilePath is not writable %w", err)
 	}
 	return nil
 }
@@ -317,7 +317,7 @@ func validateParamsTLS(config *Config) error {
 
 func validateParamsIPs(listIP []string, key string) error {
 	if len(listIP) > 0 {
-		if _, err := ip.NewChecker(logger.New(LOG_INFO, ""), listIP); err != nil {
+		if _, err := ip.NewChecker(logger.New(LogINFO, ""), listIP); err != nil {
 			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
 		}
 	}

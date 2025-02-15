@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 // Log Logger struct.
@@ -28,10 +29,9 @@ func New(logLevel string, logFilePath string) *Log {
 		logDebug.SetOutput(os.Stdout)
 	}
 	if logFilePath != "" {
-		logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		logFile, err := os.OpenFile(filepath.Clean(logFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
-			_ = fmt.Errorf("LogFilePath is not writable %v", err)
-
+			_ = fmt.Errorf("LogFilePath is not writable %w", err)
 		} else {
 			logInfo.SetOutput(logFile)
 			logError.SetOutput(logFile)
