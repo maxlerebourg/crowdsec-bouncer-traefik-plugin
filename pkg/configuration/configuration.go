@@ -271,9 +271,11 @@ func ValidateParams(config *Config) error {
 	if !(config.LogLevel == LogERROR || config.LogLevel == LogINFO || config.LogLevel == LogDEBUG) {
 		return fmt.Errorf("LogLevel should be one of (%s,%s,%s)", LogDEBUG, LogINFO, LogERROR)
 	}
-	_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		return fmt.Errorf("LogFilePath is not writable %w", err)
+	if config.LogFilePath != "" {
+		_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return fmt.Errorf("LogFilePath is not writable %w", err)
+		}
 	}
 	return nil
 }
