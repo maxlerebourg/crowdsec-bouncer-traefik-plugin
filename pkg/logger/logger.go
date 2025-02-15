@@ -3,6 +3,7 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -16,15 +17,30 @@ type Log struct {
 }
 
 // New Set Default log level to info in case log level to defined.
-func New(logLevel string) *Log {
+func New(logLevel string, logFilePath string) *Log {
 	logError := log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logInfo := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
+
 	logError.SetOutput(os.Stderr)
 	logInfo.SetOutput(os.Stdout)
 	if logLevel == "DEBUG" {
 		logDebug.SetOutput(os.Stdout)
 	}
+	if logFilePath != "" {
+		logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			_ = fmt.Errorf("LogFilePath is not writable %v", err)
+
+		} else {
+			logInfo.SetOutput(logFile)
+			logError.SetOutput(logFile)
+			if logLevel == "DEBUG" {
+				logDebug.SetOutput(logFile)
+			}
+		}
+	}
+
 	return &Log{
 		logError: logError,
 		logInfo:  logInfo,
