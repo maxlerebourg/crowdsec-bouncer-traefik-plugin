@@ -350,14 +350,14 @@ type Login struct {
 
 // To append Headers we need to call rw.WriteHeader after set any header.
 func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
+	if bouncer.remediationCustomHeader != "" {
+		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
+	}
 	if bouncer.banTemplateString == "" {
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if bouncer.remediationCustomHeader != "" {
-		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
-	}
 	rw.WriteHeader(http.StatusForbidden)
 	_, err := fmt.Fprint(rw, bouncer.banTemplateString)
 	if err != nil {
