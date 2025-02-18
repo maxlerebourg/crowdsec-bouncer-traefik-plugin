@@ -367,13 +367,17 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 
 func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw http.ResponseWriter, req *http.Request) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
-	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue {
-		if bouncer.captchaClient.Check(remoteIP) {
-			handleNextServeHTTP(bouncer, remoteIP, rw, req)
+	if remediation == cache.CaptchaValue {
+		if bouncer.captchaClient.Valid {
+			if bouncer.captchaClient.Check(remoteIP) {
+				handleNextServeHTTP(bouncer, remoteIP, rw, req)
+				return
+			}
+			bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 			return
+		} else {
+			bouncer.log.Error(fmt.Sprintf("handleRemediationServeHTTP captcha client invalid. Using ban instead."))
 		}
-		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
-		return
 	}
 	handleBanServeHTTP(bouncer, rw)
 }
