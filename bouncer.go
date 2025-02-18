@@ -366,7 +366,6 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
 				return
 			}
-			bouncer.captchaRequestCount.Add(1)
 			bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 			return
 		} else {
