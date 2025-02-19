@@ -320,7 +320,12 @@ Only one instance of the plugin is *possible*.
   - Enable the plugin
 - LogLevel
   - string
-  - default: `INFO`, expected values are: `INFO`, `DEBUG`, `ERROR`, log are written to `stdout` / `stderr`
+  - default: `INFO`, expected values are: `INFO`, `DEBUG`, `ERROR`
+  - Log are written to `stdout` / `stderr` of file if LogFilePath is provided
+- LogFilePath
+  - string
+  - default: ""
+  - File Path to write logs, must be writable by Traefik
 - CrowdsecMode
   - string
   - default: `live`, expected values are: `none`, `live`, `stream`, `alone`, `appsec`
@@ -505,6 +510,7 @@ http:
         bouncer:
           enabled: false
           logLevel: DEBUG
+          LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0
           defaultDecisionSeconds: 60
