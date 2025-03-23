@@ -39,7 +39,7 @@ const (
 	crowdsecCapiLoginRoute   = "v2/watchers/login"
 	crowdsecCapiStreamRoute  = "v2/decisions/stream"
 	cacheTimeoutKey          = "updated"
-	crowdsecMetricsRoute     = "v1/metrics"
+	crowdsecMetricsRoute     = "v1/usage-metrics"
 )
 
 //nolint:gochecknoglobals
@@ -680,19 +680,36 @@ func (bouncer *Bouncer) reportMetrics() error {
 	currentCount := atomic.LoadInt64(&bouncer.blockedRequests)
 
 	metrics := map[string]interface{}{
-		"metrics": []map[string]interface{}{
+		"remediation_components": []map[string]interface{}{
 			{
-				"name":  "traefik_bouncer_blocked_requests",
-				"value": currentCount,
-				"unit":  "count",
-				"labels": map[string]string{
-					"source": "traefik_plugin",
+				"version": "1.X.X",
+				"type":    "bouncer",
+				"name":    "traefik_plugin",
+				"metrics": []map[string]interface{}{
+					{
+						"items": []map[string]interface{}{
+							{
+								"name":  "requests_blocked_total",
+								"value": currentCount,
+								"unit":  "count",
+								"labels": map[string]string{
+									"type": "traefik_plugin",
+								},
+							},
+						},
+						"meta": map[string]interface{}{
+							"window_size_seconds": int(now.Sub(bouncer.lastMetricsPush).Seconds()),
+							"utc_now_timestamp":   now.Unix(),
+						},
+					},
+				},
+				"utc_startup_timestamp": time.Now().Unix(),
+				"feature_flags":         []string{},
+				"os": map[string]string{
+					"name":    "unknown",
+					"version": "unknown",
 				},
 			},
-		},
-		"meta": map[string]interface{}{
-			"window_size_seconds": int(now.Sub(bouncer.lastMetricsPush).Seconds()),
-			"utc_now_timestamp":   now.Unix(),
 		},
 	}
 
