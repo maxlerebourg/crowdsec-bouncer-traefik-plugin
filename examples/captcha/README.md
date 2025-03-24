@@ -7,10 +7,11 @@ This plugins support the `ban` and `captcha` remediation.
 ### Traefik configuration
 
 The minimal configuration is defined below.  
-For now 3 captcha providers are supported:  
+For now 4 captcha providers are supported:  
  - [hcaptcha](https://www.hcaptcha.com/)
  - [recaptcha](https://www.google.com/recaptcha/about/)
  - [turnstile](https://www.cloudflare.com/fr-fr/products/turnstile/)
+ - [altcha](https://altcha.org/)
 
 ```yaml
   labels:
@@ -156,6 +157,21 @@ Choose v2 (challenge) and configure the domain to protect:
 
 TODO
 
-- Hcatpcha
+- Hcaptcha
 
 TODO
+
+- ALTCHA
+
+[ALTCHA](https://altcha.org/) is a privacy friendly, open source Captcha alternative.
+
+Both paid and [free](https://altcha.org/docs/api/free_api_keys/) API keys for ALTCHA's [hosted API solution](https://altcha.org/docs/api/) (EU by default) are supported.
+
+Ensure the following values are configured for this plugin:
+- `captchaProvider`: set to `altcha`
+- `captchaSecretKey`: Your API key
+- `captchaReferer`: The domain name provided to ALTCHA when creating your API key
+
+Since their code is free and open source, it should be possible to host your own server that implements a similar API. Be sure to set these URL configuration values if this is the case:
+- `captchaChallengeUrl`
+- `captchaValidationUrl`

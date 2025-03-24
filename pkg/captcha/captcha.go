@@ -2,7 +2,9 @@
 package captcha
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -18,8 +20,11 @@ import (
 type Client struct {
 	Valid                   bool
 	provider                string
+	referer                 string
 	siteKey                 string
 	secretKey               string
+	validationUrl           string
+	challengeUrl            string
 	remediationCustomHeader string
 	gracePeriodSeconds      int64
 	captchaTemplate         *template.Template
@@ -31,6 +36,7 @@ type Client struct {
 type infoProvider struct {
 	js       string
 	key      string
+	challenge string
 	validate string
 }
 
@@ -52,15 +58,29 @@ var (
 			key:      "cf-turnstile",
 			validate: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
 		},
+		configuration.AltchaProvider: {
+			js: "https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js",
+			key: "altcha",
+			challenge: "https://eu.altcha.org/api/v1/challenge",
+			validate: "https://eu.altcha.org/api/v1/challenge/verify",
+		},
 	}
 )
 
+type templateRenderData struct {
+	SiteKey string
+	FrontendJS string
+	FrontendKey string
+	ChallengeData altchaChallengeData
+}
+
 // New Initialize captcha client.
-func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, validationUrl, challengeUrl, referer, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
 	}
+	c.referer = referer
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.provider = provider
@@ -69,10 +89,21 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 	c.captchaTemplate = html
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
+	c.validationUrl = captcha[c.provider].validate
+	if validationUrl != "" {
+		c.log.Debug("captcha:Client overriding default provider Validation Url with '" + validationUrl + "'")
+		c.validationUrl = validationUrl
+	}
+	c.challengeUrl = captcha[c.provider].challenge
+	if challengeUrl != "" {
+		c.log.Debug("captcha:Client overriding default provider Challenge Url with '" + challengeUrl + "'")
+		c.challengeUrl = challengeUrl
+	}
 	c.httpClient = httpClient
 	c.cacheClient = cacheClient
 	return nil
 }
+
 
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
@@ -88,15 +119,25 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
+	var challengeData altchaChallengeData
+	if c.provider == "altcha" {
+		err = challengeData.Get(c)
+		if err != nil {
+			c.log.Error("captcha:ServeHTTP captchaChallengeDataGet " + err.Error())
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if c.remediationCustomHeader != "" {
 		rw.Header().Set(c.remediationCustomHeader, "captcha")
 	}
 	rw.WriteHeader(http.StatusOK)
-	err = c.captchaTemplate.Execute(rw, map[string]string{
-		"SiteKey":     c.siteKey,
-		"FrontendJS":  captcha[c.provider].js,
-		"FrontendKey": captcha[c.provider].key,
+	err = c.captchaTemplate.Execute(rw, templateRenderData{
+		SiteKey:     c.siteKey,
+		FrontendJS:  captcha[c.provider].js,
+		FrontendKey: captcha[c.provider].key,
+		ChallengeData: challengeData,
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
@@ -115,21 +156,50 @@ type responseProvider struct {
 	Success bool `json:"success"`
 }
 
+type altchaResponseProvider struct {
+	Success bool `json:"verified"`
+}
+
+type altchaVerifyPayload struct {
+	Payload string `json:"payload"`
+}
+
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request) (bool, error) {
 	if r.Method != http.MethodPost {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
 	}
-	var response = r.FormValue(captcha[c.provider].key + "-response")
+	var response = r.FormValue(captcha[c.provider].key)
 	if response == "" {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
 	}
-	var body = url.Values{}
-	body.Add("secret", c.secretKey)
-	body.Add("response", response)
-	res, err := c.httpClient.PostForm(captcha[c.provider].validate, body)
+	var err error
+	var res *http.Response
+	if c.provider == "altcha" {
+		// altcha requires JSON body POSTs rather than formdata
+		body := altchaVerifyPayload{
+			Payload: response,
+		}
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return false, err
+		}
+		req, err := http.NewRequest(http.MethodPost, c.validationUrl, bytes.NewBuffer(jsonBody))
+		if err != nil {
+			return false, err
+		}
+		req.Header.Add("Content-Type", "application/json")
+		req.Header.Add("Authorization", "Bearer " + c.secretKey)
+		req.Header.Add("Referer", c.referer)
+		res, err = c.httpClient.Do(req)
+	} else {
+		var body = url.Values{}
+		body.Add("secret", c.secretKey)
+		body.Add("response", response)
+		res, err = c.httpClient.PostForm(c.validationUrl, body)
+	}
 	if err != nil {
 		return false, err
 	}
@@ -142,11 +212,48 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate responseType:noJson")
 		return false, nil
 	}
-	var captchaResponse responseProvider
-	err = json.NewDecoder(res.Body).Decode(&captchaResponse)
+
+	var captchaSuccess bool
+	if c.provider == "altcha" {
+		var captchaResponse altchaResponseProvider
+		err = json.NewDecoder(res.Body).Decode(&captchaResponse)
+		captchaSuccess = captchaResponse.Success
+	} else {
+		var captchaResponse responseProvider
+		err = json.NewDecoder(res.Body).Decode(&captchaResponse)
+		captchaSuccess = captchaResponse.Success
+	}
 	if err != nil {
 		return false, err
 	}
-	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
-	return captchaResponse.Success, nil
+	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaSuccess))
+	return captchaSuccess, nil
+}
+
+type altchaChallengeData struct {
+	Algorithm string `json:"algorithm"`
+	Challenge string `json:"challenge"`
+	MaxNumber int    `json:"maxnumber"`
+	Salt      string `json:"salt"`
+	Signature string `json:"signature"`
+	Error     string `json:"error"`
+}
+
+func (cd *altchaChallengeData) Get(c *Client) error {
+	req, err := http.NewRequest(http.MethodGet, c.challengeUrl, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Referer", c.referer)
+	req.Header.Add("Authorization", "Bearer " + c.secretKey)
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	err = json.NewDecoder(res.Body).Decode(&cd)
+	if res.StatusCode != 200 {
+		return errors.New("error retrieving challenge data: (" + res.Status + ") " + cd.Error)
+	}
+	return err
 }
