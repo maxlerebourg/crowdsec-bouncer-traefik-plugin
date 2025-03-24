@@ -52,8 +52,23 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
 
+  whoami3:
+    image: traefik/whoami
+    container_name: "simple-service-bar2"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.router-bar2.rule=PathPrefix(`/bar2`)"
+      - "traefik.http.routers.router-bar2.entrypoints=web"
+      - "traefik.http.routers.router-bar2.middlewares=crowdsec@docker"
+      - "traefik.http.services.service-bar2.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
+
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.1-2
+    image: crowdsecurity/crowdsec:v1.6.6
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
@@ -65,9 +80,10 @@ services:
       - logs-local:/var/log/traefik:ro
       - crowdsec-db-local:/var/lib/crowdsec/data/
       - crowdsec-config-local:/etc/crowdsec/
+    ports:
+      - 8083:8080
     labels:
       - "traefik.enable=false"
-
 volumes:
   logs-local:
   crowdsec-db-local:

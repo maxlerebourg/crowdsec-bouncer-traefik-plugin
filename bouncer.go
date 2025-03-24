@@ -34,12 +34,12 @@ const (
 	crowdsecLapiHeader       = "X-Api-Key"
 	crowdsecLapiRoute        = "v1/decisions"
 	crowdsecLapiStreamRoute  = "v1/decisions/stream"
+	crowdsecLapiMetricsRoute = "v1/usage-metrics"
 	crowdsecCapiHost         = "api.crowdsec.net"
 	crowdsecCapiHeader       = "Authorization"
 	crowdsecCapiLoginRoute   = "v2/watchers/login"
 	crowdsecCapiStreamRoute  = "v2/decisions/stream"
 	cacheTimeoutKey          = "updated"
-	crowdsecMetricsRoute     = "v1/usage-metrics"
 )
 
 //nolint:gochecknoglobals
@@ -721,7 +721,7 @@ func (bouncer *Bouncer) reportMetrics() error {
 	metricsURL := url.URL{
 		Scheme: bouncer.crowdsecScheme,
 		Host:   bouncer.crowdsecHost,
-		Path:   bouncer.crowdsecPath + crowdsecMetricsRoute,
+		Path:   bouncer.crowdsecPath + crowdsecLapiMetricsRoute,
 	}
 
 	_, err = crowdsecQuery(bouncer, metricsURL.String(), true, data)
