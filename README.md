@@ -36,9 +36,10 @@ For the `captcha` remediation, the user will be redirected to a page to complete
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
 
-- [hcaptcha](https://www.hcaptcha.com/)
-- [recaptcha](https://www.google.com/recaptcha/about/)
-- [turnstile](https://www.cloudflare.com/products/turnstile/)
+ - [hcaptcha](https://www.hcaptcha.com/)
+ - [recaptcha](https://www.google.com/recaptcha/about/)
+ - [turnstile](https://www.cloudflare.com/products/turnstile/)
+ - [altcha](https://altcha.org/)
 
 There are 5 operating modes (CrowdsecMode) for this plugin:
 
@@ -450,13 +451,24 @@ _By careful when you upgrade to >1.4.x_
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
 - CaptchaProvider
   - string
-  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`
+  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`, `altcha`
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider
 - CaptchaSecretKey
   - string
   - Site secret key for the captcha provider
+- CaptchaValidationUrl
+  - string
+  - default: [unique per captcha provider](pkg/captcha/captcha.go)
+  - URL which captcha challenges are validate at. Only expected to be overridden for `altcha`.
+- CaptchaChallengeUrl
+  - string
+  - default: [unique per captcha provider](pkg/captcha/captcha.go)
+  - Used only by `altcha`, URL to retrieve challenge data for the client widget.
+- CaptchaReferer
+  - string
+  - Used only when CaptchaProvider is `altcha`, used for the `Referer` Header value sent to the Captcha server.
 - CaptchaGracePeriodSeconds
   - int64
   - default: 1800 (= 30 minutes)
