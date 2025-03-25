@@ -11,7 +11,7 @@ import (
 func Test_Get(t *testing.T) {
 	IPInCache := "10.0.0.10"
 	IPNotInCache := "10.0.0.20"
-	client := &Client{cache: &localCache{}, log: logger.New("INFO")}
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
 	client.Set(IPInCache, BannedValue, 10)
 	type args struct {
 		clientIP string
@@ -47,7 +47,7 @@ func Test_Get(t *testing.T) {
 }
 
 func Test_Set(t *testing.T) {
-	client := &Client{cache: &localCache{}, log: logger.New("INFO")}
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
 	IPInCache := "10.0.0.11"
 	type args struct {
 		clientIP string
@@ -88,7 +88,7 @@ func Test_Set(t *testing.T) {
 func Test_Delete(t *testing.T) {
 	IPInCache := "10.0.0.12"
 	IPNotInCache := "10.0.0.22"
-	client := &Client{cache: &localCache{}, log: logger.New("INFO")}
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
 	client.Set(IPInCache, BannedValue, 10)
 	type args struct {
 		clientIP string
