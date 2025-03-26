@@ -64,11 +64,13 @@ services:
       - "traefik.http.services.service-bar2.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec.plugin2.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin2.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.updateintervalseconds=10"
+      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.updatemaxfailure=-1"
       - "traefik.http.middlewares.crowdsec.plugin2.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.6
+    image: crowdsecurity/crowdsec:v1.6.8
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
@@ -80,8 +82,6 @@ services:
       - logs-local:/var/log/traefik:ro
       - crowdsec-db-local:/var/lib/crowdsec/data/
       - crowdsec-config-local:/etc/crowdsec/
-    ports:
-      - 8083:8080
     labels:
       - "traefik.enable=false"
 volumes:

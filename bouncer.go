@@ -178,6 +178,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
+		lastMetricsPush:         time.Now(),
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -408,6 +409,7 @@ func handleStreamTicker(bouncer *Bouncer) {
 		updateFailure = 0
 	}
 
+	// Adding this here means that metrics will only be reported when in STREAM mode.
 	if err := bouncer.reportMetrics(); err != nil {
 		bouncer.log.Debug(fmt.Sprintf("handleStreamTicker:reportMetrics %s", err.Error()))
 	}
@@ -678,6 +680,9 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 func (bouncer *Bouncer) reportMetrics() error {
 	now := time.Now()
 	currentCount := atomic.LoadInt64(&bouncer.blockedRequests)
+	windowSizeSeconds := int(now.Sub(bouncer.lastMetricsPush).Seconds())
+
+	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
 
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{
@@ -698,7 +703,7 @@ func (bouncer *Bouncer) reportMetrics() error {
 							},
 						},
 						"meta": map[string]interface{}{
-							"window_size_seconds": int(now.Sub(bouncer.lastMetricsPush).Seconds()),
+							"window_size_seconds": windowSizeSeconds,
 							"utc_now_timestamp":   now.Unix(),
 						},
 					},
