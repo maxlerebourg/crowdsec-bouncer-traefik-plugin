@@ -37,6 +37,7 @@ The following captcha providers are supported now:
  - [hcaptcha](https://www.hcaptcha.com/)
  - [recaptcha](https://www.google.com/recaptcha/about/)
  - [turnstile](https://www.cloudflare.com/products/turnstile/)
+ - [altcha](https://altcha.org/)
 
 
 There are 5 operating modes (CrowdsecMode) for this plugin:
@@ -442,13 +443,24 @@ Only one instance of the plugin is *possible*.
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
 - CaptchaProvider
   - string
-  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`
+  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`, `altcha`
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider
 - CaptchaSecretKey
   - string
   - Site secret key for the captcha provider
+- CaptchaValidationURL
+  - string
+  - default: [unique per captcha provider](pkg/captcha/captcha.go)
+  - URL which captcha challenges are validate at. Only expected to be overridden for `altcha`.
+- CaptchaChallengeURL
+  - string
+  - default: [unique per captcha provider](pkg/captcha/captcha.go)
+  - Used only by `altcha`, URL to retrieve challenge data for the client widget.
+- CaptchaReferer
+  - string
+  - Used only when CaptchaProvider is `altcha`, used for the `Referer` Header value sent to the Captcha server.
 - CaptchaGracePeriodSeconds
   - int64
   - default: 1800 (= 30 minutes)

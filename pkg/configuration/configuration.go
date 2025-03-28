@@ -31,6 +31,7 @@ const (
 	HcaptchaProvider  = "hcaptcha"
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
+	AltchaProvider    = "altcha"
 )
 
 // Config the plugin configuration.
@@ -82,6 +83,9 @@ type Config struct {
 	CaptchaSiteKeyFile                       string   `json:"captchaSiteKeyFile,omitempty"`
 	CaptchaSecretKey                         string   `json:"captchaSecretKey,omitempty"`
 	CaptchaSecretKeyFile                     string   `json:"captchaSecretKeyFile,omitempty"`
+	CaptchaValidationURL                     string   `json:"captchaValidationURL,omitempty"`
+	CaptchaChallengeURL                      string   `json:"captchaChallengeURL,omitempty"`
+	CaptchaReferer                           string   `json:"captchaReferer,omitempty"`
 	CaptchaGracePeriodSeconds                int64    `json:"captchaGracePeriodSeconds,omitempty"`
 }
 
@@ -118,6 +122,9 @@ func New() *Config {
 		CaptchaProvider:                "",
 		CaptchaSiteKey:                 "",
 		CaptchaSecretKey:               "",
+		CaptchaValidationURL:           "",
+		CaptchaChallengeURL:            "",
+		CaptchaReferer:                 "",
 		CaptchaGracePeriodSeconds:      1800,
 		CaptchaHTMLFilePath:            "/captcha.html",
 		BanHTMLFilePath:                "",
@@ -219,6 +226,16 @@ func ValidateParams(config *Config) error {
 			return err
 		}
 	}
+	if config.CaptchaChallengeURL != "" {
+		if err := validateURLString("CaptchaChallengeURL", config.CaptchaChallengeURL); err != nil {
+			return err
+		}
+	}
+	if config.CaptchaValidationURL != "" {
+		if err := validateURLString("CaptchaValidationURL", config.CaptchaValidationURL); err != nil {
+			return err
+		}
+	}
 	if config.BanHTMLFilePath != "" {
 		if _, err := GetHTMLTemplate(config.BanHTMLFilePath); err != nil {
 			return err
@@ -269,9 +286,24 @@ func validateURL(variable, scheme, host, path string) error {
 	// This only check that the format of the URL scheme://host/path is correct and do not make requests
 	testURL := url.URL{Scheme: scheme, Host: host, Path: path}
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
-		return fmt.Errorf("CrowdsecLapiScheme://%sHost: '%v://%v%v' must be a valid URL", variable, scheme, host, path)
+		switch variable {
+		case "CrowdsecAppsec":
+			fallthrough
+		case "CrowdsecLapi":
+			return fmt.Errorf("CrowdsecLapiScheme://%sHost: '%v://%v%v' must be a valid URL", variable, scheme, host, path)
+		default:
+			return fmt.Errorf("%s: '%v://%v%v' must be a valid URL", variable, scheme, host, path)
+		}
 	}
 	return nil
+}
+
+func validateURLString(variable string, urlString string) error {
+	u, err := url.Parse(urlString)
+	if err != nil {
+		return fmt.Errorf("%s: '%s' must be a valid URL", variable, urlString)
+	}
+	return validateURL(variable, u.Scheme, u.Host, u.Path)
 }
 
 // validHeaderFieldByte reports whether b is a valid byte in a header
@@ -346,8 +378,8 @@ func validateParamsRequired(config *Config) error {
 	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
 		return errors.New("CrowdsecLapiScheme: must be one of 'http' or 'https'")
 	}
-	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider}, config.CaptchaProvider) {
-		return errors.New("CaptchaProvider: must be one of 'hcaptcha', 'recaptcha' or 'turnstile'")
+	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, AltchaProvider}, config.CaptchaProvider) {
+		return errors.New("CaptchaProvider: must be one of 'hcaptcha', 'recaptcha', 'turnstile', or 'altcha'")
 	}
 	return nil
 }
