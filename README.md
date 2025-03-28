@@ -450,11 +450,11 @@ Only one instance of the plugin is *possible*.
 - CaptchaSecretKey
   - string
   - Site secret key for the captcha provider
-- CaptchaValidationUrl
+- CaptchaValidationURL
   - string
   - default: [unique per captcha provider](pkg/captcha/captcha.go)
   - URL which captcha challenges are validate at. Only expected to be overridden for `altcha`.
-- CaptchaChallengeUrl
+- CaptchaChallengeURL
   - string
   - default: [unique per captcha provider](pkg/captcha/captcha.go)
   - Used only by `altcha`, URL to retrieve challenge data for the client widget.
