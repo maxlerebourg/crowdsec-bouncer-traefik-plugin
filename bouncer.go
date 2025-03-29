@@ -42,12 +42,32 @@ const (
 	cacheTimeoutKey          = "updated"
 )
 
+// ##############################################################
+// Important: traefik creates an instance of the bouncer per route.
+// We rely on globals (both here and in the memory cache) to share info between
+// routes. This means that some of the plugins parameters will only work "once"
+// and will take the values of the first middleware that was instantiated even
+// if you have different middlewares with different parameters. This design
+// makes it impossible to have multiple crowdsec implementations per cluster (unless you have multiple traefik deployments in it)
+// - updateInterval
+// - updateMaxFailure
+// - defaultDecisionTimeout
+// - redisUnreachableBlock
+// - appsecEnabled
+// - appsecHost
+// - metricsUpdateIntervalSeconds
+// - others...
+// ###################################
+
 //nolint:gochecknoglobals
 var (
 	isStartup               = true
 	isCrowdsecStreamHealthy = true
 	updateFailure           = 0
-	ticker                  chan bool
+	streamTicker            chan bool
+	metricsTicker           chan bool
+	lastMetricsPush         time.Time
+	blockedRequests         int64
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -91,8 +111,6 @@ type Bouncer struct {
 	cacheClient             *cache.Client
 	captchaClient           *captcha.Client
 	log                     *logger.Log
-	blockedRequests         int64
-	lastMetricsPush         time.Time
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -178,7 +196,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
-		lastMetricsPush:         time.Now(),
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -227,7 +244,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		return nil, err
 	}
 
-	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
+	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && streamTicker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
 			if err := getToken(bouncer); err != nil {
 				bouncer.log.Error("New:getToken " + err.Error())
@@ -236,10 +253,18 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 		handleStreamTicker(bouncer)
 		isStartup = false
-		ticker = startTicker(config, log, func() {
+		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
 		})
 	}
+
+	// Start metrics ticker if not already running
+	if metricsTicker == nil {
+		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
+			handleMetricsTicker(bouncer)
+		})
+	}
+
 	bouncer.log.Debug("New initialized mode:" + config.CrowdsecMode)
 
 	return bouncer, nil
@@ -355,7 +380,7 @@ type Login struct {
 
 // To append Headers we need to call rw.WriteHeader after set any header.
 func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
-	atomic.AddInt64(&bouncer.blockedRequests, 1)
+	atomic.AddInt64(&blockedRequests, 1)
 
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
@@ -408,18 +433,19 @@ func handleStreamTicker(bouncer *Bouncer) {
 		isCrowdsecStreamHealthy = true
 		updateFailure = 0
 	}
+}
 
-	// Adding this here means that metrics will only be reported when in STREAM mode.
+func handleMetricsTicker(bouncer *Bouncer) {
 	if err := bouncer.reportMetrics(); err != nil {
-		bouncer.log.Debug(fmt.Sprintf("handleStreamTicker:reportMetrics %s", err.Error()))
+		bouncer.log.Debug(fmt.Sprintf("handleMetricsTicker:reportMetrics %s", err.Error()))
 	}
 }
 
-func startTicker(config *configuration.Config, log *logger.Log, work func()) chan bool {
-	ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
+func startTicker(name string, updateInterval int64, log *logger.Log, work func()) chan bool {
+	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
-		defer log.Debug("ticker:stopped")
+		defer log.Debug(fmt.Sprintf("%s_ticker:stopped", name))
 		for {
 			select {
 			case <-ticker.C:
@@ -679,8 +705,8 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 
 func (bouncer *Bouncer) reportMetrics() error {
 	now := time.Now()
-	currentCount := atomic.LoadInt64(&bouncer.blockedRequests)
-	windowSizeSeconds := int(now.Sub(bouncer.lastMetricsPush).Seconds())
+	currentCount := atomic.LoadInt64(&blockedRequests)
+	windowSizeSeconds := int(now.Sub(lastMetricsPush).Seconds())
 
 	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
 
@@ -734,7 +760,7 @@ func (bouncer *Bouncer) reportMetrics() error {
 		return fmt.Errorf("reportMetrics:query %w", err)
 	}
 
-	atomic.StoreInt64(&bouncer.blockedRequests, 0)
-	bouncer.lastMetricsPush = now
+	atomic.StoreInt64(&blockedRequests, 0)
+	lastMetricsPush = now
 	return nil
 }

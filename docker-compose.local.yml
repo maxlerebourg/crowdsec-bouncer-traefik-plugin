@@ -36,7 +36,7 @@ services:
       - "traefik.http.routers.router-foo.middlewares=crowdsec@docker"
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
 
-  whoami2:
+  bar:
     image: traefik/whoami
     container_name: "simple-service-bar"
     restart: unless-stopped
@@ -47,12 +47,12 @@ services:
       - "traefik.http.routers.router-bar.middlewares=crowdsec@docker"
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=TRACE"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
 
-  whoami3:
+  bar2:
     image: traefik/whoami
     container_name: "simple-service-bar2"
     restart: unless-stopped
@@ -62,13 +62,21 @@ services:
       - "traefik.http.routers.router-bar2.entrypoints=web"
       - "traefik.http.routers.router-bar2.middlewares=crowdsec@docker"
       - "traefik.http.services.service-bar2.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.updateintervalseconds=10"
-      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.updatemaxfailure=-1"
-      - "traefik.http.middlewares.crowdsec.plugin2.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
-
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.updateintervalseconds=10"
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.updatemaxfailure=-1"
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
+  bar3:
+    image: traefik/whoami
+    container_name: "simple-service-bar3"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.router-bar3.rule=PathPrefix(`/bar3`)"
+      - "traefik.http.routers.router-bar3.entrypoints=web"
+      - "traefik.http.routers.router-bar3.middlewares=crowdsec2@docker"
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.8
     container_name: "crowdsec"

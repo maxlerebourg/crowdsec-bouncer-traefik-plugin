@@ -306,12 +306,18 @@ make run
 
 ### Note
 
-**/!\ Cache is shared by all services**
-*This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP*
-Only one instance of the plugin is *possible*.
+> [!IMPORTANT]  
+> Some of the behaviours and configuration parameters are shared globally across *all* crowdsec middlewares even if you declare different middlewares with different settings. 
+>
+> **Cache is shared by all services**: This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP
+>
+> If you define different caches for different middlewares, only the first one to be instantiated will be bound to the crowdsec stream.
+>
+> Overall, this middleware is designed in such a way that **only one instance of the plugin is *possible*.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, CrowdsecAppsecEnabled, etc.)
 
-**/!\ Appsec maximum body limit is defaulted to 10MB**
-*By careful when you upgrade to >1.4.x*
+> [!WARNING]  
+> **Appsec maximum body limit is defaulted to 10MB**
+> *By careful when you upgrade to >1.4.x*
 
 ### Variables
 - Enabled
@@ -321,6 +327,10 @@ Only one instance of the plugin is *possible*.
 - LogLevel
   - string
   - default: `INFO`, expected values are: `INFO`, `DEBUG`, `ERROR`, log are written to `stdout` / `stderr`
+- MetricsUpdateIntervalSeconds
+  - int64
+  - default: 600
+  - Interval in seconds between metrics updates to Crowdsec
 - CrowdsecMode
   - string
   - default: `live`, expected values are: `none`, `live`, `stream`, `alone`, `appsec`
@@ -466,6 +476,8 @@ Only one instance of the plugin is *possible*.
 
 For each plugin, the Traefik static configuration must define the module name (as is usual for Go packages).
 
+
+
 The following declaration (given here in YAML) defines a plugin:
 > Note that you don't need to copy all thoses settings but only the ones you want to use.  
 > See the examples for advanced usage.
@@ -568,6 +580,7 @@ http:
           captchaGracePeriodSeconds: 1800
           captchaHTMLFilePath: /captcha.html
           banHTMLFilePath: /ban.html
+          metricsUpdateIntervalSeconds: 600
 ```
 
 #### Fill variable with value of file
