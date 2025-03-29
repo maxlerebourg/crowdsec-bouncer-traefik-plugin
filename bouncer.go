@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -33,6 +34,7 @@ const (
 	crowdsecLapiHeader       = "X-Api-Key"
 	crowdsecLapiRoute        = "v1/decisions"
 	crowdsecLapiStreamRoute  = "v1/decisions/stream"
+	crowdsecLapiMetricsRoute = "v1/usage-metrics"
 	crowdsecCapiHost         = "api.crowdsec.net"
 	crowdsecCapiHeader       = "Authorization"
 	crowdsecCapiLoginRoute   = "v2/watchers/login"
@@ -89,6 +91,8 @@ type Bouncer struct {
 	cacheClient             *cache.Client
 	captchaClient           *captcha.Client
 	log                     *logger.Log
+	blockedRequests         int64
+	lastMetricsPush         time.Time
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -174,6 +178,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
+		lastMetricsPush:         time.Now(),
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -350,6 +355,8 @@ type Login struct {
 
 // To append Headers we need to call rw.WriteHeader after set any header.
 func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
+	atomic.AddInt64(&bouncer.blockedRequests, 1)
+
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
@@ -401,6 +408,11 @@ func handleStreamTicker(bouncer *Bouncer) {
 		isCrowdsecStreamHealthy = true
 		updateFailure = 0
 	}
+
+	// Adding this here means that metrics will only be reported when in STREAM mode.
+	if err := bouncer.reportMetrics(); err != nil {
+		bouncer.log.Debug(fmt.Sprintf("handleStreamTicker:reportMetrics %s", err.Error()))
+	}
 }
 
 func startTicker(config *configuration.Config, log *logger.Log, work func()) chan bool {
@@ -429,7 +441,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		Path:     bouncer.crowdsecPath + crowdsecLapiRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
 	}
-	body, err := crowdsecQuery(bouncer, routeURL.String(), false)
+	body, err := crowdsecQuery(bouncer, routeURL.String(), false, nil)
 	if err != nil {
 		return cache.BannedValue, err
 	}
@@ -488,7 +500,16 @@ func getToken(bouncer *Bouncer) error {
 		Host:   bouncer.crowdsecHost,
 		Path:   crowdsecCapiLoginRoute,
 	}
-	body, err := crowdsecQuery(bouncer, loginURL.String(), true)
+
+	// Move the login-specific payload here
+	loginData := []byte(fmt.Sprintf(
+		`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
+		bouncer.crowdsecMachineID,
+		bouncer.crowdsecPassword,
+		strings.Join(bouncer.crowdsecScenarios, `","`),
+	))
+
+	body, err := crowdsecQuery(bouncer, loginURL.String(), true, loginData)
 	if err != nil {
 		return err
 	}
@@ -525,7 +546,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
-	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
+	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false, nil)
 	if err != nil {
 		return err
 	}
@@ -556,15 +577,9 @@ func handleStreamCache(bouncer *Bouncer) error {
 	return nil
 }
 
-func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, error) {
+func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool, data []byte) ([]byte, error) {
 	var req *http.Request
 	if isPost {
-		data := []byte(fmt.Sprintf(
-			`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
-			bouncer.crowdsecMachineID,
-			bouncer.crowdsecPassword,
-			strings.Join(bouncer.crowdsecScenarios, `","`),
-		))
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
@@ -585,7 +600,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 		if errToken := getToken(bouncer); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}
-		return crowdsecQuery(bouncer, stringURL, false)
+		return crowdsecQuery(bouncer, stringURL, false, nil)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("crowdsecQuery url:%s, statusCode:%d", stringURL, res.StatusCode)
@@ -659,5 +674,67 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	if err != nil {
 		return fmt.Errorf("appsecQuery:readBody %w", err)
 	}
+	return nil
+}
+
+func (bouncer *Bouncer) reportMetrics() error {
+	now := time.Now()
+	currentCount := atomic.LoadInt64(&bouncer.blockedRequests)
+	windowSizeSeconds := int(now.Sub(bouncer.lastMetricsPush).Seconds())
+
+	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
+
+	metrics := map[string]interface{}{
+		"remediation_components": []map[string]interface{}{
+			{
+				"version": "1.X.X",
+				"type":    "bouncer",
+				"name":    "traefik_plugin",
+				"metrics": []map[string]interface{}{
+					{
+						"items": []map[string]interface{}{
+							{
+								"name":  "requests_blocked_total",
+								"value": currentCount,
+								"unit":  "count",
+								"labels": map[string]string{
+									"type": "traefik_plugin",
+								},
+							},
+						},
+						"meta": map[string]interface{}{
+							"window_size_seconds": windowSizeSeconds,
+							"utc_now_timestamp":   now.Unix(),
+						},
+					},
+				},
+				"utc_startup_timestamp": time.Now().Unix(),
+				"feature_flags":         []string{},
+				"os": map[string]string{
+					"name":    "unknown",
+					"version": "unknown",
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(metrics)
+	if err != nil {
+		return fmt.Errorf("reportMetrics:marshal %w", err)
+	}
+
+	metricsURL := url.URL{
+		Scheme: bouncer.crowdsecScheme,
+		Host:   bouncer.crowdsecHost,
+		Path:   bouncer.crowdsecPath + crowdsecLapiMetricsRoute,
+	}
+
+	_, err = crowdsecQuery(bouncer, metricsURL.String(), true, data)
+	if err != nil {
+		return fmt.Errorf("reportMetrics:query %w", err)
+	}
+
+	atomic.StoreInt64(&bouncer.blockedRequests, 0)
+	bouncer.lastMetricsPush = now
 	return nil
 }
