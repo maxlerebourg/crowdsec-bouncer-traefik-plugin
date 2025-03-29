@@ -22,14 +22,26 @@ func New(logLevel string) *Log {
 	logInfo := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logTrace := log.New(io.Discard, "TRACE: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	logError.SetOutput(os.Stderr)
-	logInfo.SetOutput(os.Stdout)
-	if logLevel == "DEBUG" {
+
+	// Set outputs based on log level
+	logError.SetOutput(os.Stderr) // Always show errors
+	switch logLevel {
+	case "ERROR":
+		// Only show errors
+	case "INFO":
+		logInfo.SetOutput(os.Stdout)
+	case "DEBUG":
+		logInfo.SetOutput(os.Stdout)
 		logDebug.SetOutput(os.Stdout)
-	} else if logLevel == "TRACE" {
+	case "TRACE":
+		logInfo.SetOutput(os.Stdout)
 		logDebug.SetOutput(os.Stdout)
 		logTrace.SetOutput(os.Stdout)
+	default:
+		// Default to INFO level
+		logInfo.SetOutput(os.Stdout)
 	}
+
 	return &Log{
 		logError: logError,
 		logInfo:  logInfo,
