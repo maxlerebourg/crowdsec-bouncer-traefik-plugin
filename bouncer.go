@@ -61,9 +61,9 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isStartup                     = true
-	isCrowdsecStreamHealthy       = true
-	updateFailure           int64 = 0
+	isStartup               = true
+	isCrowdsecStreamHealthy = true
+	updateFailure           int64
 	streamTicker            chan bool
 	metricsTicker           chan bool
 	lastMetricsPush         time.Time
@@ -114,6 +114,8 @@ type Bouncer struct {
 }
 
 // New creates the crowdsec bouncer plugin.
+//
+//nolint:gocyclo,funlen
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	log := logger.New(config.LogLevel)
 	err := configuration.ValidateParams(config)
@@ -400,7 +402,7 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 }
 
 func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw http.ResponseWriter, req *http.Request) {
-	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
+	bouncer.log.Trace(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue {
 		if bouncer.captchaClient.Check(remoteIP) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
@@ -439,7 +441,7 @@ func handleStreamTicker(bouncer *Bouncer) {
 
 func handleMetricsTicker(bouncer *Bouncer) {
 	if err := bouncer.reportMetrics(); err != nil {
-		bouncer.log.Error(fmt.Sprintf("handleMetricsTicker:reportMetrics %s", err.Error()))
+		bouncer.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
 	}
 }
 
@@ -447,7 +449,7 @@ func startTicker(name string, updateInterval int64, log *logger.Log, work func()
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
-		defer log.Debug(fmt.Sprintf("%s_ticker:stopped", name))
+		defer log.Debug(name + "_ticker:stopped")
 		for {
 			select {
 			case <-ticker.C:
