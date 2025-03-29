@@ -61,9 +61,9 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isStartup               = true
-	isCrowdsecStreamHealthy = true
-	updateFailure           = 0
+	isStartup                     = true
+	isCrowdsecStreamHealthy       = true
+	updateFailure           int64 = 0
 	streamTicker            chan bool
 	metricsTicker           chan bool
 	lastMetricsPush         time.Time
@@ -97,7 +97,7 @@ type Bouncer struct {
 	crowdsecPassword        string
 	crowdsecScenarios       []string
 	updateInterval          int64
-	updateMaxFailure        int
+	updateMaxFailure        int64
 	defaultDecisionTimeout  int64
 	remediationCustomHeader string
 	forwardedCustomHeader   string
