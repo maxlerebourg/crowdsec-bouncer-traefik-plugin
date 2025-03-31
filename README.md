@@ -26,34 +26,35 @@ The AppSec Component offers:
 - Low-effort virtual patching capabilities.
 - Support for your legacy ModSecurity rules.
 - Combining classic WAF benefits with advanced CrowdSec features for otherwise difficult advanced behavior detection.
+
 More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
 Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) and supported by the plugin can be either `ban` or `captcha`.  
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
-For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.  
+For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
 
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
- - [hcaptcha](https://www.hcaptcha.com/)
- - [recaptcha](https://www.google.com/recaptcha/about/)
- - [turnstile](https://www.cloudflare.com/products/turnstile/)
 
+- [hcaptcha](https://www.hcaptcha.com/)
+- [recaptcha](https://www.google.com/recaptcha/about/)
+- [turnstile](https://www.cloudflare.com/products/turnstile/)
 
 There are 5 operating modes (CrowdsecMode) for this plugin:
 
-| Mode | Description |
-|------|------|
-| none | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. All request call the Crowdsec LAPI |
-| live | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual.    The bouncer can leverage use of a local cache in order to reduce the number of requests made to the Crowdsec LAPI. It will keep in cache the status for each IP that makes queries. |
-| stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI. |
-| alone | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any locally banned IP, but can work without a crowdsec service. |
-| appsec | Disable Crowdsec IP checking but apply Crowdsec Appsec checking. This mode is intended to be used when Crowdsec IP checking is applied at the Firewall Level. |
+| Mode   | Description                                                                                                                                                                                                                                                                                           |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| none   | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. All request call the Crowdsec LAPI                                                                                                                                                  |
+| live   | If the client IP is on ban list, it will get a http code 403 response. Otherwise, request will continue as usual. The bouncer can leverage use of a local cache in order to reduce the number of requests made to the Crowdsec LAPI. It will keep in cache the status for each IP that makes queries. |
+| stream | Stream Streaming mode allows you to keep in the local cache only the Banned IPs, every requests that does not hit the cache is authorized. Every minute, the cache is updated with news from the Crowdsec LAPI.                                                                                       |
+| alone  | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any locally banned IP, but can work without a crowdsec service.                                             |
+| appsec | Disable Crowdsec IP checking but apply Crowdsec Appsec checking. This mode is intended to be used when Crowdsec IP checking is applied at the Firewall Level.                                                                                                                                         |
 
 The `streaming mode` is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between Traefik and Crowdsec. Every request that happens hits the cache for quick decisions.
 
-The cache can be local to Traefik in memory or using a separate Redis instance.  
+The cache can be local to Traefik in memory or using a separate Redis instance.
 
-Below are Mermaid diagrams detailling how each mode work:  
+Below are Mermaid diagrams detailling how each mode work:
 
 <details><summary>Mode none workflow</summary>
 
@@ -283,7 +284,7 @@ sequenceDiagram
     User->>TraefikPlugin: Fine, done!
     create participant ProviderCaptcha
     TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
-    Destroy ProviderCaptcha    
+    Destroy ProviderCaptcha
     ProviderCaptcha-->>TraefikPlugin: Yes
     TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
     Destroy PluginCache
@@ -300,6 +301,7 @@ sequenceDiagram
 To get started, use the `docker-compose.yml` file.
 
 You can run it with:
+
 ```bash
 make run
 ```
@@ -307,13 +309,14 @@ make run
 ### Note
 
 **/!\ Cache is shared by all services**
-*This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP*
-Only one instance of the plugin is *possible*.
+_This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP_
+Only one instance of the plugin is _possible_.
 
 **/!\ Appsec maximum body limit is defaulted to 10MB**
-*By careful when you upgrade to >1.4.x*
+_By careful when you upgrade to >1.4.x_
 
 ### Variables
+
 - Enabled
   - bool
   - default: false
@@ -325,7 +328,7 @@ Only one instance of the plugin is *possible*.
 - LogFilePath
   - string
   - default: ""
-  - File Path to write logs, must be writable by Traefik
+  - File Path to write logs, must be writable by Traefik, Log rotation may require a restart of traefik
 - CrowdsecMode
   - string
   - default: `live`, expected values are: `none`, `live`, `stream`, `alone`, `appsec`
@@ -367,7 +370,7 @@ Only one instance of the plugin is *possible*.
 - CrowdsecLapiKey
   - string
   - default: ""
-  - Crowdsec LAPI key for the bouncer. 
+  - Crowdsec LAPI key for the bouncer.
 - CrowdsecLapiTlsInsecureVerify
   - bool
   - default: false
@@ -385,7 +388,7 @@ Only one instance of the plugin is *possible*.
   - default: ""
   - PEM-encoded client private key of the Bouncer
 - ClientTrustedIPs
-  - string 
+  - string
   - default: []
   - List of client IPs to trust, they will bypass any check from the bouncer or cache (useful for LAN or VPN IP)
 - RemediationHeadersCustomName
@@ -405,15 +408,15 @@ Only one instance of the plugin is *possible*.
   - default: false
   - enable Redis cache instead of in-memory cache
 - RedisCacheHost
-  - string 
+  - string
   - default: "redis:6379"
   - hostname and port for the Redis service
 - RedisCachePassword
-  - string 
+  - string
   - default: ""
   - Password for the Redis service
 - RedisCacheDatabase
-  - string 
+  - string
   - default: ""
   - Database selection for the Redis service
 - RedisUnreachableBlock
@@ -472,6 +475,7 @@ Only one instance of the plugin is *possible*.
 For each plugin, the Traefik static configuration must define the module name (as is usual for Go packages).
 
 The following declaration (given here in YAML) defines a plugin:
+
 > Note that you don't need to copy all thoses settings but only the ones you want to use.  
 > See the examples for advanced usage.
 
@@ -503,7 +507,7 @@ http:
       loadBalancer:
         servers:
           - url: http://127.0.0.1:5000
-  
+
   middlewares:
     crowdsec:
       plugin:
@@ -534,10 +538,10 @@ http:
             - crowdsecurity/http-path-traversal-probing
             - crowdsecurity/http-xss-probing
             - crowdsecurity/http-generic-bf
-          forwardedHeadersTrustedIPs: 
+          forwardedHeadersTrustedIPs:
             - 10.0.10.23/32
             - 10.0.20.0/24
-          clientTrustedIPs: 
+          clientTrustedIPs:
             - 192.168.1.0/24
           forwardedHeadersCustomName: X-Custom-Header
           remediationHeadersCustomName: cs-remediation
@@ -581,9 +585,10 @@ http:
 `CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CaptchaSiteKey` and `CaptchaSecretKey` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
-Format is:  
+Format is:
+
 - Content: VariableName: XXX
-- File   : VariableNameFile: /path
+- File : VariableNameFile: /path
 
 #### Authenticate with LAPI
 
@@ -591,6 +596,7 @@ You can authenticate to the LAPI either with LAPIKEY or by using client certific
 Please see below for more details on each option.
 
 #### Generate LAPI KEY
+
 You can generate a crowdsec API key for the LAPI.  
 You can follow the documentation here: [docs.crowdsec.net/docs/user_guides/lapi_mgmt](https://docs.crowdsec.net/docs/user_guides/lapi_mgmt)
 
@@ -600,24 +606,26 @@ docker exec crowdsec cscli bouncers add crowdsecBouncer
 ```
 
 This LAPI key must be set where is noted FIXME-LAPI-KEY in the docker-compose.yml
+
 ```yaml
-...
+..
 whoami:
   labels:
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY"
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=http"
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapihost=crowdsec:8080"
-...
+..
 crowdsec:
   environment:
     BOUNCER_KEY_TRAEFIK: FIXME-LAPI-KEY
-...
 ```
 
 Note:
+
 > Crowdsec does not require a specific format for la LAPI-key, you may use something like FIXME-LAPI-KEY but that is not recommanded for obvious reasons
 
 You can then run all the containers:
+
 ```bash
 docker compose up -d
 ```
@@ -643,7 +651,7 @@ Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bounc
 docker compose up -d crowdsec
 docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m # this will be effective 10min
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10
-docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m -t captcha # this will return a captcha challenge  
+docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m -t captcha # this will return a captcha challenge
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 ```
 
@@ -690,16 +698,18 @@ The source code of the plugin should be organized as follows:
                     ├── LICENSE
                     ├── Makefile
                     ├── readme.md
-                    └── vendor/* 
+                    └── vendor/*
 ```
 
 For local development, a `docker-compose.local.yml` is provided which reproduces the directory layout needed by Traefik.  
-This works once you have generated and filled your *LAPI-KEY* (crowdsecLapiKey), if not read above for informations.
+This works once you have generated and filled your _LAPI-KEY_ (crowdsecLapiKey), if not read above for informations.
 
 ```bash
 docker compose -f docker-compose.local.yml up -d
 ```
+
 Equivalent to
+
 ```bash
 make run_local
 ```
@@ -707,7 +717,7 @@ make run_local
 ### About
 
 [mathieuHa](https://github.com/mathieuHa) and [I](https://github.com/maxlerebourg) have been using Traefik since 2020 at [Primadviz](https://primadviz.com).
-We come from a web development and security engineer background and wanted to add the power of a very promising technology (Crowdsec) to the edge router we love.  
+We come from a web development and security engineer background and wanted to add the power of a very promising technology (Crowdsec) to the edge router we love.
 
 We initially ran into this project: [github.com/fbonalair/traefik-crowdsec-bouncer](https://github.com/fbonalair/traefik-crowdsec-bouncer)
 It was using traefik and forward auth middleware to verify every request.  

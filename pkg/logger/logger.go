@@ -25,6 +25,7 @@ func New(logLevel string, logFilePath string) *Log {
 
 	logError.SetOutput(os.Stderr)
 	logInfo.SetOutput(os.Stdout)
+	// we initialize logger to STDOUT/STDERR first so if the file logger cannot be initialized we can inform the user
 	if logLevel == "DEBUG" {
 		logDebug.SetOutput(os.Stdout)
 	}

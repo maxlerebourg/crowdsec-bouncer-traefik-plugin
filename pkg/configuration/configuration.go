@@ -102,7 +102,7 @@ func contains(source []string, target string) bool {
 func New() *Config {
 	return &Config{
 		Enabled:                        false,
-		LogLevel:                       LogERROR,
+		LogLevel:                       LogINFO,
 		LogFilePath:                    "",
 		CrowdsecMode:                   LiveMode,
 		CrowdsecAppsecEnabled:          false,
@@ -268,7 +268,8 @@ func ValidateParams(config *Config) error {
 	}
 
 	// Check logging configuration
-	if !(config.LogLevel == LogERROR || config.LogLevel == LogINFO || config.LogLevel == LogDEBUG) {
+
+	if !contains([]string{LogERROR, LogDEBUG, LogINFO}, config.LogLevel) {
 		return fmt.Errorf("LogLevel should be one of (%s,%s,%s)", LogDEBUG, LogINFO, LogERROR)
 	}
 	if config.LogFilePath != "" {

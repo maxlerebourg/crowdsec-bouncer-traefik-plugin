@@ -25,27 +25,27 @@ linters-settings:
     rules:
       Main:
         files:
-        - $all
-        - "!$test"
+          - $all
+          - "!$test"
         allow:
-        - $gostd
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
-        - github.com/leprosus/golang-ttl-map
-        - github.com/maxlerebourg/simpleredis
+          - $gostd
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/leprosus/golang-ttl-map
+          - github.com/maxlerebourg/simpleredis
       Test:
         files:
-        - $test
+          - $test
         allow:
-        - $gostd
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
-        - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - $gostd
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
 
 linters:
   enable-all: true
@@ -72,7 +72,7 @@ linters:
     - gofumpt
     - gci
     - mnd
-
+    - exportloopref
 issues:
   exclude-use-default: false
   max-same-issues: 0
