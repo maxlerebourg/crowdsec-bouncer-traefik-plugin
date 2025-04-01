@@ -61,7 +61,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.router-bar2.rule=PathPrefix(`/bar2`)"
       - "traefik.http.routers.router-bar2.entrypoints=web"
-      - "traefik.http.routers.router-bar2.middlewares=crowdsec@docker"
+      - "traefik.http.routers.router-bar2.middlewares=crowdsec2@docker"
       - "traefik.http.services.service-bar2.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.loglevel=DEBUG"

@@ -408,6 +408,7 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			return
 		}
+		atomic.AddInt64(&blockedRequests, 1) //  If we serve a captcha that should count as a dropped request.
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
@@ -471,7 +472,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		Path:     bouncer.crowdsecPath + crowdsecLapiRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
 	}
-	body, err := crowdsecQuery(bouncer, routeURL.String(), nil, []int{http.StatusOK})
+	body, err := crowdsecQuery(bouncer, routeURL.String(), nil)
 	if err != nil {
 		return cache.BannedValue, err
 	}
@@ -539,7 +540,7 @@ func getToken(bouncer *Bouncer) error {
 		strings.Join(bouncer.crowdsecScenarios, `","`),
 	))
 
-	body, err := crowdsecQuery(bouncer, loginURL.String(), loginData, []int{http.StatusOK})
+	body, err := crowdsecQuery(bouncer, loginURL.String(), loginData)
 	if err != nil {
 		return err
 	}
@@ -576,7 +577,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
-	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil, []int{http.StatusOK})
+	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -607,7 +608,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	return nil
 }
 
-func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte, expectedStatusCodes []int) ([]byte, error) {
+func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, error) {
 	var req *http.Request
 	if len(data) > 0 {
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
@@ -630,20 +631,13 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte, expectedStat
 		if errToken := getToken(bouncer); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}
-		return crowdsecQuery(bouncer, stringURL, nil, expectedStatusCodes)
+		return crowdsecQuery(bouncer, stringURL, nil)
 	}
 
-	// Check if the status code is in the expected list
-	isExpectedStatus := false
-	for _, expectedCode := range expectedStatusCodes {
-		if res.StatusCode == expectedCode {
-			isExpectedStatus = true
-			break
-		}
-	}
-
-	if !isExpectedStatus {
-		return nil, fmt.Errorf("crowdsecQuery method:%s url:%s, statusCode:%d (expected: %v)", req.Method, stringURL, res.StatusCode, expectedStatusCodes)
+	// Check if the status code starts with 2
+	statusStr := fmt.Sprintf("%d", res.StatusCode)
+	if len(statusStr) < 1 || statusStr[0] != '2' {
+		return nil, fmt.Errorf("crowdsecQuery method:%s url:%s, statusCode:%d (expected: 2xx)", req.Method, stringURL, res.StatusCode)
 	}
 
 	body, err := io.ReadAll(res.Body)
@@ -769,7 +763,7 @@ func (bouncer *Bouncer) reportMetrics() error {
 		Path:   bouncer.crowdsecPath + crowdsecLapiMetricsRoute,
 	}
 
-	_, err = crowdsecQuery(bouncer, metricsURL.String(), data, []int{http.StatusOK, http.StatusCreated})
+	_, err = crowdsecQuery(bouncer, metricsURL.String(), data)
 	if err != nil {
 		return fmt.Errorf("reportMetrics:query %w", err)
 	}
