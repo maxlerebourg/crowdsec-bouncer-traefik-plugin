@@ -26,9 +26,11 @@ func New(logLevel string, logFilePath string) *Log {
 	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logTrace := log.New(io.Discard, "TRACE: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 
-	// Prepare output destinations
+	// we initialize logger to STDOUT/STDERR first so if the file logger cannot be initialized we can inform the user
 	output := os.Stdout
 	errorOutput := os.Stderr
+
+	// prepare file logging if specified
 	if logFilePath != "" {
 		logFile, err := os.OpenFile(filepath.Clean(logFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err == nil {
