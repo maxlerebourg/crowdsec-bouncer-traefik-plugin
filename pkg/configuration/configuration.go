@@ -28,6 +28,10 @@ const (
 	AppsecMode        = "appsec"
 	HTTPS             = "https"
 	HTTP              = "http"
+	LogDEBUG          = "DEBUG"
+	LogINFO           = "INFO"
+	LogERROR          = "ERROR"
+	LogTRACE          = "TRACE"
 	HcaptchaProvider  = "hcaptcha"
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
@@ -37,6 +41,7 @@ const (
 type Config struct {
 	Enabled                                  bool     `json:"enabled,omitempty"`
 	LogLevel                                 string   `json:"logLevel,omitempty"`
+	LogFilePath                              string   `json:"logFilePath,omitempty"`
 	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
 	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
 	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
@@ -99,7 +104,8 @@ func contains(source []string, target string) bool {
 func New() *Config {
 	return &Config{
 		Enabled:                        false,
-		LogLevel:                       "INFO",
+		LogLevel:                       LogINFO,
+		LogFilePath:                    "",
 		CrowdsecMode:                   LiveMode,
 		CrowdsecAppsecEnabled:          false,
 		CrowdsecAppsecHost:             "crowdsec:7422",
@@ -264,6 +270,17 @@ func ValidateParams(config *Config) error {
 		}
 	}
 
+	// Check logging configuration
+
+	if !contains([]string{LogERROR, LogDEBUG, LogINFO, LogTRACE}, config.LogLevel) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogERROR, LogTRACE)
+	}
+	if config.LogFilePath != "" {
+		_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return fmt.Errorf("LogFilePath is not writable %w", err)
+		}
+	}
 	return nil
 }
 
@@ -306,7 +323,7 @@ func validateParamsTLS(config *Config) error {
 
 func validateParamsIPs(listIP []string, key string) error {
 	if len(listIP) > 0 {
-		if _, err := ip.NewChecker(logger.New("INFO"), listIP); err != nil {
+		if _, err := ip.NewChecker(logger.New(LogINFO, ""), listIP); err != nil {
 			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
 		}
 	}

@@ -3,9 +3,11 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 // Log Logger struct.
@@ -17,29 +19,45 @@ type Log struct {
 }
 
 // New Set Default log level to info in case log level to defined.
-func New(logLevel string) *Log {
+func New(logLevel string, logFilePath string) *Log {
+	// Initialize loggers with discard output
 	logError := log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logInfo := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logTrace := log.New(io.Discard, "TRACE: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 
-	// Set outputs based on log level
-	logError.SetOutput(os.Stderr) // Always show errors
+	// Prepare output destinations
+	output := os.Stdout
+	errorOutput := os.Stderr
+	if logFilePath != "" {
+		logFile, err := os.OpenFile(filepath.Clean(logFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err == nil {
+			output = logFile
+			errorOutput = logFile
+		} else {
+			_ = fmt.Errorf("LogFilePath is not writable %w", err)
+		}
+	}
+
+	// Set error logger output
+	logError.SetOutput(errorOutput)
+
+	// Configure log levels
 	switch logLevel {
 	case "ERROR":
-		// Only show errors
+		// Only error logging is enabled
 	case "INFO":
-		logInfo.SetOutput(os.Stdout)
+		logInfo.SetOutput(output)
 	case "DEBUG":
-		logInfo.SetOutput(os.Stdout)
-		logDebug.SetOutput(os.Stdout)
+		logInfo.SetOutput(output)
+		logDebug.SetOutput(output)
 	case "TRACE":
-		logInfo.SetOutput(os.Stdout)
-		logDebug.SetOutput(os.Stdout)
-		logTrace.SetOutput(os.Stdout)
+		logInfo.SetOutput(output)
+		logDebug.SetOutput(output)
+		logTrace.SetOutput(output)
 	default:
 		// Default to INFO level
-		logInfo.SetOutput(os.Stdout)
+		logInfo.SetOutput(output)
 	}
 
 	return &Log{
