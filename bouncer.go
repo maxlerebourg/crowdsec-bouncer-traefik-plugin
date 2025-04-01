@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"text/template"
@@ -635,7 +636,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	}
 
 	// Check if the status code starts with 2
-	statusStr := fmt.Sprintf("%d", res.StatusCode)
+	statusStr := strconv.Itoa(res.StatusCode)
 	if len(statusStr) < 1 || statusStr[0] != '2' {
 		return nil, fmt.Errorf("crowdsecQuery method:%s url:%s, statusCode:%d (expected: 2xx)", req.Method, stringURL, res.StatusCode)
 	}
