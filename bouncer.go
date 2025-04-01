@@ -261,7 +261,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	}
 
 	// Start metrics ticker if not already running
-	if metricsTicker == nil {
+	if metricsTicker == nil && config.MetricsUpdateIntervalSeconds > 0 {
 		lastMetricsPush = time.Now() // Initialize lastMetricsPush when starting the metrics ticker
 		handleMetricsTicker(bouncer)
 		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
@@ -471,7 +471,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		Path:     bouncer.crowdsecPath + crowdsecLapiRoute,
 		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
 	}
-	body, err := crowdsecQuery(bouncer, routeURL.String(), false, nil, []int{http.StatusOK})
+	body, err := crowdsecQuery(bouncer, routeURL.String(), nil, []int{http.StatusOK})
 	if err != nil {
 		return cache.BannedValue, err
 	}
@@ -539,7 +539,7 @@ func getToken(bouncer *Bouncer) error {
 		strings.Join(bouncer.crowdsecScenarios, `","`),
 	))
 
-	body, err := crowdsecQuery(bouncer, loginURL.String(), true, loginData, []int{http.StatusOK})
+	body, err := crowdsecQuery(bouncer, loginURL.String(), loginData, []int{http.StatusOK})
 	if err != nil {
 		return err
 	}
@@ -576,7 +576,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
-	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false, nil, []int{http.StatusOK})
+	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil, []int{http.StatusOK})
 	if err != nil {
 		return err
 	}
@@ -607,9 +607,9 @@ func handleStreamCache(bouncer *Bouncer) error {
 	return nil
 }
 
-func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool, data []byte, expectedStatusCodes []int) ([]byte, error) {
+func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte, expectedStatusCodes []int) ([]byte, error) {
 	var req *http.Request
-	if isPost {
+	if len(data) > 0 {
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
@@ -630,7 +630,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool, data []byte,
 		if errToken := getToken(bouncer); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}
-		return crowdsecQuery(bouncer, stringURL, false, nil, expectedStatusCodes)
+		return crowdsecQuery(bouncer, stringURL, nil, expectedStatusCodes)
 	}
 
 	// Check if the status code is in the expected list
@@ -769,7 +769,7 @@ func (bouncer *Bouncer) reportMetrics() error {
 		Path:   bouncer.crowdsecPath + crowdsecLapiMetricsRoute,
 	}
 
-	_, err = crowdsecQuery(bouncer, metricsURL.String(), true, data, []int{http.StatusOK, http.StatusCreated})
+	_, err = crowdsecQuery(bouncer, metricsURL.String(), data, []int{http.StatusOK, http.StatusCreated})
 	if err != nil {
 		return fmt.Errorf("reportMetrics:query %w", err)
 	}

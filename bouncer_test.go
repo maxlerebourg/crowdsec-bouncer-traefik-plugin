@@ -163,7 +163,6 @@ func Test_crowdsecQuery(t *testing.T) {
 	type args struct {
 		bouncer   *Bouncer
 		stringURL string
-		isPost    bool
 		data      []byte
 	}
 	tests := []struct {
@@ -176,7 +175,7 @@ func Test_crowdsecQuery(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := crowdsecQuery(tt.args.bouncer, tt.args.stringURL, tt.args.isPost, tt.args.data, []int{http.StatusOK})
+			got, err := crowdsecQuery(tt.args.bouncer, tt.args.stringURL, tt.args.data, []int{http.StatusOK})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("crowdsecQuery() error = %v, wantErr %v", err, tt.wantErr)
 				return

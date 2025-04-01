@@ -331,6 +331,7 @@ make run
   - int64
   - default: 600
   - Interval in seconds between metrics updates to Crowdsec
+  - If set to zero or less, metrics collection is disabled
 - CrowdsecMode
   - string
   - default: `live`, expected values are: `none`, `live`, `stream`, `alone`, `appsec`
