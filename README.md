@@ -419,7 +419,7 @@ _By careful when you upgrade to >1.4.x_
   - string
   - default: ""
   - Database selection for the Redis service
-- RedisUnreachableBlock
+- RedisCacheUnreachableBlock
   - bool
   - default: true
   - Block request when Redis is unreachable (if Redis is unreachable, 1-second delay is added to each request)
