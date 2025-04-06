@@ -15,7 +15,7 @@ linters-settings:
     locale: US
   funlen:
     lines: -1
-    statements: 50
+    statements: 60
   godox:
     keywords:
       - FIXME

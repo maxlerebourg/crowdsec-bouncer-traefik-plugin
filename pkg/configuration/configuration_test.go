@@ -85,8 +85,14 @@ func Test_ValidateParams(t *testing.T) {
 	cfg6 := getMinimalConfig()
 	cfg6.CrowdsecLapiScheme = HTTPS
 	cfg6.CrowdsecLapiTLSInsecureVerify = true
+	cfg7 := getMinimalConfig()
+	cfg7.CrowdsecLapiScheme = HTTPS
 	cfg8 := getMinimalConfig()
-	cfg8.CrowdsecLapiScheme = HTTPS
+	cfg8.LogLevel = LogINFO
+	cfg9 := getMinimalConfig()
+	cfg9.LogLevel = "info"
+	cfg10 := getMinimalConfig()
+	cfg10.LogLevel = "Warning"
 	type args struct {
 		config *Config
 	}
@@ -104,7 +110,10 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Not validate a bad clients ips", args: args{config: cfg5}, wantErr: true},
 		// HTTPS enabled
 		{name: "Validate https config with insecure verify", args: args{config: cfg6}, wantErr: false},
-		{name: "Not validate https without cert authority", args: args{config: cfg8}, wantErr: true},
+		{name: "Not validate https without cert authority", args: args{config: cfg7}, wantErr: true},
+		{name: "Valid log level uppercase INFO", args: args{config: cfg8}, wantErr: false},
+		{name: "Valid log level lowercase info", args: args{config: cfg9}, wantErr: false},
+		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
