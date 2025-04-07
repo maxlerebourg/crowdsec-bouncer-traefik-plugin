@@ -31,6 +31,7 @@ const (
 	LogDEBUG          = "DEBUG"
 	LogINFO           = "INFO"
 	LogERROR          = "ERROR"
+	LogTRACE          = "TRACE"
 	HcaptchaProvider  = "hcaptcha"
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
@@ -66,7 +67,8 @@ type Config struct {
 	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
-	UpdateMaxFailure                         int      `json:"updateMaxFailure,omitempty"`
+	MetricsUpdateIntervalSeconds             int64    `json:"metricsUpdateIntervalSeconds,omitempty"`
+	UpdateMaxFailure                         int64    `json:"updateMaxFailure,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
 	RemediationHeadersCustomName             string   `json:"remediationHeadersCustomName,omitempty"`
@@ -117,6 +119,7 @@ func New() *Config {
 		CrowdsecLapiKey:                "",
 		CrowdsecLapiTLSInsecureVerify:  false,
 		UpdateIntervalSeconds:          60,
+		MetricsUpdateIntervalSeconds:   600,
 		UpdateMaxFailure:               0,
 		DefaultDecisionSeconds:         60,
 		HTTPTimeoutSeconds:             10,
@@ -269,8 +272,8 @@ func ValidateParams(config *Config) error {
 
 	// Check logging configuration
 	// to upper allow of anycase of log level
-	if !contains([]string{LogERROR, LogDEBUG, LogINFO}, strings.ToUpper(config.LogLevel)) {
-		return fmt.Errorf("LogLevel should be one of (%s,%s,%s)", LogDEBUG, LogINFO, LogERROR)
+	if !contains([]string{LogERROR, LogDEBUG, LogINFO, LogTRACE}, strings.ToUpper(config.LogLevel)) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogERROR, LogTRACE)
 	}
 	if config.LogFilePath != "" {
 		_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
@@ -339,10 +342,11 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt := map[string]int64{
-		"UpdateIntervalSeconds":     config.UpdateIntervalSeconds,
-		"DefaultDecisionSeconds":    config.DefaultDecisionSeconds,
-		"HTTPTimeoutSeconds":        config.HTTPTimeoutSeconds,
-		"CaptchaGracePeriodSeconds": config.CaptchaGracePeriodSeconds,
+		"UpdateIntervalSeconds":        config.UpdateIntervalSeconds,
+		"MetricsUpdateIntervalSeconds": config.MetricsUpdateIntervalSeconds,
+		"DefaultDecisionSeconds":       config.DefaultDecisionSeconds,
+		"HTTPTimeoutSeconds":           config.HTTPTimeoutSeconds,
+		"CaptchaGracePeriodSeconds":    config.CaptchaGracePeriodSeconds,
 	}
 	for key, val := range requiredInt {
 		if val < 1 {
