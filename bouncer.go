@@ -118,6 +118,7 @@ type Bouncer struct {
 //
 //nolint:gocyclo,funlen
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
+	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.New(config.LogLevel, config.LogFilePath)
 	err := configuration.ValidateParams(config)
 	if err != nil {

@@ -271,8 +271,8 @@ func ValidateParams(config *Config) error {
 	}
 
 	// Check logging configuration
-
-	if !contains([]string{LogERROR, LogDEBUG, LogINFO, LogTRACE}, config.LogLevel) {
+	// to upper allow of anycase of log level
+	if !contains([]string{LogERROR, LogDEBUG, LogINFO, LogTRACE}, strings.ToUpper(config.LogLevel)) {
 		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogERROR, LogTRACE)
 	}
 	if config.LogFilePath != "" {
