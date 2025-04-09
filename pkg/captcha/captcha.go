@@ -23,8 +23,8 @@ type Client struct {
 	referer                 string
 	siteKey                 string
 	secretKey               string
-	validationUrl           string
-	challengeUrl            string
+	validationURL           string
+	challengeURL            string
 	remediationCustomHeader string
 	gracePeriodSeconds      int64
 	captchaTemplate         *template.Template
@@ -34,48 +34,53 @@ type Client struct {
 }
 
 type infoProvider struct {
-	js       string
-	key      string
-	challenge string
-	validate string
+	js          string
+	key         string
+	responseKey string
+	challenge   string
+	validate    string
 }
 
 var (
 	//nolint:gochecknoglobals
 	captcha = map[string]infoProvider{
 		configuration.HcaptchaProvider: {
-			js:       "https://hcaptcha.com/1/api.js",
-			key:      "h-captcha",
-			validate: "https://api.hcaptcha.com/siteverify",
+			js:          "https://hcaptcha.com/1/api.js",
+			key:         "h-captcha",
+			responseKey: "h-captcha-response",
+			validate:    "https://api.hcaptcha.com/siteverify",
 		},
 		configuration.RecaptchaProvider: {
-			js:       "https://www.google.com/recaptcha/api.js",
-			key:      "g-recaptcha",
-			validate: "https://www.google.com/recaptcha/api/siteverify",
+			js:          "https://www.google.com/recaptcha/api.js",
+			key:         "g-recaptcha",
+			responseKey: "g-recaptcha-response",
+			validate:    "https://www.google.com/recaptcha/api/siteverify",
 		},
 		configuration.TurnstileProvider: {
-			js:       "https://challenges.cloudflare.com/turnstile/v0/api.js",
-			key:      "cf-turnstile",
-			validate: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+			js:          "https://challenges.cloudflare.com/turnstile/v0/api.js",
+			key:         "cf-turnstile",
+			responseKey: "cf-turnstile-response",
+			validate:    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
 		},
 		configuration.AltchaProvider: {
-			js: "https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js",
-			key: "altcha",
-			challenge: "https://eu.altcha.org/api/v1/challenge",
-			validate: "https://eu.altcha.org/api/v1/challenge/verify",
+			js:          "https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js",
+			key:         "altcha",
+			responseKey: "altcha",
+			challenge:   "https://eu.altcha.org/api/v1/challenge",
+			validate:    "https://eu.altcha.org/api/v1/challenge/verify",
 		},
 	}
 )
 
 type templateRenderData struct {
-	SiteKey string
-	FrontendJS string
-	FrontendKey string
+	SiteKey       string
+	FrontendJS    string
+	FrontendKey   string
 	ChallengeData altchaChallengeData
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, validationUrl, challengeUrl, referer, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, validationURL, challengeURL, referer, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -89,21 +94,20 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 	c.captchaTemplate = html
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
-	c.validationUrl = captcha[c.provider].validate
-	if validationUrl != "" {
-		c.log.Debug("captcha:Client overriding default provider Validation Url with '" + validationUrl + "'")
-		c.validationUrl = validationUrl
+	c.validationURL = captcha[c.provider].validate
+	if validationURL != "" {
+		c.log.Debug("captcha:Client overriding default provider Validation URL with '" + validationURL + "'")
+		c.validationURL = validationURL
 	}
-	c.challengeUrl = captcha[c.provider].challenge
-	if challengeUrl != "" {
-		c.log.Debug("captcha:Client overriding default provider Challenge Url with '" + challengeUrl + "'")
-		c.challengeUrl = challengeUrl
+	c.challengeURL = captcha[c.provider].challenge
+	if challengeURL != "" {
+		c.log.Debug("captcha:Client overriding default provider Challenge URL with '" + challengeURL + "'")
+		c.challengeURL = challengeURL
 	}
 	c.httpClient = httpClient
 	c.cacheClient = cacheClient
 	return nil
 }
-
 
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
@@ -134,9 +138,9 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	rw.WriteHeader(http.StatusOK)
 	err = c.captchaTemplate.Execute(rw, templateRenderData{
-		SiteKey:     c.siteKey,
-		FrontendJS:  captcha[c.provider].js,
-		FrontendKey: captcha[c.provider].key,
+		SiteKey:       c.siteKey,
+		FrontendJS:    captcha[c.provider].js,
+		FrontendKey:   captcha[c.provider].key,
 		ChallengeData: challengeData,
 	})
 	if err != nil {
@@ -170,7 +174,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
 	}
-	var response = r.FormValue(captcha[c.provider].key)
+	var response = r.FormValue(captcha[c.provider].responseKey)
 	if response == "" {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
@@ -182,23 +186,23 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		body := altchaVerifyPayload{
 			Payload: response,
 		}
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			return false, err
+		jsonBody, aErr := json.Marshal(body)
+		if aErr != nil {
+			return false, aErr
 		}
-		req, err := http.NewRequest(http.MethodPost, c.validationUrl, bytes.NewBuffer(jsonBody))
-		if err != nil {
-			return false, err
+		req, aErr := http.NewRequest(http.MethodPost, c.validationURL, bytes.NewBuffer(jsonBody))
+		if aErr != nil {
+			return false, aErr
 		}
 		req.Header.Add("Content-Type", "application/json")
-		req.Header.Add("Authorization", "Bearer " + c.secretKey)
+		req.Header.Add("Authorization", "Bearer "+c.secretKey)
 		req.Header.Add("Referer", c.referer)
 		res, err = c.httpClient.Do(req)
 	} else {
 		var body = url.Values{}
 		body.Add("secret", c.secretKey)
 		body.Add("response", response)
-		res, err = c.httpClient.PostForm(c.validationUrl, body)
+		res, err = c.httpClient.PostForm(c.validationURL, body)
 	}
 	if err != nil {
 		return false, err
@@ -240,19 +244,23 @@ type altchaChallengeData struct {
 }
 
 func (cd *altchaChallengeData) Get(c *Client) error {
-	req, err := http.NewRequest(http.MethodGet, c.challengeUrl, nil)
+	req, err := http.NewRequest(http.MethodGet, c.challengeURL, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Add("Referer", c.referer)
-	req.Header.Add("Authorization", "Bearer " + c.secretKey)
+	req.Header.Add("Authorization", "Bearer "+c.secretKey)
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err = res.Body.Close(); err != nil {
+			c.log.Error("captcha:Validate " + err.Error())
+		}
+	}()
 	err = json.NewDecoder(res.Body).Decode(&cd)
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		return errors.New("error retrieving challenge data: (" + res.Status + ") " + cd.Error)
 	}
 	return err
