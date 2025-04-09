@@ -61,6 +61,7 @@ type Bouncer struct {
 
 	enabled                 bool
 	appsecEnabled           bool
+	appsecScheme            string
 	appsecHost              string
 	appsecPath              string
 	appsecFailureBlock      bool
@@ -153,6 +154,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		enabled:                 config.Enabled,
 		crowdsecMode:            config.CrowdsecMode,
 		appsecEnabled:           config.CrowdsecAppsecEnabled,
+		appsecScheme:            config.CrowdsecAppsecScheme,
 		appsecHost:              config.CrowdsecAppsecHost,
 		appsecPath:              config.CrowdsecAppsecPath,
 		appsecFailureBlock:      config.CrowdsecAppsecFailureBlock,
@@ -601,7 +603,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	routeURL := url.URL{
-		Scheme: bouncer.crowdsecScheme,
+		Scheme: bouncer.appsecScheme,
 		Host:   bouncer.appsecHost,
 		Path:   bouncer.appsecPath,
 	}

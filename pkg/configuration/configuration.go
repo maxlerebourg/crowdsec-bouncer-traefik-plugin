@@ -43,6 +43,7 @@ type Config struct {
 	LogFilePath                              string   `json:"logFilePath,omitempty"`
 	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
 	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
+	CrowdsecAppsecScheme                     string   `json:"crowdsecAppsecScheme,omitempty"`
 	CrowdsecAppsecHost                       string   `json:"crowdsecAppsecHost,omitempty"`
 	CrowdsecAppsecPath                       string   `json:"crowdsecAppsecPath,omitempty"`
 	CrowdsecAppsecFailureBlock               bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
