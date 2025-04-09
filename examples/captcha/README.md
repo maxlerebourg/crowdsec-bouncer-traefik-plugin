@@ -173,5 +173,5 @@ Ensure the following values are configured for this plugin:
 - `captchaReferer`: The domain name provided to ALTCHA when creating your API key
 
 Since their code is free and open source, it should be possible to host your own server that implements a similar API. Be sure to set these URL configuration values if this is the case:
-- `captchaChallengeUrl`
-- `captchaValidationUrl`
+- `captchaChallengeURL`
+- `captchaValidationURL`
