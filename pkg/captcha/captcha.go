@@ -111,21 +111,23 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
-	valid, err := c.Validate(r)
-	if err != nil {
-		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
-		rw.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if valid {
-		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
-		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
-		return
+	if r.Method == http.MethodPost {
+		valid, err := c.Validate(r)
+		if err != nil {
+			c.log.Info("captcha:ServeHTTP:validate " + err.Error())
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if valid {
+			c.log.Debug("captcha:ServeHTTP captcha:valid")
+			c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+			http.Redirect(rw, r, r.URL.String(), http.StatusFound)
+			return
+		}
 	}
 	var challengeData altchaChallengeData
 	if c.provider == "altcha" {
-		err = challengeData.Get(c)
+		err := challengeData.Get(c)
 		if err != nil {
 			c.log.Error("captcha:ServeHTTP captchaChallengeDataGet " + err.Error())
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -137,7 +139,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		rw.Header().Set(c.remediationCustomHeader, "captcha")
 	}
 	rw.WriteHeader(http.StatusOK)
-	err = c.captchaTemplate.Execute(rw, templateRenderData{
+	err := c.captchaTemplate.Execute(rw, templateRenderData{
 		SiteKey:       c.siteKey,
 		FrontendJS:    captcha[c.provider].js,
 		FrontendKey:   captcha[c.provider].key,
@@ -170,10 +172,6 @@ type altchaVerifyPayload struct {
 
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request) (bool, error) {
-	if r.Method != http.MethodPost {
-		c.log.Debug("captcha:Validate invalid method: " + r.Method)
-		return false, nil
-	}
 	var response = r.FormValue(captcha[c.provider].responseKey)
 	if response == "" {
 		c.log.Debug("captcha:Validate no captcha response found in request")
