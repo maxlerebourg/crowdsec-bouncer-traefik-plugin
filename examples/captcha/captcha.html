@@ -277,7 +277,7 @@
       }
     }
   </style>
-  <script src="{{ .FrontendJS }}" async defer></script>
+  <script src="{{ .FrontendJS }}" async defer {{ if eq .FrontendKey "altcha" }} type="module" {{ end }}></script>
 </head>
 
 <body class="h-screen w-screen p-4">
@@ -334,5 +334,28 @@
       setTimeout(() => document.querySelector('#captcha-form').submit(), 500);
     }
   </script>
+  {{ if eq .FrontendKey "altcha" }}
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const altchaGenericCaptcha = document.querySelector('#captcha.altcha');
+      if (altchaGenericCaptcha) {
+        const altchaWidget = document.createElement('altcha-widget');
+        altchaGenericCaptcha.replaceWith(altchaWidget);
+        altchaWidget.addEventListener('load', () => {
+          altchaWidget.configure({
+            challenge: {
+              algorithm: "{{ .ChallengeData.Algorithm }}",
+              challenge: "{{ .ChallengeData.Challenge }}",
+              maxnumber: "{{ .ChallengeData.MaxNumber }}",
+              salt: "{{ .ChallengeData.Salt }}",
+              signature: "{{ .ChallengeData.Signature }}",
+            }
+          });
+        });
+        altchaWidget.addEventListener('verified', captchaCallback);
+      }
+    });
+  </script>
+  {{ end }}
 </body>
 </html>
