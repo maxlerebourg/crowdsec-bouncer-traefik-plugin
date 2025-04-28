@@ -428,7 +428,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + crowdsecLapiRoute,
-		RawQuery: fmt.Sprintf("ip=%v&banned=true", remoteIP),
+		RawQuery: fmt.Sprintf("ip=%v", remoteIP),
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String(), false)
 	if err != nil {
