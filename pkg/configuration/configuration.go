@@ -357,7 +357,7 @@ func validateParamsRequired(config *Config) error {
 	if config.CrowdsecAppsecBodyLimit < 0 {
 		return errors.New("CrowdsecAppsecBodyLimit: cannot be less than 0")
 	}
-	if config.RemediationStatusCode < 100 || config.RemediationStatusCode >= 600  {
+	if config.RemediationStatusCode < 100 || config.RemediationStatusCode >= 600 {
 		return errors.New("RemediationStatusCode: cannot be less than 100 and more than 600")
 	}
 
