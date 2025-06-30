@@ -68,6 +68,7 @@ type Config struct {
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	UpdateMaxFailure                         int      `json:"updateMaxFailure,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
+	DefaultStatusCode                        int      `json:"defaultStatusCode,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
 	RemediationHeadersCustomName             string   `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomName,omitempty"`
@@ -119,6 +120,7 @@ func New() *Config {
 		UpdateIntervalSeconds:          60,
 		UpdateMaxFailure:               0,
 		DefaultDecisionSeconds:         60,
+		DefaultStatusCode:              http.StatusForbidden,
 		HTTPTimeoutSeconds:             10,
 		CaptchaProvider:                "",
 		CaptchaSiteKey:                 "",
