@@ -439,6 +439,10 @@ _By careful when you upgrade to >1.4.x_
   - int64
   - default: 60
   - Used only in `live` mode, maximum decision duration
+- DefaultStatusCode
+  - int
+  - default: 403
+  - HTTP status code for banned user (not captcha)
 - CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
@@ -518,6 +522,7 @@ http:
           updateIntervalSeconds: 60
           updateMaxFailure: 0
           defaultDecisionSeconds: 60
+          defaultStatusCode: 403
           httpTimeoutSeconds: 10
           crowdsecMode: live
           crowdsecAppsecEnabled: false
