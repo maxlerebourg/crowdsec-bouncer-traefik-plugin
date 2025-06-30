@@ -77,7 +77,7 @@ type Bouncer struct {
 	updateInterval          int64
 	updateMaxFailure        int
 	defaultDecisionTimeout  int64
-	defaultStatusCode       int
+	remediationStatusCode   int
 	remediationCustomHeader string
 	forwardedCustomHeader   string
 	crowdsecStreamRoute     string
@@ -171,7 +171,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		remediationCustomHeader: config.RemediationHeadersCustomName,
 		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
-		defaultStatusCode:       config.DefaultStatusCode,
+		remediationStatusCode:   config.RemediationStatusCode,
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		banTemplateString:       banTemplateString,
 		crowdsecStreamRoute:     crowdsecStreamRoute,
@@ -357,11 +357,11 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
 	if bouncer.banTemplateString == "" {
-		rw.WriteHeader(bouncer.defaultStatusCode)
+		rw.WriteHeader(bouncer.remediationStatusCode)
 		return
 	}
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-	rw.WriteHeader(bouncer.defaultStatusCode)
+	rw.WriteHeader(bouncer.remediationStatusCode)
 	_, err := fmt.Fprint(rw, bouncer.banTemplateString)
 	if err != nil {
 		bouncer.log.Error("handleBanServeHTTP could not write template to ResponseWriter")
