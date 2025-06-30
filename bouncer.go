@@ -205,11 +205,17 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	)
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
+	tlsConfig2 := new(tls.Config)
+	tlsConfig2.InsecureSkipVerify = true
 	err = bouncer.captchaClient.New(
 		log,
 		bouncer.cacheClient,
 		&http.Client{
-			Transport: &http.Transport{MaxIdleConns: 10, IdleConnTimeout: 30 * time.Second},
+			Transport: &http.Transport{
+				MaxIdleConns: 10,
+				IdleConnTimeout: 30 * time.Second,
+				TLSClientConfig: tlsConfig2,
+			},
 			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
 		config.CaptchaProvider,

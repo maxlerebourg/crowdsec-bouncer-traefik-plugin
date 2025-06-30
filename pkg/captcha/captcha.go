@@ -31,6 +31,7 @@ type Client struct {
 type infoProvider struct {
 	js       string
 	key      string
+	response string
 	validate string
 }
 
@@ -40,17 +41,26 @@ var (
 		configuration.HcaptchaProvider: {
 			js:       "https://hcaptcha.com/1/api.js",
 			key:      "h-captcha",
+			response: "h-captcha-response",
 			validate: "https://api.hcaptcha.com/siteverify",
 		},
 		configuration.RecaptchaProvider: {
 			js:       "https://www.google.com/recaptcha/api.js",
 			key:      "g-recaptcha",
+			response: "g-recaptcha-response",
 			validate: "https://www.google.com/recaptcha/api/siteverify",
 		},
 		configuration.TurnstileProvider: {
 			js:       "https://challenges.cloudflare.com/turnstile/v0/api.js",
 			key:      "cf-turnstile",
+			response: "cf-turnstile-response",
 			validate: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+		},
+		configuration.WicketkeeperProvider: {
+			js:       "https://captcha.max.lan/fast.js",
+			key:      "wicketkeeper",
+			response: "wicketkeeper_solution",
+			validate: "https://captcha.max.lan/v0/siteverify",
 		},
 	}
 )
@@ -121,7 +131,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
 	}
-	var response = r.FormValue(captcha[c.provider].key + "-response")
+	var response = r.FormValue(captcha[c.provider].response)
 	if response == "" {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
