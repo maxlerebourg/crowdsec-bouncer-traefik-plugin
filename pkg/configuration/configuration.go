@@ -340,23 +340,28 @@ func validateParamsRequired(config *Config) error {
 			return fmt.Errorf("%v: cannot be empty", key)
 		}
 	}
-	requiredInt := map[string]int64{
-		"UpdateIntervalSeconds":        config.UpdateIntervalSeconds,
+	requiredInt0 := map[string]int64{
+		"CrowdsecAppsecBodyLimit":      config.CrowdsecAppsecBodyLimit,
 		"MetricsUpdateIntervalSeconds": config.MetricsUpdateIntervalSeconds,
+	}
+	for key, val := range requiredInt0 {
+		if val < 0 {
+			return fmt.Errorf("%v: cannot be less than 0", key)
+		}
+	}
+	requiredInt1 := map[string]int64{
+		"UpdateIntervalSeconds":        config.UpdateIntervalSeconds,
 		"DefaultDecisionSeconds":       config.DefaultDecisionSeconds,
 		"HTTPTimeoutSeconds":           config.HTTPTimeoutSeconds,
 		"CaptchaGracePeriodSeconds":    config.CaptchaGracePeriodSeconds,
 	}
-	for key, val := range requiredInt {
+	for key, val := range requiredInt1 {
 		if val < 1 {
 			return fmt.Errorf("%v: cannot be less than 1", key)
 		}
 	}
 	if config.UpdateMaxFailure < -1 {
 		return errors.New("UpdateMaxFailure: cannot be less than -1")
-	}
-	if config.CrowdsecAppsecBodyLimit < 0 {
-		return errors.New("CrowdsecAppsecBodyLimit: cannot be less than 0")
 	}
 
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {

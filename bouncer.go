@@ -443,7 +443,7 @@ func handleStreamTicker(bouncer *Bouncer) {
 }
 
 func handleMetricsTicker(bouncer *Bouncer) {
-	if err := bouncer.reportMetrics(); err != nil {
+	if err := reportMetrics(bouncer); err != nil {
 		bouncer.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
 	}
 }
@@ -713,7 +713,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	return nil
 }
 
-func (bouncer *Bouncer) reportMetrics() error {
+func reportMetrics(bouncer *Bouncer) error {
 	now := time.Now()
 	currentCount := atomic.LoadInt64(&blockedRequests)
 	windowSizeSeconds := int(now.Sub(lastMetricsPush).Seconds())
