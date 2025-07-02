@@ -329,7 +329,7 @@ make run
   - Enable the plugin
 - LogLevel
   - string
-  - default: `INFO`, expected values are: `INFO`, `DEBUG`, `ERROR`, `TRACE`
+  - default: `INFO`, expected values are: `INFO`, `DEBUG`, `ERROR`
   - Log are written to `stdout` / `stderr` or file if LogFilePath is provided
 - LogFilePath
   - string

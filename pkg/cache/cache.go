@@ -110,19 +110,19 @@ func (c *Client) New(log *logger.Log, isRedis bool, host, pass, database string)
 
 // Delete delete decision in cache.
 func (c *Client) Delete(key string) {
-	c.log.Trace(fmt.Sprintf("cache:Delete key:%v", key))
+	c.log.Debug(fmt.Sprintf("cache:Delete key:%v", key))
 	c.cache.delete(key)
 }
 
 // Get check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func (c *Client) Get(key string) (string, error) {
-	c.log.Trace(fmt.Sprintf("cache:Get key:%v", key))
+	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
 	return c.cache.get(key)
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.
 func (c *Client) Set(key string, value string, duration int64) {
-	c.log.Trace(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
+	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
 	c.cache.set(key, value, duration)
 }

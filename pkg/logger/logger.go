@@ -24,7 +24,6 @@ func New(logLevel string, logFilePath string) *Log {
 	logError := log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logInfo := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	logTrace := log.New(io.Discard, "TRACE: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 
 	// we initialize logger to STDOUT/STDERR first so if the file logger cannot be initialized we can inform the user
 	output := os.Stdout
@@ -53,10 +52,6 @@ func New(logLevel string, logFilePath string) *Log {
 	case "DEBUG":
 		logInfo.SetOutput(output)
 		logDebug.SetOutput(output)
-	case "TRACE":
-		logInfo.SetOutput(output)
-		logDebug.SetOutput(output)
-		logTrace.SetOutput(output)
 	default:
 		// Default to INFO level
 		logInfo.SetOutput(output)
@@ -66,7 +61,6 @@ func New(logLevel string, logFilePath string) *Log {
 		logError: logError,
 		logInfo:  logInfo,
 		logDebug: logDebug,
-		logTrace: logTrace,
 	}
 }
 
@@ -78,11 +72,6 @@ func (l *Log) Info(str string) {
 // Debug log to Stdout.
 func (l *Log) Debug(str string) {
 	l.logDebug.Printf("%s", str)
-}
-
-// Trace log to Stdout.
-func (l *Log) Trace(str string) {
-	l.logTrace.Printf("%s", str)
 }
 
 // Error log to Stderr.
