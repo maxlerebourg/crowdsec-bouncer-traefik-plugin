@@ -59,7 +59,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.1-2
+    image: crowdsecurity/crowdsec:v1.6.8
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
