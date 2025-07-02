@@ -15,7 +15,6 @@ type Log struct {
 	logError *log.Logger
 	logInfo  *log.Logger
 	logDebug *log.Logger
-	logTrace *log.Logger
 }
 
 // New Set Default log level to info in case log level to defined.
