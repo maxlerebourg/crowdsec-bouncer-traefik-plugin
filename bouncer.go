@@ -12,7 +12,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -33,6 +35,7 @@ const (
 	crowdsecLapiHeader       = "X-Api-Key"
 	crowdsecLapiRoute        = "v1/decisions"
 	crowdsecLapiStreamRoute  = "v1/decisions/stream"
+	crowdsecLapiMetricsRoute = "v1/usage-metrics"
 	crowdsecCapiHost         = "api.crowdsec.net"
 	crowdsecCapiHeader       = "Authorization"
 	crowdsecCapiLoginRoute   = "v2/watchers/login"
@@ -40,12 +43,32 @@ const (
 	cacheTimeoutKey          = "updated"
 )
 
+// ##############################################################
+// Important: traefik creates an instance of the bouncer per route.
+// We rely on globals (both here and in the memory cache) to share info between
+// routes. This means that some of the plugins parameters will only work "once"
+// and will take the values of the first middleware that was instantiated even
+// if you have different middlewares with different parameters. This design
+// makes it impossible to have multiple crowdsec implementations per cluster (unless you have multiple traefik deployments in it)
+// - updateInterval
+// - updateMaxFailure
+// - defaultDecisionTimeout
+// - redisUnreachableBlock
+// - appsecEnabled
+// - appsecHost
+// - metricsUpdateIntervalSeconds
+// - others...
+// ###################################
+
 //nolint:gochecknoglobals
 var (
 	isStartup               = true
 	isCrowdsecStreamHealthy = true
-	updateFailure           = 0
-	ticker                  chan bool
+	updateFailure           int64
+	streamTicker            chan bool
+	metricsTicker           chan bool
+	lastMetricsPush         time.Time
+	blockedRequests         int64
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -75,7 +98,7 @@ type Bouncer struct {
 	crowdsecPassword        string
 	crowdsecScenarios       []string
 	updateInterval          int64
-	updateMaxFailure        int
+	updateMaxFailure        int64
 	defaultDecisionTimeout  int64
 	remediationStatusCode   int
 	remediationCustomHeader string
@@ -93,6 +116,8 @@ type Bouncer struct {
 }
 
 // New creates the crowdsec bouncer plugin.
+//
+//nolint:gocyclo
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.New(config.LogLevel, config.LogFilePath)
@@ -231,7 +256,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		return nil, err
 	}
 
-	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && ticker == nil {
+	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && streamTicker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
 			if err := getToken(bouncer); err != nil {
 				bouncer.log.Error("New:getToken " + err.Error())
@@ -240,10 +265,20 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 		handleStreamTicker(bouncer)
 		isStartup = false
-		ticker = startTicker(config, log, func() {
+		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
 		})
 	}
+
+	// Start metrics ticker if not already running
+	if metricsTicker == nil && config.MetricsUpdateIntervalSeconds > 0 {
+		lastMetricsPush = time.Now() // Initialize lastMetricsPush when starting the metrics ticker
+		handleMetricsTicker(bouncer)
+		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
+			handleMetricsTicker(bouncer)
+		})
+	}
+
 	bouncer.log.Debug("New initialized mode:" + config.CrowdsecMode)
 
 	return bouncer, nil
@@ -359,6 +394,8 @@ type Login struct {
 
 // To append Headers we need to call rw.WriteHeader after set any header.
 func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
+	atomic.AddInt64(&blockedRequests, 1)
+
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
@@ -381,6 +418,7 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			return
 		}
+		atomic.AddInt64(&blockedRequests, 1) //  If we serve a captcha that should count as a dropped request.
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
@@ -412,11 +450,17 @@ func handleStreamTicker(bouncer *Bouncer) {
 	}
 }
 
-func startTicker(config *configuration.Config, log *logger.Log, work func()) chan bool {
-	ticker := time.NewTicker(time.Duration(config.UpdateIntervalSeconds) * time.Second)
+func handleMetricsTicker(bouncer *Bouncer) {
+	if err := reportMetrics(bouncer); err != nil {
+		bouncer.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
+	}
+}
+
+func startTicker(name string, updateInterval int64, log *logger.Log, work func()) chan bool {
+	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
-		defer log.Debug("ticker:stopped")
+		defer log.Debug(name + "_ticker:stopped")
 		for {
 			select {
 			case <-ticker.C:
@@ -438,7 +482,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		Path:     bouncer.crowdsecPath + crowdsecLapiRoute,
 		RawQuery: fmt.Sprintf("ip=%v", remoteIP),
 	}
-	body, err := crowdsecQuery(bouncer, routeURL.String(), false)
+	body, err := crowdsecQuery(bouncer, routeURL.String(), nil)
 	if err != nil {
 		return cache.BannedValue, err
 	}
@@ -497,7 +541,16 @@ func getToken(bouncer *Bouncer) error {
 		Host:   bouncer.crowdsecHost,
 		Path:   crowdsecCapiLoginRoute,
 	}
-	body, err := crowdsecQuery(bouncer, loginURL.String(), true)
+
+	// Move the login-specific payload here
+	loginData := []byte(fmt.Sprintf(
+		`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
+		bouncer.crowdsecMachineID,
+		bouncer.crowdsecPassword,
+		strings.Join(bouncer.crowdsecScenarios, `","`),
+	))
+
+	body, err := crowdsecQuery(bouncer, loginURL.String(), loginData)
 	if err != nil {
 		return err
 	}
@@ -534,7 +587,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
 	}
-	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), false)
+	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -565,15 +618,9 @@ func handleStreamCache(bouncer *Bouncer) error {
 	return nil
 }
 
-func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, error) {
+func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, error) {
 	var req *http.Request
-	if isPost {
-		data := []byte(fmt.Sprintf(
-			`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
-			bouncer.crowdsecMachineID,
-			bouncer.crowdsecPassword,
-			strings.Join(bouncer.crowdsecScenarios, `","`),
-		))
+	if len(data) > 0 {
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
@@ -594,13 +641,16 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, isPost bool) ([]byte, err
 		if errToken := getToken(bouncer); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}
-		return crowdsecQuery(bouncer, stringURL, false)
+		return crowdsecQuery(bouncer, stringURL, nil)
 	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("crowdsecQuery url:%s, statusCode:%d", stringURL, res.StatusCode)
-	}
-	body, err := io.ReadAll(res.Body)
 
+	// Check if the status code starts with 2
+	statusStr := strconv.Itoa(res.StatusCode)
+	if len(statusStr) < 1 || statusStr[0] != '2' {
+		return nil, fmt.Errorf("crowdsecQuery method:%s url:%s, statusCode:%d (expected: 2xx)", req.Method, stringURL, res.StatusCode)
+	}
+
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery:readBody %w", err)
 	}
@@ -668,5 +718,67 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	if err != nil {
 		return fmt.Errorf("appsecQuery:readBody %w", err)
 	}
+	return nil
+}
+
+func reportMetrics(bouncer *Bouncer) error {
+	now := time.Now()
+	currentCount := atomic.LoadInt64(&blockedRequests)
+	windowSizeSeconds := int(now.Sub(lastMetricsPush).Seconds())
+
+	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
+
+	metrics := map[string]interface{}{
+		"remediation_components": []map[string]interface{}{
+			{
+				"version": "1.X.X",
+				"type":    "bouncer",
+				"name":    "traefik_plugin",
+				"metrics": []map[string]interface{}{
+					{
+						"items": []map[string]interface{}{
+							{
+								"name":  "dropped",
+								"value": currentCount,
+								"unit":  "request",
+								"labels": map[string]string{
+									"type": "traefik_plugin",
+								},
+							},
+						},
+						"meta": map[string]interface{}{
+							"window_size_seconds": windowSizeSeconds,
+							"utc_now_timestamp":   now.Unix(),
+						},
+					},
+				},
+				"utc_startup_timestamp": time.Now().Unix(),
+				"feature_flags":         []string{},
+				"os": map[string]string{
+					"name":    "unknown",
+					"version": "unknown",
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(metrics)
+	if err != nil {
+		return fmt.Errorf("reportMetrics:marshal %w", err)
+	}
+
+	metricsURL := url.URL{
+		Scheme: bouncer.crowdsecScheme,
+		Host:   bouncer.crowdsecHost,
+		Path:   bouncer.crowdsecPath + crowdsecLapiMetricsRoute,
+	}
+
+	_, err = crowdsecQuery(bouncer, metricsURL.String(), data)
+	if err != nil {
+		return fmt.Errorf("reportMetrics:query %w", err)
+	}
+
+	atomic.StoreInt64(&blockedRequests, 0)
+	lastMetricsPush = now
 	return nil
 }
