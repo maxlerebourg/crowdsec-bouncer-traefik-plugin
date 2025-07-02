@@ -352,10 +352,10 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt1 := map[string]int64{
-		"UpdateIntervalSeconds":        config.UpdateIntervalSeconds,
-		"DefaultDecisionSeconds":       config.DefaultDecisionSeconds,
-		"HTTPTimeoutSeconds":           config.HTTPTimeoutSeconds,
-		"CaptchaGracePeriodSeconds":    config.CaptchaGracePeriodSeconds,
+		"UpdateIntervalSeconds":     config.UpdateIntervalSeconds,
+		"DefaultDecisionSeconds":    config.DefaultDecisionSeconds,
+		"HTTPTimeoutSeconds":        config.HTTPTimeoutSeconds,
+		"CaptchaGracePeriodSeconds": config.CaptchaGracePeriodSeconds,
 	}
 	for key, val := range requiredInt1 {
 		if val < 1 {
