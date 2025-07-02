@@ -6,6 +6,7 @@ logs:
     level: DEBUG
   access:
     enabled: true
+    format: json
     fields:
       headers: 
         defaultmode: keep

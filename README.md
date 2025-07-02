@@ -450,6 +450,10 @@ make run
   - int64
   - default: 60
   - Used only in `live` mode, maximum decision duration
+- RemediationStatusCode
+  - int
+  - default: 403
+  - HTTP status code for banned user (not captcha)
 - CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
@@ -529,6 +533,7 @@ http:
           updateIntervalSeconds: 60
           updateMaxFailure: 0
           defaultDecisionSeconds: 60
+          remediationStatusCode: 403
           httpTimeoutSeconds: 10
           crowdsecMode: live
           crowdsecAppsecEnabled: false
@@ -538,7 +543,6 @@ http:
           crowdsecAppsecUnreachableBlock: true
           crowdsecAppsecBodyLimit: 10485760
           crowdsecLapiKey: privateKey-foo
-          crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
           crowdsecLapiScheme: http
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiPath: "/"
@@ -567,7 +571,6 @@ http:
             ...
             Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
             -----END CERTIFICATE-----
-          crowdsecLapiTLSCertificateAuthorityFile: /etc/traefik/crowdsec-certs/ca.pem
           crowdsecLapiTLSCertificateBouncer: |-
             -----BEGIN CERTIFICATE-----
             MIIEHjCCAwagAwIBAgIUOBTs1eqkaAUcPplztUr2xRapvNAwDQYJKoZIhvcNAQEL
@@ -575,14 +578,12 @@ http:
             RaXAnYYUVRblS1jmePemh388hFxbmrpG2pITx8B5FMULqHoj11o2Rl0gSV6tHIHz
             N2U=
             -----END CERTIFICATE-----
-          crowdsecLapiTLSCertificateBouncerFile: /etc/traefik/crowdsec-certs/bouncer.pem
           crowdsecLapiTLSCertificateBouncerKey: |-
             -----BEGIN RSA PRIVATE KEY-----
             MIIEogIBAAKCAQEAtYQnbJqifH+ZymePylDxGGLIuxzcAUU4/ajNj+qRAdI/Ux3d
             ...
             ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
             -----END RSA PRIVATE KEY-----
-          crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
           captchaProvider: hcaptcha
           captchaSiteKey: FIXME
           captchaSecretKey: FIXME
@@ -594,7 +595,7 @@ http:
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CaptchaSiteKey` and `CaptchaSecretKey` can be provided with the content as raw or through a file path that Traefik can read.  
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CaptchaSiteKey`, `CaptchaSecretKey` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:

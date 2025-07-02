@@ -69,6 +69,7 @@ type Config struct {
 	MetricsUpdateIntervalSeconds             int64    `json:"metricsUpdateIntervalSeconds,omitempty"`
 	UpdateMaxFailure                         int64    `json:"updateMaxFailure,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
+	RemediationStatusCode                    int      `json:"remediationStatusCode,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
 	RemediationHeadersCustomName             string   `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomName,omitempty"`
@@ -121,6 +122,7 @@ func New() *Config {
 		MetricsUpdateIntervalSeconds:   600,
 		UpdateMaxFailure:               0,
 		DefaultDecisionSeconds:         60,
+		RemediationStatusCode:          http.StatusForbidden,
 		HTTPTimeoutSeconds:             10,
 		CaptchaProvider:                "",
 		CaptchaSiteKey:                 "",
@@ -362,6 +364,12 @@ func validateParamsRequired(config *Config) error {
 	}
 	if config.UpdateMaxFailure < -1 {
 		return errors.New("UpdateMaxFailure: cannot be less than -1")
+	}
+	if config.CrowdsecAppsecBodyLimit < 0 {
+		return errors.New("CrowdsecAppsecBodyLimit: cannot be less than 0")
+	}
+	if config.RemediationStatusCode < 100 || config.RemediationStatusCode >= 600 {
+		return errors.New("RemediationStatusCode: cannot be less than 100 and more than 600")
 	}
 
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
