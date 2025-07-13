@@ -308,12 +308,18 @@ make run
 
 ### Note
 
-**/!\ Cache is shared by all services**
-_This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP_
-Only one instance of the plugin is _possible_.
+> [!IMPORTANT]  
+> Some of the behaviours and configuration parameters are shared globally across *all* crowdsec middlewares even if you declare different middlewares with different settings. 
+>
+> **Cache is shared by all services**: This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP
+>
+> If you define different caches for different middlewares, only the first one to be instantiated will be bound to the crowdsec stream.
+>
+> Overall, this middleware is designed in such a way that **only one instance of the plugin is *possible*.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, CrowdsecAppsecEnabled, etc.)
 
-**/!\ Appsec maximum body limit is defaulted to 10MB**
-_By careful when you upgrade to >1.4.x_
+> [!WARNING]  
+> **Appsec maximum body limit is defaulted to 10MB**
+> *Be careful when you upgrade to >1.4.x*
 
 ### Variables
 
@@ -324,11 +330,16 @@ _By careful when you upgrade to >1.4.x_
 - LogLevel
   - string
   - default: `INFO`, expected values are: `INFO`, `DEBUG`, `ERROR`
-  - Log are written to `stdout` / `stderr` of file if LogFilePath is provided
+  - Log are written to `stdout` / `stderr` or file if LogFilePath is provided
 - LogFilePath
   - string
   - default: ""
   - File Path to write logs, must be writable by Traefik, Log rotation may require a restart of traefik
+- MetricsUpdateIntervalSeconds
+  - int64
+  - default: 600
+  - Interval in seconds between metrics updates to Crowdsec
+  - If set to zero or less, metrics collection is disabled
 - CrowdsecMode
   - string
   - default: `live`, expected values are: `none`, `live`, `stream`, `alone`, `appsec`
@@ -439,6 +450,10 @@ _By careful when you upgrade to >1.4.x_
   - int64
   - default: 60
   - Used only in `live` mode, maximum decision duration
+- RemediationStatusCode
+  - int
+  - default: 403
+  - HTTP status code for banned user (not captcha)
 - CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
@@ -518,6 +533,7 @@ http:
           updateIntervalSeconds: 60
           updateMaxFailure: 0
           defaultDecisionSeconds: 60
+          remediationStatusCode: 403
           httpTimeoutSeconds: 10
           crowdsecMode: live
           crowdsecAppsecEnabled: false
@@ -527,7 +543,6 @@ http:
           crowdsecAppsecUnreachableBlock: true
           crowdsecAppsecBodyLimit: 10485760
           crowdsecLapiKey: privateKey-foo
-          crowdsecLapiKeyFile: /etc/traefik/cs-privateKey-foo
           crowdsecLapiScheme: http
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiPath: "/"
@@ -556,7 +571,6 @@ http:
             ...
             Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
             -----END CERTIFICATE-----
-          crowdsecLapiTLSCertificateAuthorityFile: /etc/traefik/crowdsec-certs/ca.pem
           crowdsecLapiTLSCertificateBouncer: |-
             -----BEGIN CERTIFICATE-----
             MIIEHjCCAwagAwIBAgIUOBTs1eqkaAUcPplztUr2xRapvNAwDQYJKoZIhvcNAQEL
@@ -564,25 +578,24 @@ http:
             RaXAnYYUVRblS1jmePemh388hFxbmrpG2pITx8B5FMULqHoj11o2Rl0gSV6tHIHz
             N2U=
             -----END CERTIFICATE-----
-          crowdsecLapiTLSCertificateBouncerFile: /etc/traefik/crowdsec-certs/bouncer.pem
           crowdsecLapiTLSCertificateBouncerKey: |-
             -----BEGIN RSA PRIVATE KEY-----
             MIIEogIBAAKCAQEAtYQnbJqifH+ZymePylDxGGLIuxzcAUU4/ajNj+qRAdI/Ux3d
             ...
             ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
             -----END RSA PRIVATE KEY-----
-          crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem
           captchaProvider: hcaptcha
           captchaSiteKey: FIXME
           captchaSecretKey: FIXME
           captchaGracePeriodSeconds: 1800
           captchaHTMLFilePath: /captcha.html
           banHTMLFilePath: /ban.html
+          metricsUpdateIntervalSeconds: 600
 ```
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CaptchaSiteKey` and `CaptchaSecretKey` can be provided with the content as raw or through a file path that Traefik can read.  
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CaptchaSiteKey`, `CaptchaSecretKey` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:

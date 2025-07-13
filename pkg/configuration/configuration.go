@@ -67,8 +67,10 @@ type Config struct {
 	CrowdsecCapiPasswordFile                 string   `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                    []string `json:"crowdsecCapiScenarios,omitempty"`
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
-	UpdateMaxFailure                         int      `json:"updateMaxFailure,omitempty"`
+	MetricsUpdateIntervalSeconds             int64    `json:"metricsUpdateIntervalSeconds,omitempty"`
+	UpdateMaxFailure                         int64    `json:"updateMaxFailure,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
+	RemediationStatusCode                    int      `json:"remediationStatusCode,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
 	RemediationHeadersCustomName             string   `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName               string   `json:"forwardedHeadersCustomName,omitempty"`
@@ -118,8 +120,10 @@ func New() *Config {
 		CrowdsecLapiKey:                "",
 		CrowdsecLapiTLSInsecureVerify:  false,
 		UpdateIntervalSeconds:          60,
+		MetricsUpdateIntervalSeconds:   600,
 		UpdateMaxFailure:               0,
 		DefaultDecisionSeconds:         60,
+		RemediationStatusCode:          http.StatusForbidden,
 		HTTPTimeoutSeconds:             10,
 		CaptchaProvider:                "",
 		CaptchaSiteKey:                 "",
@@ -339,13 +343,22 @@ func validateParamsRequired(config *Config) error {
 			return fmt.Errorf("%v: cannot be empty", key)
 		}
 	}
-	requiredInt := map[string]int64{
+	requiredInt0 := map[string]int64{
+		"CrowdsecAppsecBodyLimit":      config.CrowdsecAppsecBodyLimit,
+		"MetricsUpdateIntervalSeconds": config.MetricsUpdateIntervalSeconds,
+	}
+	for key, val := range requiredInt0 {
+		if val < 0 {
+			return fmt.Errorf("%v: cannot be less than 0", key)
+		}
+	}
+	requiredInt1 := map[string]int64{
 		"UpdateIntervalSeconds":     config.UpdateIntervalSeconds,
 		"DefaultDecisionSeconds":    config.DefaultDecisionSeconds,
 		"HTTPTimeoutSeconds":        config.HTTPTimeoutSeconds,
 		"CaptchaGracePeriodSeconds": config.CaptchaGracePeriodSeconds,
 	}
-	for key, val := range requiredInt {
+	for key, val := range requiredInt1 {
 		if val < 1 {
 			return fmt.Errorf("%v: cannot be less than 1", key)
 		}
@@ -355,6 +368,9 @@ func validateParamsRequired(config *Config) error {
 	}
 	if config.CrowdsecAppsecBodyLimit < 0 {
 		return errors.New("CrowdsecAppsecBodyLimit: cannot be less than 0")
+	}
+	if config.RemediationStatusCode < 100 || config.RemediationStatusCode >= 600 {
+		return errors.New("RemediationStatusCode: cannot be less than 100 and more than 600")
 	}
 
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
