@@ -465,7 +465,19 @@ make run
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
 - CaptchaProvider
   - string
-  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`
+  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
+- CaptchaCustomJsURL
+  - string
+  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
+-	CaptchaCustomValidateURL
+  - string
+  - If CaptchaProvider is `custom`, URL used to validate the challenge (in case of hcaptcha: `https://api.hcaptcha.com/siteverify`)
+-	CaptchaCustomKey
+  - string
+  - If CaptchaProvider is `custom`, used to set classname of the div used by captcha provider (in case of hcaptcha: `h-captcha`)
+-	CaptchaCustomResponse
+  - string
+  - If CaptchaProvider is `custom`, used to set the field in the validate URL body (in case of hcaptcha: `h-captcha-response`)
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider

@@ -34,7 +34,7 @@ const (
 	HcaptchaProvider  = "hcaptcha"
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
-	WicketkeeperProvider = "wicketkeeper"
+	CustomProvider    = "custom"
 )
 
 // Config the plugin configuration.
@@ -85,6 +85,10 @@ type Config struct {
 	BanHTMLFilePath                          string   `json:"banHtmlFilePath,omitempty"`
 	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
 	CaptchaProvider                          string   `json:"captchaProvider,omitempty"`
+	CaptchaCustomJsURL                string   `json:"captchaCustomJsUrl,omitempty"`
+	CaptchaCustomValidateURL                 string   `json:"captchaCustomValidateURL,omitempty"`
+	CaptchaCustomKey                         string   `json:"captchaCustomKey,omitempty"`
+	CaptchaCustomResponse                    string   `json:"captchaCustomResponse,omitempty"`
 	CaptchaSiteKey                           string   `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                       string   `json:"captchaSiteKeyFile,omitempty"`
 	CaptchaSecretKey                         string   `json:"captchaSecretKey,omitempty"`
@@ -126,6 +130,10 @@ func New() *Config {
 		RemediationStatusCode:          http.StatusForbidden,
 		HTTPTimeoutSeconds:             10,
 		CaptchaProvider:                "",
+		CaptchaCustomJsURL:      "",
+		CaptchaCustomValidateURL:       "",
+		CaptchaCustomKey:               "",
+		CaptchaCustomResponse:          "",
 		CaptchaSiteKey:                 "",
 		CaptchaSecretKey:               "",
 		CaptchaGracePeriodSeconds:      1800,
@@ -194,6 +202,10 @@ func GetHTMLTemplate(path string) (*template.Template, error) {
 //nolint:gocyclo,gocognit
 func ValidateParams(config *Config) error {
 	if err := validateParamsRequired(config); err != nil {
+		return err
+	}
+	
+	if err := validateCaptcha(config); err != nil {
 		return err
 	}
 
@@ -332,6 +344,23 @@ func validateParamsIPs(listIP []string, key string) error {
 	return nil
 }
 
+func validateCaptcha(config *Config) error {
+	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
+		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
+	}
+	if config.CaptchaProvider == CustomProvider {
+		if config.CaptchaCustomKey == "" || config.CaptchaCustomResponse == "" || config.CaptchaCustomValidateURL == "" || config.CaptchaCustomJsURL == "" {
+			return fmt.Errorf(
+				"CaptchaProvider: provider is custom, captchaCustom variables must be filled: CaptchaCustomKey:%s, CaptchaCustomResponse:%s, CaptchaCustomValidateURL:%s, CaptchaCustomJsURL:%s",
+				config.CaptchaCustomKey ,
+				config.CaptchaCustomResponse,
+				config.CaptchaCustomValidateURL,
+				config.CaptchaCustomJsURL,
+			)
+		}
+	}
+}
+
 func validateParamsRequired(config *Config) error {
 	requiredStrings := map[string]string{
 		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
@@ -340,7 +369,7 @@ func validateParamsRequired(config *Config) error {
 	}
 	for key, val := range requiredStrings {
 		if len(val) == 0 {
-			return fmt.Errorf("%v: cannot be empty", key)
+			return errors.New(key + ": cannot be empty")
 		}
 	}
 	requiredInt0 := map[string]int64{
@@ -349,7 +378,7 @@ func validateParamsRequired(config *Config) error {
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
-			return fmt.Errorf("%v: cannot be less than 0", key)
+			return errors.New(key + ": cannot be less than 0", )
 		}
 	}
 	requiredInt1 := map[string]int64{
@@ -360,7 +389,7 @@ func validateParamsRequired(config *Config) error {
 	}
 	for key, val := range requiredInt1 {
 		if val < 1 {
-			return fmt.Errorf("%v: cannot be less than 1", key)
+			return errors.New(key + ": cannot be less than 1", )
 		}
 	}
 	if config.UpdateMaxFailure < -1 {
@@ -378,9 +407,6 @@ func validateParamsRequired(config *Config) error {
 	}
 	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
 		return errors.New("CrowdsecLapiScheme: must be one of 'http' or 'https'")
-	}
-	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, WicketkeeperProvider}, config.CaptchaProvider) {
-		return errors.New("CaptchaProvider: must be one of 'hcaptcha', 'recaptcha', 'turnstile' or 'wicketkeeper'")
 	}
 	return nil
 }

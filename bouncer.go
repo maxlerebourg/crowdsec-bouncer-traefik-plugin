@@ -234,6 +234,17 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
 	tlsConfig2 := new(tls.Config)
 	tlsConfig2.InsecureSkipVerify = true
+
+	var infoProvider *captcha.InfoProvider
+	if config.CaptchaProvider == configuration.CustomProvider {
+		infoProvider = &captcha.InfoProvider{
+			js: config.CaptchaCustomJsURL,
+			validate: config.CaptchaCustomValidateURL,
+			key: config.CaptchaCustomKey,
+			response: config.CaptchaCustomResponse,
+		}
+	}
+
 	err = bouncer.captchaClient.New(
 		log,
 		bouncer.cacheClient,
@@ -245,6 +256,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 			},
 			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
+		infoProvider,
 		config.CaptchaProvider,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
