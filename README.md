@@ -469,13 +469,13 @@ make run
 - CaptchaCustomJsURL
   - string
   - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
--	CaptchaCustomValidateURL
+- CaptchaCustomValidateURL
   - string
   - If CaptchaProvider is `custom`, URL used to validate the challenge (in case of hcaptcha: `https://api.hcaptcha.com/siteverify`)
--	CaptchaCustomKey
+- CaptchaCustomKey
   - string
   - If CaptchaProvider is `custom`, used to set classname of the div used by captcha provider (in case of hcaptcha: `h-captcha`)
--	CaptchaCustomResponse
+- CaptchaCustomResponse
   - string
   - If CaptchaProvider is `custom`, used to set the field in the validate URL body (in case of hcaptcha: `h-captcha-response`)
 - CaptchaSiteKey
