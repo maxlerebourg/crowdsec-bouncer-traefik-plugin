@@ -17,7 +17,6 @@ import (
 // Client Captcha client.
 type Client struct {
 	Valid                   bool
-	provider                string
 	siteKey                 string
 	secretKey               string
 	remediationCustomHeader string
@@ -26,54 +25,51 @@ type Client struct {
 	cacheClient             *cache.Client
 	httpClient              *http.Client
 	log                     *logger.Log
+	infoProvider            *InfoProvider
 }
 
-type infoProvider struct {
+// InfoProvider Information for self-hosted provider.
+type InfoProvider struct {
 	js       string
 	key      string
 	response string
 	validate string
 }
 
-var (
-	//nolint:gochecknoglobals
-	captcha = map[string]infoProvider{
-		configuration.HcaptchaProvider: {
-			js:       "https://hcaptcha.com/1/api.js",
-			key:      "h-captcha",
-			response: "h-captcha-response",
-			validate: "https://api.hcaptcha.com/siteverify",
-		},
-		configuration.RecaptchaProvider: {
-			js:       "https://www.google.com/recaptcha/api.js",
-			key:      "g-recaptcha",
-			response: "g-recaptcha-response",
-			validate: "https://www.google.com/recaptcha/api/siteverify",
-		},
-		configuration.TurnstileProvider: {
-			js:       "https://challenges.cloudflare.com/turnstile/v0/api.js",
-			key:      "cf-turnstile",
-			response: "cf-turnstile-response",
-			validate: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-		},
-		configuration.WicketkeeperProvider: {
-			js:       "https://captcha.max.lan/fast.js",
-			key:      "wicketkeeper",
-			response: "wicketkeeper_solution",
-			validate: "https://captcha.max.lan/v0/siteverify",
-		},
-	}
-)
+//nolint:gochecknoglobals
+var infoProviders = map[string]*InfoProvider{
+	configuration.HcaptchaProvider: &InfoProvider{
+		js:       "https://hcaptcha.com/1/api.js",
+		key:      "h-captcha",
+		response: "h-captcha-response",
+		validate: "https://api.hcaptcha.com/siteverify",
+	},
+	configuration.RecaptchaProvider: &InfoProvider{
+		js:       "https://www.google.com/recaptcha/api.js",
+		key:      "g-recaptcha",
+		response: "g-recaptcha-response",
+		validate: "https://www.google.com/recaptcha/api/siteverify",
+	},
+	configuration.TurnstileProvider: &InfoProvider{
+		js:       "https://challenges.cloudflare.com/turnstile/v0/api.js",
+		key:      "cf-turnstile",
+		response: "cf-turnstile-response",
+		validate: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+	},
+}
 
 // New Initialize captcha client.
-func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, infoProvider *InfoProvider, provider, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
 	}
+	c.infoProvider = infoProvider
+	if c.infoProvider == nil {
+		c.infoProvider = infoProviders[provider]
+	}
 	c.siteKey = siteKey
 	c.secretKey = secretKey
-	c.provider = provider
 	c.remediationCustomHeader = remediationCustomHeader
 	html, _ := configuration.GetHTMLTemplate(captchaTemplatePath)
 	c.captchaTemplate = html
@@ -105,8 +101,8 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	rw.WriteHeader(http.StatusOK)
 	err = c.captchaTemplate.Execute(rw, map[string]string{
 		"SiteKey":     c.siteKey,
-		"FrontendJS":  captcha[c.provider].js,
-		"FrontendKey": captcha[c.provider].key,
+		"FrontendJS":  c.infoProvider.js,
+		"FrontendKey": c.infoProvider.key,
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
@@ -131,7 +127,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
 	}
-	var response = r.FormValue(captcha[c.provider].response)
+	var response = r.FormValue(c.infoProvider.response)
 	if response == "" {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
@@ -139,7 +135,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	var body = url.Values{}
 	body.Add("secret", c.secretKey)
 	body.Add("response", response)
-	res, err := c.httpClient.PostForm(captcha[c.provider].validate, body)
+	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
 	if err != nil {
 		return false, err
 	}
