@@ -232,16 +232,14 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	)
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
-	tlsConfig2 := new(tls.Config)
-	tlsConfig2.InsecureSkipVerify = true
 
 	var infoProvider *captcha.InfoProvider
 	if config.CaptchaProvider == configuration.CustomProvider {
 		infoProvider = &captcha.InfoProvider{
-			js: config.CaptchaCustomJsURL,
-			validate: config.CaptchaCustomValidateURL,
-			key: config.CaptchaCustomKey,
+			js:       config.CaptchaCustomJsURL,
+			key:      config.CaptchaCustomKey,
 			response: config.CaptchaCustomResponse,
+			validate: config.CaptchaCustomValidateURL,
 		}
 	}
 
@@ -249,11 +247,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		log,
 		bouncer.cacheClient,
 		&http.Client{
-			Transport: &http.Transport{
-				MaxIdleConns: 10,
-				IdleConnTimeout: 30 * time.Second,
-				TLSClientConfig: tlsConfig2,
-			},
+			Transport: &http.Transport{MaxIdleConns: 10, IdleConnTimeout: 30 * time.Second},
 			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
 		infoProvider,
