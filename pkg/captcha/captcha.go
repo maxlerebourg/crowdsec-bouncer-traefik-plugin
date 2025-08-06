@@ -38,19 +38,19 @@ type InfoProvider struct {
 
 //nolint:gochecknoglobals
 var infoProviders = map[string]*InfoProvider{
-	configuration.HcaptchaProvider: &InfoProvider{
+	configuration.HcaptchaProvider: {
 		js:       "https://hcaptcha.com/1/api.js",
 		key:      "h-captcha",
 		response: "h-captcha-response",
 		validate: "https://api.hcaptcha.com/siteverify",
 	},
-	configuration.RecaptchaProvider: &InfoProvider{
+	configuration.RecaptchaProvider: {
 		js:       "https://www.google.com/recaptcha/api.js",
 		key:      "g-recaptcha",
 		response: "g-recaptcha-response",
 		validate: "https://www.google.com/recaptcha/api/siteverify",
 	},
-	configuration.TurnstileProvider: &InfoProvider{
+	configuration.TurnstileProvider: {
 		js:       "https://challenges.cloudflare.com/turnstile/v0/api.js",
 		key:      "cf-turnstile",
 		response: "cf-turnstile-response",
