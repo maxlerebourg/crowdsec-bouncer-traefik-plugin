@@ -86,7 +86,7 @@ type Config struct {
 	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
 	CaptchaProvider                          string   `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                       string   `json:"captchaCustomJsUrl,omitempty"`
-	CaptchaCustomValidateURL                 string   `json:"captchaCustomValidateURL,omitempty"`
+	CaptchaCustomValidateURL                 string   `json:"captchaCustomValidateUrl,omitempty"`
 	CaptchaCustomKey                         string   `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                    string   `json:"captchaCustomResponse,omitempty"`
 	CaptchaSiteKey                           string   `json:"captchaSiteKey,omitempty"`
@@ -359,6 +359,7 @@ func validateCaptcha(config *Config) error {
 			)
 		}
 	}
+	return nil
 }
 
 func validateParamsRequired(config *Config) error {
