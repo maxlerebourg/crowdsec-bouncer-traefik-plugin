@@ -359,6 +359,7 @@ func validateCaptcha(config *Config) error {
 			)
 		}
 	}
+	return nil
 }
 
 func validateParamsRequired(config *Config) error {
