@@ -294,12 +294,7 @@
         <h1 class="text-2xl lg:text-3xl xl:text-4xl">CrowdSec Captcha</h1>
       </div>
       <form action="" method="POST" class="flex flex-col items-center space-y-1" id="captcha-form">
-        <div
-          id="captcha"
-          class="{{ .FrontendKey }}"
-          data-sitekey="{{ .SiteKey }}"
-          data-callback="captchaCallback"
-        >
+        <div id="captcha" class="{{ .FrontendKey }}" data-sitekey="{{ .SiteKey }}" data-callback="captchaCallback">
         </div>
       </form>
       <div class="flex justify-center flex-wrap">

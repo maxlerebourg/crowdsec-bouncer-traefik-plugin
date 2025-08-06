@@ -85,7 +85,7 @@ type Config struct {
 	BanHTMLFilePath                          string   `json:"banHtmlFilePath,omitempty"`
 	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
 	CaptchaProvider                          string   `json:"captchaProvider,omitempty"`
-	CaptchaCustomJsURL                string   `json:"captchaCustomJsUrl,omitempty"`
+	CaptchaCustomJsURL                       string   `json:"captchaCustomJsUrl,omitempty"`
 	CaptchaCustomValidateURL                 string   `json:"captchaCustomValidateURL,omitempty"`
 	CaptchaCustomKey                         string   `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                    string   `json:"captchaCustomResponse,omitempty"`
@@ -130,7 +130,7 @@ func New() *Config {
 		RemediationStatusCode:          http.StatusForbidden,
 		HTTPTimeoutSeconds:             10,
 		CaptchaProvider:                "",
-		CaptchaCustomJsURL:      "",
+		CaptchaCustomJsURL:             "",
 		CaptchaCustomValidateURL:       "",
 		CaptchaCustomKey:               "",
 		CaptchaCustomResponse:          "",
@@ -204,7 +204,7 @@ func ValidateParams(config *Config) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err
 	}
-	
+
 	if err := validateCaptcha(config); err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func validateCaptcha(config *Config) error {
 		if config.CaptchaCustomKey == "" || config.CaptchaCustomResponse == "" || config.CaptchaCustomValidateURL == "" || config.CaptchaCustomJsURL == "" {
 			return fmt.Errorf(
 				"CaptchaProvider: provider is custom, captchaCustom variables must be filled: CaptchaCustomKey:%s, CaptchaCustomResponse:%s, CaptchaCustomValidateURL:%s, CaptchaCustomJsURL:%s",
-				config.CaptchaCustomKey ,
+				config.CaptchaCustomKey,
 				config.CaptchaCustomResponse,
 				config.CaptchaCustomValidateURL,
 				config.CaptchaCustomJsURL,
@@ -378,7 +378,7 @@ func validateParamsRequired(config *Config) error {
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
-			return errors.New(key + ": cannot be less than 0", )
+			return errors.New(key + ": cannot be less than 0")
 		}
 	}
 	requiredInt1 := map[string]int64{
@@ -389,7 +389,7 @@ func validateParamsRequired(config *Config) error {
 	}
 	for key, val := range requiredInt1 {
 		if val < 1 {
-			return errors.New(key + ": cannot be less than 1", )
+			return errors.New(key + ": cannot be less than 1")
 		}
 	}
 	if config.UpdateMaxFailure < -1 {

@@ -58,16 +58,24 @@ var infoProviders = map[string]*InfoProvider{
 	},
 }
 
+// GetInfoProvider Get InfoProvider.
+func GetInfoProvider(provider, js, key, response, validate string) *InfoProvider {
+	var infoProvider InfoProvider
+	if provider == configuration.CustomProvider {
+		infoProvider = &captcha.InfoProvider{js, key, response, validate}
+	} else {
+		infoProvider = infoProviders[provider]
+	}
+	return infoProvider
+}
+
 // New Initialize captcha client.
-func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, infoProvider *InfoProvider, provider, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, infoProvider *InfoProvider, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
 	}
 	c.infoProvider = infoProvider
-	if c.infoProvider == nil {
-		c.infoProvider = infoProviders[provider]
-	}
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.remediationCustomHeader = remediationCustomHeader
