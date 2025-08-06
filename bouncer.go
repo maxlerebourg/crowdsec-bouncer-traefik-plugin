@@ -233,16 +233,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
 
-	var infoProvider *captcha.InfoProvider
-	if config.CaptchaProvider == configuration.CustomProvider {
-		infoProvider = &captcha.InfoProvider{
-			js:       config.CaptchaCustomJsURL,
-			key:      config.CaptchaCustomKey,
-			response: config.CaptchaCustomResponse,
-			validate: config.CaptchaCustomValidateURL,
-		}
-	}
-
 	err = bouncer.captchaClient.New(
 		log,
 		bouncer.cacheClient,
@@ -250,7 +240,13 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 			Transport: &http.Transport{MaxIdleConns: 10, IdleConnTimeout: 30 * time.Second},
 			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
-		infoProvider,
+		captcha.GetInfoProvider(
+			config.CaptchaProvider,
+			config.CaptchaCustomJsURL,
+			config.CaptchaCustomKey,
+			config.CaptchaCustomResponse,
+			config.CaptchaCustomValidateURL,
+		),
 		config.CaptchaProvider,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
