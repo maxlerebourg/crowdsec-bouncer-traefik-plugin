@@ -41,13 +41,16 @@ run_tlsauth:
 	docker compose -f examples/tls-auth/docker-compose.yml up  -d --remove-orphans
 
 run_appsec:
-	docker compose -f examples/appsec-enabled/docker-compose.yml up -d
+	docker compose -f examples/appsec-enabled/docker-compose.yml up -d --remove-orphans
+
+run_custom_captcha:
+	docker compose -f examples/custo-captcha/docker-compose.yml up -d --remove-orphans
 
 run_captcha:
-	docker compose -f examples/captcha/docker-compose.yml up -d
+	docker compose -f examples/captcha/docker-compose.yml up -d --remove-orphans
 
 run_custom_ban_page:
-	docker compose -f examples/custom-ban-page/docker-compose.yml up -d
+	docker compose -f examples/custom-ban-page/docker-compose.yml up -d --remove-orphans
 
 run:
 	docker compose -f docker-compose.yml up -d --remove-orphans
