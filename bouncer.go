@@ -252,6 +252,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CaptchaGracePeriodSeconds,
 	)
 	if err != nil {
+		log.Error("CaptchaClient not valid " + err.Error())
 		return nil, err
 	}
 

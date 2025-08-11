@@ -39,6 +39,7 @@ The following captcha providers are supported now:
 - [hcaptcha](https://www.hcaptcha.com/)
 - [recaptcha](https://www.google.com/recaptcha/about/)
 - [turnstile](https://www.cloudflare.com/products/turnstile/)
+- [custom/wicketkeeper](https://github.com/a-ve/wicketkeeper)
 
 There are 5 operating modes (CrowdsecMode) for this plugin:
 
@@ -701,6 +702,8 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 #### 9. Using Traefik with Captcha remediation feature enabled [examples/captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/captcha/README.md)
 
 #### 10. Using Traefik with Custom Ban HTML Page [examples/custom-ban-page/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-ban-page/README.md)
+
+#### 11. Using Traefik with Custom Captcha Whiketkeeper[examples/custom-captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-captcha/README.md)
 
 ### Local Mode
 

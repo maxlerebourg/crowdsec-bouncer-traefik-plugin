@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.0.0"
+    image: "traefik:v3.5.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -11,14 +11,15 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.forwardedheaders.trustedips=172.18.0.0/24"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
       - "--experimental.plugins.bouncer.version=v1.4.5"
       # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - logs-captcha-enabled:/var/log/traefik
-      - './captcha.html:/captcha.html'
+      - logs-custom-captcha-enabled:/var/log/traefik
+      - "./captcha.html:/captcha.html"
       # - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 8000:80
@@ -26,14 +27,14 @@ services:
     depends_on:
       - crowdsec
 
-  whoami:
+  whoami-foo:
     image: traefik/whoami
-    container_name: "whoaami"
+    container_name: "simple-service-custom-captcha-foo"
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router-foo.rule=Host(`localhost`)"
+      - "traefik.http.routers.router-foo.rule=PathPrefix(`/foo`)"
       - "traefik.http.routers.router-foo.entrypoints=web"
       - "traefik.http.routers.router-foo.middlewares=crowdsec@docker"
       # Definition of the service
@@ -42,18 +43,19 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-     
+
       # Choose captcha provider
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=custom"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsURL=http://captcha.localhost:8080/fast.js"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://captcha.localhost:8080/v0/siteverify"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketpeeker"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=response"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsURL=http://captcha.localhost:8000/fast.js"
+      # Inside Traefik container the plugin must be able to reach wicketkeeper service so we can go through a Traefik localhost
+      # domain which would resolve traefik itself and the port for the dashboard
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
       # Define captcha grade period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
       # Define captcha HTML file path
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
-
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.1-2
@@ -65,39 +67,44 @@ services:
       BOUNCER_KEY_TRAEFIK_DEV: 40796d93c2958f9e58345514e67740e5
     volumes:
       # For captcha and ban mixed decision
-      - './profiles.yaml:/etc/crowdsec/profiles.yaml:ro' 
+      - "./profiles.yaml:/etc/crowdsec/profiles.yaml:ro"
       # For captcha only remediation
       # - './profiles_captcha_only.yaml:/etc/crowdsec/profiles.yaml:ro'
-      - './acquis.yaml:/etc/crowdsec/acquis.yaml:ro'
-      - logs-captcha-enabled:/var/log/traefik:ro
-      - crowdsec-db-captcha-enabled:/var/lib/crowdsec/data/
-      - crowdsec-config-captcha-enabled:/etc/crowdsec/
+      - "./acquis.yaml:/etc/crowdsec/acquis.yaml:ro"
+      - logs-custom-captcha-enabled:/var/log/traefik:ro
+      - crowdsec-db-custom-captcha-enabled:/var/lib/crowdsec/data/
+      - crowdsec-config-custom-captcha-enabled:/etc/crowdsec/
     labels:
       - "traefik.enable=false"
 
   wicketkeeper:
-    image: ghcr.io/a-ve/wicketkeeper:latest
+    image: ghcr.io/maxlerebourg/wicketkeeper:latest
     container_name: "wicketkeeper"
     environment:
-      - ROOT_URL=http://localhost:8080
+      - ROOT_URL=http://captcha.localhost:8000
       - LISTEN_PORT=8080
       - REDIS_ADDR=redis:6379
       - DIFFICULTY=4
       - ALLOWED_ORIGINS=*
+      - PRIVATE_KEY_PATH=/data/wicketkeeper.key
+    volumes:
+      - wicketkeeper-custom-captcha-enabled:/data
+    user: root
     labels:
       - "traefik.enable=true"
       # Definition of the router
       - "traefik.http.routers.router-wicketpeeker.rule=Host(`captcha.localhost`)"
       - "traefik.http.routers.router-wicketpeeker.entrypoints=web"
       # Definition of the service
-      - "traefik.http.services.service-foo.loadbalancer.server.port=8080"
+      - "traefik.http.services.service-whitekeeper.loadbalancer.server.port=8080"
     depends_on:
       - redis
 
   redis:
     image: redis/redis-stack-server:latest
-  
+
 volumes:
-  logs-captcha-enabled:
-  crowdsec-db-captcha-enabled:
-  crowdsec-config-captcha-enabled:
+  logs-custom-captcha-enabled:
+  wicketkeeper-custom-captcha-enabled:
+  crowdsec-db-custom-captcha-enabled:
+  crowdsec-config-custom-captcha-enabled:
