@@ -11,8 +11,8 @@ Minimal API requirement:
 
 - the JS file URL to load the captcha on the served `captcha.html`
 - the HTML className to tell to the JS where to display the challenge
-- the verify URL endpoint to send the response from the captcha
-- the name of the field in the verify URL
+- the verify URL endpoint to send the field `response` from the captcha with `content-type: application/x-www-form-urlencoded`
+- the name of the field when you POST the resolved captcha to Traefik
 
 - the JS file need to respect the `data-callback` on the div that contains the captcha if you use our template, but you can customize it by your side
 

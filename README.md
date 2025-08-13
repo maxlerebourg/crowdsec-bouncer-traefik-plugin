@@ -475,10 +475,10 @@ make run
   - If CaptchaProvider is `custom`, URL used to validate the challenge (in case of hcaptcha: `https://api.hcaptcha.com/siteverify`)
 - CaptchaCustomKey
   - string
-  - If CaptchaProvider is `custom`, used to set classname of the div used by captcha provider (in case of hcaptcha: `h-captcha`)
+  - If CaptchaProvider is `custom`, used to set class name of the div used by captcha provider (in case of hcaptcha: `h-captcha`)
 - CaptchaCustomResponse
   - string
-  - If CaptchaProvider is `custom`, used to set the field in the validate URL body (in case of hcaptcha: `h-captcha-response`)
+  - If CaptchaProvider is `custom`, used to set the field in the POST body from the captcha.html to Traefik (in case of hcaptcha: `h-captcha-response`)
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider

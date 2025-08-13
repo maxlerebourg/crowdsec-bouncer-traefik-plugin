@@ -78,7 +78,7 @@ services:
       - "traefik.enable=false"
 
   wicketkeeper:
-    image: ghcr.io/maxlerebourg/wicketkeeper:latest
+    image: ghcr.io/a-ve/wicketkeeper:latest
     container_name: "wicketkeeper"
     environment:
       - ROOT_URL=http://captcha.localhost:8000
@@ -86,7 +86,7 @@ services:
       - REDIS_ADDR=redis:6379
       - DIFFICULTY=4
       - ALLOWED_ORIGINS=*
-      - PRIVATE_KEY_PATH=/data/wicketkeeper.key
+      - PRIVATE_KEY_PATH=/data/wicketkeeper.key # To override in production environment
     volumes:
       - wicketkeeper-custom-captcha-enabled:/data
     user: root
