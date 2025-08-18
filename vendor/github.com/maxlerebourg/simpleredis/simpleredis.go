@@ -117,7 +117,7 @@ func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) redisCmd {
 				str := string(read)
 				if strings.Contains(str, "-NOAUTH") {
 					return redisCmd{Error: fmt.Errorf(RedisNoAuth)}
-				} else if str != "$1" {
+				} else if str == "$-1" {
 					return redisCmd{Error: fmt.Errorf(RedisMiss)}
 				}
 				read, _ = reader.ReadLineBytes()

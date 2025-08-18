@@ -1,6 +1,6 @@
 # github.com/leprosus/golang-ttl-map v1.1.7
 ## explicit; go 1.15
 github.com/leprosus/golang-ttl-map
-# github.com/maxlerebourg/simpleredis v1.0.11
+# github.com/maxlerebourg/simpleredis v1.0.12
 ## explicit; go 1.22
 github.com/maxlerebourg/simpleredis
