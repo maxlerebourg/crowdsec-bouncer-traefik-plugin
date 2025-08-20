@@ -71,16 +71,16 @@ restart_trustedips:
 	docker compose -f examples/trusted-ips/docker-compose.yml restart
 
 restart_tlsauth:
-	docker compose -f examples/tls-auth/docker-compose.yml
+	docker compose -f examples/tls-auth/docker-compose.yml restart
 
 restart_appsec:
-	docker compose -f examples/tls-auth/docker-compose.yml
+	docker compose -f examples/tls-auth/docker-compose.yml restart
 
 restart_captcha:
-	docker compose -f examples/captcha/docker-compose.yml
+	docker compose -f examples/captcha/docker-compose.yml restart
 
 restart_custombanpage:
-	docker compose -f examples/custom-ban-page/docker-compose.yml
+	docker compose -f examples/custom-ban-page/docker-compose.yml restart
 
 show_logs:
 	docker compose -f docker-compose.yml restart
