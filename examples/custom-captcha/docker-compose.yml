@@ -78,7 +78,8 @@ services:
       - "traefik.enable=false"
 
   wicketkeeper:
-    image: ghcr.io/a-ve/wicketkeeper:latest
+    # Until https://github.com/a-ve/wicketkeeper/issues/15, use maxlerebourg's fork image
+    image: ghcr.io/maxlerebourg/wicketkeeper:latest
     container_name: "wicketkeeper"
     environment:
       - ROOT_URL=http://captcha.localhost:8000
