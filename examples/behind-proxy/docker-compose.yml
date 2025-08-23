@@ -4,7 +4,7 @@ services:
     container_name: "cloudflare"
     restart: unless-stopped
     command:
-      - "--log.level=DEBUG"
+      # - "--log.level=DEBUG"
       - "--accesslog"
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--api.insecure=true"
@@ -22,7 +22,7 @@ services:
     container_name: "traefik"
     restart: unless-stopped
     command:
-      - "--log.level=DEBUG"
+      # - "--log.level=DEBUG"
       - "--accesslog"
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--api.insecure=true"
@@ -33,7 +33,7 @@ services:
       - "--entryPoints.web.proxyProtocol.trustedIPs=172.0.0.0/8"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.4.4"
+      - "--experimental.plugins.bouncer.version=v1.3.0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-traefik:/var/log/traefik
