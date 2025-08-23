@@ -5,7 +5,7 @@ http:
       entryPoints:
       - web
       service: traefik
-      rule: Host(`localhost`)
+      rule: Path(`/foo`) || Path(`/bar`)
 
   # Add the service
   services:
