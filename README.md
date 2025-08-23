@@ -318,6 +318,10 @@ make run
 > Overall, this middleware is designed in such a way that **only one instance of the plugin is *possible*.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, CrowdsecAppsecEnabled, etc.)
 
 > [!WARNING]  
+> **ForwardedHeadersCustomName new default value is X-Real-Ip**
+> *Be careful when you upgrade to >1.5.x*  
+
+> [!WARNING]  
 > **Appsec maximum body limit is defaulted to 10MB**
 > *Be careful when you upgrade to >1.4.x*
 
@@ -408,7 +412,7 @@ make run
   - Name of the header you want in response when request are cancelled (possible value of the header `ban` or `captcha`)
 - ForwardedHeadersCustomName
   - string
-  - default: "X-Forwarded-For"
+  - default: "X-Real-Ip"
   - Name of the header where the real IP of the client should be retrieved
 - ForwardedHeadersTrustedIPs
   - []string

@@ -1,15 +1,15 @@
 http:
   # Add the router
   routers:
-    router0:
+    traefik:
       entryPoints:
       - web
-      service: service-foo
-      rule: Path(`/foo`)
+      service: traefik
+      rule: Host(`localhost`)
 
   # Add the service
   services:
-    service-foo:
+    traefik:
       loadBalancer:
         servers:
-        - url: http://traefik/foo:80
+        - url: http://traefik:80

@@ -131,7 +131,7 @@ func New() *Config {
 		CaptchaHTMLFilePath:            "/captcha.html",
 		BanHTMLFilePath:                "",
 		RemediationHeadersCustomName:   "",
-		ForwardedHeadersCustomName:     "X-Forwarded-For",
+		ForwardedHeadersCustomName:     "X-Real-Ip",
 		ForwardedHeadersTrustedIPs:     []string{},
 		ClientTrustedIPs:               []string{},
 		RedisCacheEnabled:              false,
