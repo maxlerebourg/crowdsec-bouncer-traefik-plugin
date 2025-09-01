@@ -232,7 +232,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	)
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
-
 	err = bouncer.captchaClient.New(
 		log,
 		bouncer.cacheClient,

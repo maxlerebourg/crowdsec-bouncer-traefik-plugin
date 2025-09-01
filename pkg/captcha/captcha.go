@@ -28,8 +28,8 @@ type Client struct {
 	infoProvider            *InfoProvider
 }
 
-// InfoProvider Information for self-hosted provider.
-type InfoProvider struct {
+// Information for self-hosted provider.
+type infoProvider struct {
 	js       string
 	key      string
 	response string
@@ -37,7 +37,7 @@ type InfoProvider struct {
 }
 
 //nolint:gochecknoglobals
-var infoProviders = map[string]*InfoProvider{
+var infoProviders = map[string]*infoProvider{
 	configuration.HcaptchaProvider: {
 		js:       "https://hcaptcha.com/1/api.js",
 		key:      "h-captcha",
@@ -64,9 +64,9 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 	if !c.Valid {
 		return nil
 	}
-	var infoProvider *InfoProvider
+	var infoProvider *infoProvider
 	if provider == configuration.CustomProvider {
-		infoProvider = &InfoProvider{js: js, key: key, response: response, validate: validate}
+		infoProvider = &infoProvider{js: js, key: key, response: response, validate: validate}
 	} else {
 		infoProvider = infoProviders[provider]
 	}
