@@ -25,7 +25,7 @@ type Client struct {
 	cacheClient             *cache.Client
 	httpClient              *http.Client
 	log                     *logger.Log
-	infoProvider            *InfoProvider
+	infoProvider            *infoProvider
 }
 
 // Information for self-hosted provider.
@@ -64,13 +64,13 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 	if !c.Valid {
 		return nil
 	}
-	var infoProvider *infoProvider
+	var info *infoProvider
 	if provider == configuration.CustomProvider {
-		infoProvider = &infoProvider{js: js, key: key, response: response, validate: validate}
+		info = &infoProvider{js: js, key: key, response: response, validate: validate}
 	} else {
-		infoProvider = infoProviders[provider]
+		info = infoProviders[provider]
 	}
-	c.infoProvider = infoProvider
+	c.infoProvider = info
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.remediationCustomHeader = remediationCustomHeader

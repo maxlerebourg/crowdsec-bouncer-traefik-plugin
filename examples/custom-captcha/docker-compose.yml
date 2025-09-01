@@ -40,9 +40,10 @@ services:
       # Definition of the service
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       # Definition of the middleware
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
 
       # Choose captcha provider
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=custom"
