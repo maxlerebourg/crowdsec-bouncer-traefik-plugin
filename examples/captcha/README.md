@@ -20,7 +20,7 @@ For now 3 captcha providers are supported:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSiteKey=FIXME"
       # Define captcha secret key
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=FIXME"
-      # Define captcha grade period seconds
+      # Define captcha grace period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
       # Define captcha HTML file path
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"

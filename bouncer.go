@@ -240,6 +240,10 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
 		config.CaptchaProvider,
+		config.CaptchaCustomJsURL,
+		config.CaptchaCustomKey,
+		config.CaptchaCustomResponse,
+		config.CaptchaCustomValidateURL,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
 		config.RemediationHeadersCustomName,
@@ -247,6 +251,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CaptchaGracePeriodSeconds,
 	)
 	if err != nil {
+		log.Error("CaptchaClient not valid " + err.Error())
 		return nil, err
 	}
 

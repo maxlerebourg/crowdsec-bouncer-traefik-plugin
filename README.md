@@ -39,6 +39,7 @@ The following captcha providers are supported now:
 - [hcaptcha](https://www.hcaptcha.com/)
 - [recaptcha](https://www.google.com/recaptcha/about/)
 - [turnstile](https://www.cloudflare.com/products/turnstile/)
+- [custom/wicketkeeper](https://github.com/a-ve/wicketkeeper)
 
 There are 5 operating modes (CrowdsecMode) for this plugin:
 
@@ -465,7 +466,19 @@ make run
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
 - CaptchaProvider
   - string
-  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`
+  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
+- CaptchaCustomJsURL
+  - string
+  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
+- CaptchaCustomValidateURL
+  - string
+  - If CaptchaProvider is `custom`, URL used to validate the challenge (in case of hcaptcha: `https://api.hcaptcha.com/siteverify`)
+- CaptchaCustomKey
+  - string
+  - If CaptchaProvider is `custom`, used to set class name of the div used by captcha provider (in case of hcaptcha: `h-captcha`)
+- CaptchaCustomResponse
+  - string
+  - If CaptchaProvider is `custom`, used to set the field in the POST body from the captcha.html to Traefik (in case of hcaptcha: `h-captcha-response`)
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider
@@ -689,6 +702,8 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 #### 9. Using Traefik with Captcha remediation feature enabled [examples/captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/captcha/README.md)
 
 #### 10. Using Traefik with Custom Ban HTML Page [examples/custom-ban-page/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-ban-page/README.md)
+
+#### 11. Using Traefik with Custom Captcha Whiketkeeper[examples/custom-captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-captcha/README.md)
 
 ### Local Mode
 
