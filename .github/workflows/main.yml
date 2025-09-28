@@ -117,7 +117,9 @@ jobs:
           echo "=== Traefik logs ==="
           docker logs traefik-test 2>/dev/null || echo "No Traefik container logs"
           echo "=== Traefik Access Logs ==="
-          docker exec traefik-test cat /var/log/traefik/access.log 2>/dev/null || echo "No Traefik access logs"
+          docker exec traefik-test cat /var/log/traefik/access.log 2>/dev/null || echo "No current Traefik access logs"
+          echo "=== Traefik Access Logs Backup (from test runs) ==="
+          docker exec traefik-test cat /var/log/traefik/access.log.bak 2>/dev/null || echo "No Traefik access logs backup"
           echo "=== Whoami logs ==="
           docker logs whoami-test 2>/dev/null || echo "No Whoami container logs"
 

@@ -271,7 +271,7 @@ function Get-TraefikAccessLogs {
     }
 }
 
-# Helper function to clear Traefik access logs
+# Helper function to clear Traefik access logs (with backup for CI debugging)
 function Clear-TraefikAccessLogs {
     param(
         [string]$ContainerName = "traefik-test",
@@ -279,6 +279,11 @@ function Clear-TraefikAccessLogs {
     )
     
     Write-Host "🧹 Clearing Traefik access logs..." -ForegroundColor Yellow
+    
+    # Append current log contents to backup for CI debugging before clearing
+    docker exec $ContainerName sh -c "cat $LogPath >> ${LogPath}.bak 2>/dev/null || touch ${LogPath}.bak" 2>$null
+    
+    # Clear the main log file
     docker exec $ContainerName sh -c "echo '' > $LogPath" 2>$null
 }
 
