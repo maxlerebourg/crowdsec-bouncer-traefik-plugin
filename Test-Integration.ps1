@@ -10,7 +10,7 @@
     and then cleans up the services.
 
 .PARAMETER SkipDockerCleanup
-    Skip stopping Docker services after tests complete (useful for debugging)
+    Skip stopping Docker services after tests complete (useful for debugging and CI log collection)
 
 .PARAMETER SkipWait
     Skip waiting for services to be ready (assumes they're already running)

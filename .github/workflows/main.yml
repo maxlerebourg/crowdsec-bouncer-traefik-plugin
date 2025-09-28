@@ -104,8 +104,8 @@ jobs:
       - name: Run Integration Tests
         shell: pwsh
         run: |
-          # Run the integration test script
-          ./Test-Integration.ps1 -HttpTimeoutSeconds 60
+          # Run the integration test script (skip cleanup for log collection on failure)
+          ./Test-Integration.ps1 -HttpTimeoutSeconds 60 -SkipDockerCleanup
 
       - name: Show logs on failure
         if: failure()
@@ -116,6 +116,8 @@ jobs:
           docker logs crowdsec-test 2>/dev/null || echo "No CrowdSec container logs"
           echo "=== Traefik logs ==="
           docker logs traefik-test 2>/dev/null || echo "No Traefik container logs"
+          echo "=== Traefik Access Logs ==="
+          docker exec traefik-test cat /var/log/traefik/access.log 2>/dev/null || echo "No Traefik access logs"
           echo "=== Whoami logs ==="
           docker logs whoami-test 2>/dev/null || echo "No Whoami container logs"
 

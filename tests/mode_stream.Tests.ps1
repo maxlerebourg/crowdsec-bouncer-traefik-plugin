@@ -48,8 +48,8 @@ Describe "CrowdSec Bouncer Stream Mode Tests" {
             # Add a decision for the client IP that will be seen by the stream mode bouncer
             Add-TestDecision -IP $script:TestIPs.BannedIP -Type "ban"
             
-            # Stream mode initial sync can take very long, so use generous timeout
-            $result = Wait-ForCondition -Description "Stream mode to block IP $($script:TestIPs.BannedIP)" -TimeoutSeconds 120 -RetryIntervalSeconds 3 -Condition {
+            # Stream mode initial sync can take time, but keep timeout reasonable
+            $result = Wait-ForCondition -Description "Stream mode to block IP $($script:TestIPs.BannedIP)" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/stream" -IP $script:TestIPs.BannedIP -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }
@@ -60,7 +60,7 @@ Describe "CrowdSec Bouncer Stream Mode Tests" {
             Remove-TestDecision -IP $script:TestIPs.BannedIP
             
             # Wait for stream mode to allow the IP again (should be faster after initial sync)
-            $result = Wait-ForCondition -Description "Stream mode to allow IP $($script:TestIPs.BannedIP) after decision removal" -TimeoutSeconds 60 -RetryIntervalSeconds 3 -Condition {
+            $result = Wait-ForCondition -Description "Stream mode to allow IP $($script:TestIPs.BannedIP) after decision removal" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/stream" -IP $script:TestIPs.BannedIP -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -eq 200)
             }
@@ -74,7 +74,7 @@ Describe "CrowdSec Bouncer Stream Mode Tests" {
                 Add-TestDecision -IP $script:TestIPs.BannedIP -Type "ban"
                 
                 # Wait for stream mode to block the IP (initial sync can be slow)
-                $result = Wait-ForCondition -Description "Stream mode to block IP" -TimeoutSeconds 90 -RetryIntervalSeconds 2 -Silent -Condition {
+                $result = Wait-ForCondition -Description "Stream mode to block IP" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Silent -Condition {
                     $response = Test-HttpRequest -Endpoint "/stream" -IP $script:TestIPs.BannedIP -TraefikUrl $script:TraefikUrl
                     return ($response.StatusCode -in @(403, 429))
                 }
