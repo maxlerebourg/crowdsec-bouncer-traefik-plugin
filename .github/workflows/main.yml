@@ -70,3 +70,61 @@ jobs:
         run: make yaegi_test
         env:
           GOPATH: ${{ github.workspace }}/go
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install PowerShell and Pester
+        run: |
+          # Set non-interactive mode to avoid prompts
+          export DEBIAN_FRONTEND=noninteractive
+          
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https software-properties-common
+          
+          # Download and install Microsoft signing key and repository
+          wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
+          
+          # Use dpkg with force-confdef and force-confold to handle config conflicts automatically
+          sudo dpkg --force-confdef --force-confold -i packages-microsoft-prod.deb
+          
+          sudo apt-get update
+          sudo apt-get install -y powershell
+          
+          # Install Pester testing framework
+          pwsh -c "Install-Module -Name Pester -Force -Scope CurrentUser -SkipPublisherCheck"
+
+      - name: Run Integration Tests
+        shell: pwsh
+        run: |
+          # Run the integration test script
+          ./Test-Integration.ps1 -TestMode all -HttpTimeoutSeconds 60
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== CrowdSec logs ==="
+          docker compose -f docker-compose.test.yml logs crowdsec 2>/dev/null || echo "No CrowdSec logs"
+          echo "=== Traefik logs ==="
+          docker compose -f docker-compose.test.yml logs traefik 2>/dev/null || echo "No Traefik logs"
+          echo "=== Whoami logs ==="
+          docker compose -f docker-compose.test.yml logs whoami 2>/dev/null || echo "No Whoami logs"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v --remove-orphans
