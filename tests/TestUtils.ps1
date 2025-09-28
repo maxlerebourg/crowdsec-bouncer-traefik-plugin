@@ -327,3 +327,14 @@ function Find-TraefikLogEntry {
         LogEntry = $null
     }
 }
+
+# Helper function to remove all decisions using cscli
+function Remove-AllTestDecisions {
+    docker exec crowdsec-test cscli decisions delete --all 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "⚠️ Failed to remove all decisions" -ForegroundColor Yellow
+    } else {
+        Write-Host "✅ Removed all decisions" -ForegroundColor Green
+    }
+    return $true
+}

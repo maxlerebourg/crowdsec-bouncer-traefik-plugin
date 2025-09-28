@@ -36,19 +36,15 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
     Context "Captcha Remediation Tests" -Tag "captcha" {
         
         BeforeEach {
-            # Clear Traefik access logs for clean test isolation
             Clear-TraefikAccessLogs
-            # Clean up any existing decisions
-            foreach ($ip in $script:TestIPs.Values) {
-                try { Remove-TestDecision -IP $ip } catch { }
-            }
+            Remove-AllTestDecisions
         }
         
         It "Should show captcha remediation for captcha decision" {
-            # Add captcha decision for the IP the bouncer actually sees
-            Add-TestDecision -IP $script:TestIPs.BannedIP -Type "captcha"
+            # Add captcha decision for the IP we'll test with
+            Add-TestDecision -IP $script:TestIPs.CaptchaIP -Type "captcha"
             
-            # Test captcha endpoint
+            # Test captcha endpoint with the same IP
             $response = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl
             $response.StatusCode | Should -BeIn @(200, 429)
             
@@ -77,8 +73,8 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
         }
         
         It "Should fallback to ban when captcha is not configured" {
-            # Add captcha decision for the IP the bouncer actually sees
-            Add-TestDecision -IP $script:TestIPs.BannedIP -Type "captcha"
+            # Add captcha decision for the IP we'll test with
+            Add-TestDecision -IP $script:TestIPs.CaptchaIP -Type "captcha"
             
             # Test an endpoint without captcha configuration (should fallback to ban)
             $response = Test-HttpRequest -Endpoint "/whoami" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl
@@ -104,8 +100,8 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
         }
         
         It "Should show ban remediation for ban decision even on captcha endpoint" {
-            # Add ban decision (not captcha) for the IP the bouncer actually sees
-            Add-TestDecision -IP $script:TestIPs.BannedIP -Type "ban"
+            # Add ban decision (not captcha) for the IP we'll test with
+            Add-TestDecision -IP $script:TestIPs.CaptchaIP -Type "ban"
             
             # Test captcha endpoint with ban decision (should show ban, not captcha)
             $response = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl

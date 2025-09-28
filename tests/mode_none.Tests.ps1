@@ -36,12 +36,8 @@ Describe "CrowdSec Bouncer None Mode Tests" {
     Context "Basic Bouncer Functionality" -Tag "none" {
         
         BeforeEach {
-            # Clear Traefik access logs for clean test isolation
             Clear-TraefikAccessLogs
-            # Clean up any existing decisions
-            foreach ($ip in $script:TestIPs.Values) {
-                try { Remove-TestDecision -IP $ip } catch { }
-            }
+            Remove-AllTestDecisions
         }
         
         It "Should allow clean IP through" {
@@ -85,12 +81,8 @@ Describe "CrowdSec Bouncer None Mode Tests" {
     Context "Performance Tests" -Tag "none" {
         
         BeforeEach {
-            # Clear Traefik access logs for clean test isolation
             Clear-TraefikAccessLogs
-            # Clean up any existing decisions
-            foreach ($ip in $script:TestIPs.Values) {
-                try { Remove-TestDecision -IP $ip } catch { }
-            }
+            Remove-AllTestDecisions
         }
         
         It "Should handle requests within reasonable time" {

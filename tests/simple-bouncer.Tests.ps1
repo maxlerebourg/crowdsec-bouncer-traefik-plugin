@@ -45,8 +45,8 @@ BeforeAll {
 Describe "Basic CrowdSec Bouncer Integration Test" {
     
     BeforeEach {
-        # Clear Traefik access logs for clean test isolation
         Clear-TraefikAccessLogs
+        Remove-AllTestDecisions
     }
     
     It "Should allow access when no decision exists" {
@@ -121,8 +121,8 @@ Describe "Basic CrowdSec Bouncer Integration Test" {
 Describe "CrowdSec Bouncer General Tests" {
     
     BeforeEach {
-        # Clear Traefik access logs for clean test isolation
         Clear-TraefikAccessLogs
+        Remove-AllTestDecisions
     }
     
     Context "Service Health Checks" {

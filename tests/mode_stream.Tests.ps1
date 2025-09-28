@@ -36,12 +36,8 @@ Describe "CrowdSec Bouncer Stream Mode Tests" {
     Context "Stream Mode Tests" -Tag "stream" {
         
         BeforeEach {
-            # Clear Traefik access logs for clean test isolation
             Clear-TraefikAccessLogs
-            # Clean up any existing decisions
-            foreach ($ip in $script:TestIPs.Values) {
-                try { Remove-TestDecision -IP $ip } catch { }
-            }
+            Remove-AllTestDecisions
         }
         
         It "Should handle decisions with cache updates" {

@@ -10,6 +10,7 @@ services:
       - "--accesslog.format=json"
       - "--accesslog.bufferingSize=0"  # Disable buffering for immediate log writes in tests
       - "--accesslog.fields.headers.names.X-Crowdsec-Remediation=keep"
+      - "--accesslog.fields.headers.names.X-Forwarded-For=keep"
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
