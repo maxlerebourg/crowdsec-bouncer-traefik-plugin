@@ -15,7 +15,7 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.forwardedHeaders.trustedIPs=0.0.0.0/0"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=172.20.0.0/16"
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
@@ -56,7 +56,7 @@ services:
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
-      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderstrustedips=0.0.0.0/0"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Test service - protected endpoint
@@ -80,7 +80,7 @@ services:
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.banHtmlFilePath=/ban.html"
-      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderstrustedips=0.0.0.0/0"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Test service - captcha enabled
@@ -108,7 +108,7 @@ services:
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaSiteKey=test-site-key"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaSecretKey=test-secret-key"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
-      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderstrustedips=0.0.0.0/0"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Test service - disabled bouncer
@@ -150,7 +150,7 @@ services:
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.banHtmlFilePath=/ban.html"
-      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderstrustedips=0.0.0.0/0"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Test service - stream mode
@@ -173,7 +173,7 @@ services:
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderstrustedips=0.0.0.0/0"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   crowdsec:
@@ -220,4 +220,8 @@ volumes:
 
 networks:
   default:
-    name: crowdsec-test-network 
+    name: crowdsec-test-network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1 
