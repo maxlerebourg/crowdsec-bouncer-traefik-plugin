@@ -110,12 +110,14 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: |
+          echo "=== Docker container status ==="
+          docker ps -a
           echo "=== CrowdSec logs ==="
-          docker compose -f docker-compose.test.yml logs crowdsec 2>/dev/null || echo "No CrowdSec logs"
+          docker logs crowdsec-test 2>/dev/null || echo "No CrowdSec container logs"
           echo "=== Traefik logs ==="
-          docker compose -f docker-compose.test.yml logs traefik 2>/dev/null || echo "No Traefik logs"
+          docker logs traefik-test 2>/dev/null || echo "No Traefik container logs"
           echo "=== Whoami logs ==="
-          docker compose -f docker-compose.test.yml logs whoami 2>/dev/null || echo "No Whoami logs"
+          docker logs whoami-test 2>/dev/null || echo "No Whoami container logs"
 
       - name: Upload test results
         if: always()
