@@ -105,7 +105,7 @@ jobs:
         shell: pwsh
         run: |
           # Run the integration test script
-          ./Test-Integration.ps1 -TestMode all -HttpTimeoutSeconds 60
+          ./Test-Integration.ps1 -HttpTimeoutSeconds 60
 
       - name: Show logs on failure
         if: failure()
