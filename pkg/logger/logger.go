@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-// Custom log levels following slog best practices
+// Custom log levels following slog best practices.
 const (
 	LevelTrace = slog.Level(-8) // More verbose than DEBUG
 	LevelDebug = slog.LevelDebug
@@ -61,10 +61,13 @@ func NewWithFormat(logLevel string, logFilePath string, logFormat string) *slog.
 	var handler slog.Handler
 	opts := &slog.HandlerOptions{
 		Level: level,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			// Customize level names to match our expected format
 			if a.Key == slog.LevelKey {
-				level := a.Value.Any().(slog.Level)
+				level, ok := a.Value.Any().(slog.Level)
+				if !ok {
+					return a
+				}
 				switch {
 				case level < LevelDebug:
 					a.Value = slog.StringValue("TRACE")

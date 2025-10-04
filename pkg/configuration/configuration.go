@@ -29,8 +29,10 @@ const (
 	AppsecMode        = "appsec"
 	HTTPS             = "https"
 	HTTP              = "http"
+	LogTRACE          = "TRACE"
 	LogDEBUG          = "DEBUG"
 	LogINFO           = "INFO"
+	LogWARN           = "WARN"
 	LogERROR          = "ERROR"
 	HcaptchaProvider  = "hcaptcha"
 	RecaptchaProvider = "recaptcha"
@@ -289,8 +291,8 @@ func ValidateParams(config *Config) error {
 
 	// Check logging configuration
 	// to upper allow of anycase of log level
-	if !contains([]string{LogERROR, LogDEBUG, LogINFO}, strings.ToUpper(config.LogLevel)) {
-		return fmt.Errorf("LogLevel should be one of (%s,%s,%s)", LogDEBUG, LogINFO, LogERROR)
+	if !contains([]string{LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s,%s)", LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR)
 	}
 	if config.LogFilePath != "" {
 		_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
