@@ -264,7 +264,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
-		})
+		}, true)
 	}
 
 	// Start metrics ticker if not already running
@@ -273,7 +273,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		handleMetricsTicker(bouncer)
 		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
 			handleMetricsTicker(bouncer)
-		})
+		}, false)
 	}
 
 	bouncer.log.Debug("New initialized mode:" + config.CrowdsecMode)
@@ -453,11 +453,17 @@ func handleMetricsTicker(bouncer *Bouncer) {
 	}
 }
 
-func startTicker(name string, updateInterval int64, log *logger.Log, work func()) chan bool {
+func startTicker(name string, updateInterval int64, log *logger.Log, work func(), runOnInit bool) chan bool {
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
 		defer log.Debug(name + "_ticker:stopped")
+
+		// Execute work immediately on ticker setup
+		if runOnInit {
+			go work()
+		}
+
 		for {
 			select {
 			case <-ticker.C:
