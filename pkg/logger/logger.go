@@ -13,16 +13,20 @@ import (
 // Log Logger struct.
 type Log struct {
 	logError *log.Logger
+	logWarn  *log.Logger
 	logInfo  *log.Logger
 	logDebug *log.Logger
+	logTrace *log.Logger
 }
 
 // New Set Default log level to info in case log level to defined.
 func New(logLevel string, logFilePath string) *Log {
 	// Initialize loggers with discard output
 	logError := log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
+	logWarn := log.New(io.Discard, "WARN: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logInfo := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
+	logTrace := log.New(io.Discard, "TRACE: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
 
 	// we initialize logger to STDOUT/STDERR first so if the file logger cannot be initialized we can inform the user
 	output := os.Stdout
@@ -42,25 +46,47 @@ func New(logLevel string, logFilePath string) *Log {
 	// Set error logger output
 	logError.SetOutput(errorOutput)
 
-	// Configure log levels
+	// Configure log levels (hierarchy: TRACE > DEBUG > INFO > WARN > ERROR)
 	switch logLevel {
 	case "ERROR":
 		// Only error logging is enabled
+	case "WARN":
+		logWarn.SetOutput(output)
 	case "INFO":
+		logWarn.SetOutput(output)
 		logInfo.SetOutput(output)
 	case "DEBUG":
+		logWarn.SetOutput(output)
 		logInfo.SetOutput(output)
 		logDebug.SetOutput(output)
+	case "TRACE":
+		logWarn.SetOutput(output)
+		logInfo.SetOutput(output)
+		logDebug.SetOutput(output)
+		logTrace.SetOutput(output)
 	default:
 		// Default to INFO level
+		logWarn.SetOutput(output)
 		logInfo.SetOutput(output)
 	}
 
 	return &Log{
 		logError: logError,
+		logWarn:  logWarn,
 		logInfo:  logInfo,
 		logDebug: logDebug,
+		logTrace: logTrace,
 	}
+}
+
+// Trace log to Stdout.
+func (l *Log) Trace(str string) {
+	l.logTrace.Printf("%s", str)
+}
+
+// Debug log to Stdout.
+func (l *Log) Debug(str string) {
+	l.logDebug.Printf("%s", str)
 }
 
 // Info log to Stdout.
@@ -68,9 +94,9 @@ func (l *Log) Info(str string) {
 	l.logInfo.Printf("%s", str)
 }
 
-// Debug log to Stdout.
-func (l *Log) Debug(str string) {
-	l.logDebug.Printf("%s", str)
+// Warn log to Stdout.
+func (l *Log) Warn(str string) {
+	l.logWarn.Printf("%s", str)
 }
 
 // Error log to Stderr.
