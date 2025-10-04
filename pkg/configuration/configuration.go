@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -41,6 +42,7 @@ const (
 type Config struct {
 	Enabled                                  bool     `json:"enabled,omitempty"`
 	LogLevel                                 string   `json:"logLevel,omitempty"`
+	LogFormat                                string   `json:"logFormat,omitempty"`
 	LogFilePath                              string   `json:"logFilePath,omitempty"`
 	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
 	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
@@ -110,6 +112,7 @@ func New() *Config {
 	return &Config{
 		Enabled:                        false,
 		LogLevel:                       LogINFO,
+		LogFormat:                      "common",
 		LogFilePath:                    "",
 		CrowdsecMode:                   LiveMode,
 		CrowdsecAppsecEnabled:          false,
@@ -415,7 +418,7 @@ func validateParamsRequired(config *Config) error {
 // GetTLSConfigCrowdsec get TLS config from Config.
 //
 //nolint:nestif
-func GetTLSConfigCrowdsec(config *Config, log *logger.Log) (*tls.Config, error) {
+func GetTLSConfigCrowdsec(config *Config, log *slog.Logger) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	//nolint:gocritic
