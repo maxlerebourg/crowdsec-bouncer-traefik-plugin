@@ -131,10 +131,13 @@ func TestLogLevels(t *testing.T) {
 	// Create a logger with TRACE level to capture output
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{
 		Level: LevelTrace, // Use our custom TRACE level
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			// Customize level names to match our expected format
 			if a.Key == slog.LevelKey {
-				level := a.Value.Any().(slog.Level)
+				level, ok := a.Value.Any().(slog.Level)
+				if !ok {
+					return a
+				}
 				switch {
 				case level < LevelDebug:
 					a.Value = slog.StringValue("TRACE")
@@ -232,9 +235,12 @@ func TestTraceLevel(t *testing.T) {
 	// Create a logger with TRACE level to capture output
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{
 		Level: LevelTrace,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			if a.Key == slog.LevelKey {
-				level := a.Value.Any().(slog.Level)
+				level, ok := a.Value.Any().(slog.Level)
+				if !ok {
+					return a
+				}
 				switch {
 				case level < LevelDebug:
 					a.Value = slog.StringValue("TRACE")

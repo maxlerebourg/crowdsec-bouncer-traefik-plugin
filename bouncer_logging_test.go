@@ -60,6 +60,131 @@ func getTestConfig() *configuration.Config {
 	}
 }
 
+// Helper function to create and execute a bouncer request for testing
+func createAndExecuteBouncerRequest(t *testing.T, config *configuration.Config) {
+	t.Helper()
+
+	// Create a mock next handler
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
+	})
+
+	// Create the bouncer plugin (this will initialize the logger with file output)
+	bouncerHandler, err := New(context.Background(), nextHandler, config, "test-bouncer")
+	if err != nil {
+		t.Fatalf("Failed to create bouncer: %v", err)
+	}
+
+	// Create a test request to trigger logging
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+	req.RemoteAddr = "192.168.1.100:12345" // Use a non-trusted IP to trigger logging
+	rw := httptest.NewRecorder()
+
+	// Process the request (this should generate log entries)
+	bouncerHandler.ServeHTTP(rw, req)
+
+	// Give a moment for log writes to complete
+	time.Sleep(100 * time.Millisecond)
+}
+
+// Helper function to parse log file and extract found levels
+func parseLogFileAndExtractLevels(t *testing.T, logFile string) map[string]bool {
+	t.Helper()
+
+	// Verify the log file was created and contains entries
+	if _, statErr := os.Stat(logFile); os.IsNotExist(statErr) {
+		t.Fatalf("Log file was not created: %s", logFile)
+	}
+
+	// Read the log file content
+	// #nosec G304 - logFile is a test-generated temporary file path
+	logContent, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("Failed to read log file: %v", err)
+	}
+
+	logString := string(logContent)
+	if len(logString) == 0 {
+		return make(map[string]bool) // Return empty map for empty log files
+	}
+
+	// Parse and verify JSON log entries
+	lines := strings.Split(strings.TrimSpace(logString), "\n")
+	foundLevels := make(map[string]bool)
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		var logEntry map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &logEntry); err != nil {
+			t.Errorf("Invalid JSON log entry: %s, error: %v", line, err)
+			continue
+		}
+
+		// Verify required fields
+		validateLogEntry(t, logEntry)
+
+		// Track log levels we've seen
+		if level, ok := logEntry["level"].(string); ok {
+			foundLevels[level] = true
+		}
+	}
+
+	return foundLevels
+}
+
+// Helper function to validate log entry structure
+func validateLogEntry(t *testing.T, logEntry map[string]interface{}) {
+	t.Helper()
+
+	if logEntry["time"] == nil {
+		t.Error("Log entry missing 'time' field")
+	}
+	if logEntry["level"] == nil {
+		t.Error("Log entry missing 'level' field")
+	}
+	if logEntry["msg"] == nil {
+		t.Error("Log entry missing 'msg' field")
+	}
+	if logEntry["component"] != "CrowdsecBouncerTraefikPlugin" {
+		t.Errorf("Expected component 'CrowdsecBouncerTraefikPlugin', got %v", logEntry["component"])
+	}
+}
+
+// Helper function to verify expected and forbidden log levels
+func verifyLogLevels(t *testing.T, foundLevels map[string]bool, expectedLevels, forbiddenLevels []string, logLevel string) {
+	t.Helper()
+
+	// Handle case where no logs are expected
+	if len(expectedLevels) == 0 {
+		if len(foundLevels) > 0 {
+			t.Errorf("Expected no logs at %s level, but found: %v", logLevel, foundLevels)
+		}
+	} else {
+		// Verify we got some log entries
+		if len(foundLevels) == 0 {
+			t.Fatal("No valid log entries found")
+		}
+
+		// Verify expected levels are present
+		for _, expectedLevel := range expectedLevels {
+			if !foundLevels[expectedLevel] {
+				t.Errorf("Expected to find %s level logs, but didn't. Found levels: %v", expectedLevel, foundLevels)
+			}
+		}
+	}
+
+	// Verify forbidden levels are NOT present
+	for _, forbiddenLevel := range forbiddenLevels {
+		if foundLevels[forbiddenLevel] {
+			t.Errorf("Found forbidden %s level logs at %s level. Found levels: %v", forbiddenLevel, logLevel, foundLevels)
+		}
+	}
+}
+
 func TestBouncerFileLoggingLevels(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -99,114 +224,26 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 			config.LogFormat = "json" // Use JSON format for easier parsing
 			config.LogFilePath = logFile
 
-			// Create a mock next handler
-			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("OK"))
-			})
+			// Create and execute bouncer request
+			createAndExecuteBouncerRequest(t, config)
 
-			// Create the bouncer plugin (this will initialize the logger with file output)
-			bouncerHandler, err := New(context.Background(), nextHandler, config, "test-bouncer")
-			if err != nil {
-				t.Fatalf("Failed to create bouncer: %v", err)
-			}
-
-			// Create a test request to trigger logging
-			req := httptest.NewRequest("GET", "http://example.com/test", nil)
-			req.RemoteAddr = "192.168.1.100:12345" // Use a non-trusted IP to trigger logging
-			rw := httptest.NewRecorder()
-
-			// Process the request (this should generate log entries)
-			bouncerHandler.ServeHTTP(rw, req)
-
-			// Give a moment for log writes to complete
-			time.Sleep(100 * time.Millisecond)
-
-			// Verify the log file was created and contains entries
-			if _, err := os.Stat(logFile); os.IsNotExist(err) {
-				t.Fatalf("Log file was not created: %s", logFile)
-			}
-
-			// Read the log file content
-			logContent, err := os.ReadFile(logFile)
-			if err != nil {
-				t.Fatalf("Failed to read log file: %v", err)
-			}
-
-			logString := string(logContent)
+			// Parse log file and extract found levels
+			foundLevels := parseLogFileAndExtractLevels(t, logFile)
 
 			// Handle empty log files for higher log levels (expected behavior)
-			if len(logString) == 0 {
-				if len(tt.expectedLevels) > 0 {
-					t.Fatalf("Expected log entries but log file is empty for level %s", tt.logLevel)
-				}
+			if len(foundLevels) == 0 && len(tt.expectedLevels) > 0 {
+				t.Fatalf("Expected log entries but log file is empty for level %s", tt.logLevel)
+			}
+			if len(foundLevels) == 0 {
 				// Empty file is expected for this log level
 				t.Logf("LogLevel %s: No logs generated (expected behavior)", tt.logLevel)
 				return
 			}
 
-			// Parse and verify JSON log entries
-			lines := strings.Split(strings.TrimSpace(logString), "\n")
-			foundLevels := make(map[string]bool)
+			// Verify expected and forbidden log levels
+			verifyLogLevels(t, foundLevels, tt.expectedLevels, tt.forbiddenLevels, tt.logLevel)
 
-			for _, line := range lines {
-				if strings.TrimSpace(line) == "" {
-					continue
-				}
-
-				var logEntry map[string]interface{}
-				if err := json.Unmarshal([]byte(line), &logEntry); err != nil {
-					t.Errorf("Invalid JSON log entry: %s, error: %v", line, err)
-					continue
-				}
-
-				// Verify required fields
-				if logEntry["time"] == nil {
-					t.Error("Log entry missing 'time' field")
-				}
-				if logEntry["level"] == nil {
-					t.Error("Log entry missing 'level' field")
-				}
-				if logEntry["msg"] == nil {
-					t.Error("Log entry missing 'msg' field")
-				}
-				if logEntry["component"] != "CrowdsecBouncerTraefikPlugin" {
-					t.Errorf("Expected component 'CrowdsecBouncerTraefikPlugin', got %v", logEntry["component"])
-				}
-
-				// Track log levels we've seen
-				if level, ok := logEntry["level"].(string); ok {
-					foundLevels[level] = true
-				}
-			}
-
-			// Handle case where no logs are expected
-			if len(tt.expectedLevels) == 0 {
-				if len(foundLevels) > 0 {
-					t.Errorf("Expected no logs at %s level, but found: %v", tt.logLevel, foundLevels)
-				}
-			} else {
-				// Verify we got some log entries
-				if len(foundLevels) == 0 {
-					t.Fatal("No valid log entries found")
-				}
-
-				// Verify expected levels are present
-				for _, expectedLevel := range tt.expectedLevels {
-					if !foundLevels[expectedLevel] {
-						t.Errorf("Expected to find %s level logs, but didn't. Found levels: %v", expectedLevel, foundLevels)
-					}
-				}
-			}
-
-			// Verify forbidden levels are NOT present
-			for _, forbiddenLevel := range tt.forbiddenLevels {
-				if foundLevels[forbiddenLevel] {
-					t.Errorf("Found forbidden %s level logs at %s level. Found levels: %v", forbiddenLevel, tt.logLevel, foundLevels)
-				}
-			}
-
-			t.Logf("LogLevel %s: Successfully logged to file with %d lines and levels: %v", tt.logLevel, len(lines), foundLevels)
+			t.Logf("LogLevel %s: Successfully logged to file with levels: %v", tt.logLevel, foundLevels)
 		})
 	}
 }
@@ -223,9 +260,9 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 	config.LogFilePath = logFile
 
 	// Create a mock next handler
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Create the bouncer plugin
@@ -235,7 +272,7 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 	}
 
 	// Create a test request to trigger logging
-	req := httptest.NewRequest("GET", "http://example.com/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
 	req.RemoteAddr = "192.168.1.100:12345"
 	rw := httptest.NewRecorder()
 
@@ -246,11 +283,12 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify the log file was created and contains entries
-	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+	if _, statErr := os.Stat(logFile); os.IsNotExist(statErr) {
 		t.Fatalf("Log file was not created: %s", logFile)
 	}
 
 	// Read the log file content
+	// #nosec G304 - logFile is a test-generated temporary file path
 	logContent, err := os.ReadFile(logFile)
 	if err != nil {
 		t.Fatalf("Failed to read log file: %v", err)
