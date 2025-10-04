@@ -62,7 +62,7 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isStartup               = true
+	lapiStreamInitialized   = false
 	isCrowdsecStreamHealthy = true
 	updateFailure           int64
 	streamTicker            chan bool
@@ -262,8 +262,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 				return nil, err
 			}
 		}
-		handleStreamTicker(bouncer)
-		isStartup = false
 		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
 		})
@@ -584,7 +582,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
+		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || !lapiStreamInitialized),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
@@ -614,6 +612,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
+	lapiStreamInitialized = true
 	return nil
 }
 
@@ -723,6 +722,12 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 func reportMetrics(bouncer *Bouncer) error {
 	now := time.Now()
 	currentCount := atomic.LoadInt64(&blockedRequests)
+
+	// Initialize lastMetricsPush if it's zero value
+	if lastMetricsPush.IsZero() {
+		lastMetricsPush = now
+	}
+
 	windowSizeSeconds := int(now.Sub(lastMetricsPush).Seconds())
 
 	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
