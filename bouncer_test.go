@@ -264,7 +264,6 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 		})
 	}
 }
-
 func TestCaptchaMethodBasedLogic(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -291,23 +290,35 @@ func TestCaptchaMethodBasedLogic(t *testing.T) {
 			expectBanFallback: false,
 		},
 		{
-			name:              "PUT with captcha remediation should fallback to ban",
+			name:              "PUT with captcha remediation should allow captcha",
 			method:            http.MethodPut,
 			remediation:       cache.CaptchaValue,
-			expectBanFallback: true,
+			expectBanFallback: false,
 		},
 		{
-			name:              "DELETE with captcha remediation should fallback to ban",
+			name:              "DELETE with captcha remediation should allow captcha",
 			method:            http.MethodDelete,
 			remediation:       cache.CaptchaValue,
-			expectBanFallback: true,
+			expectBanFallback: false,
+		},
+		{
+			name:              "PATCH with captcha remediation should allow captcha",
+			method:            http.MethodPatch,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: false,
+		},
+		{
+			name:              "OPTIONS with captcha remediation should allow captcha",
+			method:            http.MethodOptions,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Test the core logic: should we use captcha or fallback to ban?
-			shouldUseCaptcha := tt.remediation == cache.CaptchaValue && (tt.method == http.MethodGet || tt.method == http.MethodPost)
+			// Test the core logic: captcha is served for all methods except HEAD
+			shouldUseCaptcha := tt.remediation == cache.CaptchaValue && tt.method != http.MethodHead
 
 			if shouldUseCaptcha == tt.expectBanFallback {
 				t.Errorf("Method %s with %s remediation: expected ban fallback %v, but logic would use captcha %v",
