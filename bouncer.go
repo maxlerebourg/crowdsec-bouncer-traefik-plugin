@@ -269,8 +269,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 	// Start metrics ticker if not already running
 	if metricsTicker == nil && config.MetricsUpdateIntervalSeconds > 0 {
-		lastMetricsPush = time.Now() // Initialize lastMetricsPush when starting the metrics ticker
-		handleMetricsTicker(bouncer)
 		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
 			handleMetricsTicker(bouncer)
 		}, false)
