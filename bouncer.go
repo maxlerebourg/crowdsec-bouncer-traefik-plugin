@@ -262,7 +262,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 				return nil, err
 			}
 		}
-		if (config.StreamStartupBlock) {
+		if config.StreamStartupBlock {
 			handleStreamTicker(bouncer)
 		} else {
 			go handleStreamTicker(bouncer)
