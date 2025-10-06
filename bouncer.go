@@ -417,7 +417,6 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter, method string)
 
 func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw http.ResponseWriter, req *http.Request) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
-	// Only serve captcha for GET and POST requests, fallback to BAN for other methods. We need POST because the actual captcha post-processing is done in the POST request.
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
@@ -427,7 +426,6 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
-	// For non-GET/POST requests or when captcha is not valid, serve ban response
 	handleBanServeHTTP(bouncer, rw, req.Method)
 }
 
