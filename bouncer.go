@@ -62,7 +62,7 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isStartup               = true
+	isCrowdsecStreamStartup = true
 	isCrowdsecStreamHealthy = true
 	updateFailure           int64
 	streamTicker            chan bool
@@ -267,7 +267,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		} else {
 			go handleStreamTicker(bouncer)
 		}
-		isStartup = false
 		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
 		})
@@ -623,6 +622,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
+	isCrowdsecStreamStartup = false
 	return nil
 }
 
