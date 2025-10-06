@@ -262,7 +262,11 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 				return nil, err
 			}
 		}
-		handleStreamTicker(bouncer)
+		if (config.StreamStartupBlock) {
+			handleStreamTicker(bouncer)
+		} else {
+			go handleStreamTicker(bouncer)
+		}
 		isStartup = false
 		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
@@ -272,7 +276,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	// Start metrics ticker if not already running
 	if metricsTicker == nil && config.MetricsUpdateIntervalSeconds > 0 {
 		lastMetricsPush = time.Now() // Initialize lastMetricsPush when starting the metrics ticker
-		handleMetricsTicker(bouncer)
+		go handleMetricsTicker(bouncer)
 		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
 			handleMetricsTicker(bouncer)
 		})
