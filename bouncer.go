@@ -405,20 +405,20 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter, method string)
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	rw.WriteHeader(bouncer.remediationStatusCode)
 
-	// Don't write body content for HEAD requests
-	if method != http.MethodHead {
-		_, err := fmt.Fprint(rw, bouncer.banTemplateString)
-		if err != nil {
-			// use warn when https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/276 is completed
-			bouncer.log.Info("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
-		}
+	if method == http.MethodHead {
+		return
+	}
+	_, err := fmt.Fprint(rw, bouncer.banTemplateString)
+	if err != nil {
+		// use warn when https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/276 is completed
+		bouncer.log.Error("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
 	}
 }
 
 func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw http.ResponseWriter, req *http.Request) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	// Only serve captcha for GET and POST requests, fallback to BAN for other methods. We need POST because the actual captcha post-processing is done in the POST request.
-	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && (req.Method != http.MethodHead) {
+	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			return
