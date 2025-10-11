@@ -3,6 +3,7 @@
 package logger
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -17,13 +18,23 @@ const (
 	LevelError = slog.LevelError
 )
 
-// New creates a slog.Logger with default format (common).
-func New(logLevel string, logFilePath string) *slog.Logger {
+// Log wraps slog.Logger to add a Trace method for consistent logging interface.
+type Log struct {
+	*slog.Logger
+}
+
+// Trace logs at TRACE level using the custom LevelTrace.
+func (l *Log) Trace(msg string) {
+	l.Logger.Log(context.Background(), LevelTrace, msg)
+}
+
+// New creates a Log wrapper with default format (common).
+func New(logLevel string, logFilePath string) *Log {
 	return NewWithFormat(logLevel, logFilePath, "common")
 }
 
-// NewWithFormat creates a slog.Logger with specified format (common or json).
-func NewWithFormat(logLevel string, logFilePath string, logFormat string) *slog.Logger {
+// NewWithFormat creates a Log wrapper with specified format (common or json).
+func NewWithFormat(logLevel string, logFilePath string, logFormat string) *Log {
 	// Determine log level
 	var level slog.Level
 	switch logLevel {
@@ -95,5 +106,5 @@ func NewWithFormat(logLevel string, logFilePath string, logFormat string) *slog.
 	// Create logger with component attribute
 	logger := slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
 
-	return logger
+	return &Log{Logger: logger}
 }

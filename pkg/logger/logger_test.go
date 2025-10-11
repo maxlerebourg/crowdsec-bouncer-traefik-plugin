@@ -229,6 +229,55 @@ func TestErrorLevel(t *testing.T) {
 	}
 }
 
+func TestTraceMethod(t *testing.T) {
+	var buf bytes.Buffer
+
+	// Create a logger with TRACE level to capture output
+	logger := NewWithFormat("TRACE", "", "common")
+
+	// Replace the handler to capture output
+	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{
+		Level: LevelTrace,
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.LevelKey {
+				level, ok := a.Value.Any().(slog.Level)
+				if !ok {
+					return a
+				}
+				switch {
+				case level < LevelDebug:
+					a.Value = slog.StringValue("TRACE")
+				case level < LevelInfo:
+					a.Value = slog.StringValue("DEBUG")
+				case level < LevelWarn:
+					a.Value = slog.StringValue("INFO")
+				case level < LevelError:
+					a.Value = slog.StringValue("WARN")
+				default:
+					a.Value = slog.StringValue("ERROR")
+				}
+			}
+			return a
+		},
+	})
+	logger.Logger = slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
+
+	testMessage := "trace method test"
+	logger.Trace(testMessage)
+
+	output := buf.String()
+
+	// Verify TRACE level appears
+	if !strings.Contains(output, "level=TRACE") {
+		t.Error("Expected TRACE level message to appear")
+	}
+
+	// Verify message content appears
+	if !strings.Contains(output, testMessage) {
+		t.Error("Expected trace message content to appear")
+	}
+}
+
 func TestTraceLevel(t *testing.T) {
 	var buf bytes.Buffer
 
