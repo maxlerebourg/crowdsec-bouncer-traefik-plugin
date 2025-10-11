@@ -62,7 +62,7 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	lapiStreamInitialized   = false
+	isCrowdsecStreamStartup = true
 	isCrowdsecStreamHealthy = true
 	updateFailure           int64
 	streamTicker            chan bool
@@ -262,9 +262,14 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 				return nil, err
 			}
 		}
+
+		if config.StreamStartupBlock {
+			handleStreamTicker(bouncer)
+		}
+
 		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
-		}, true)
+		}, !config.StreamStartupBlock)
 	}
 
 	// Start metrics ticker if not already running
@@ -451,21 +456,20 @@ func handleMetricsTicker(bouncer *Bouncer) {
 	}
 }
 
-func startTicker(name string, updateInterval int64, log *logger.Log, work func(), runOnInit bool) chan bool {
+func startTicker(name string, updateInterval int64, log *logger.Log, work func(), noStartupDelay bool) chan bool {
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
 		defer log.Debug(name + "_ticker:stopped")
 
-		// Execute work immediately on ticker setup
-		if runOnInit {
-			go work()
+		if noStartupDelay {
+			work()
 		}
 
 		for {
 			select {
 			case <-ticker.C:
-				go work()
+				work()
 			case <-stop:
 				return
 			}
@@ -586,7 +590,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || !lapiStreamInitialized),
+		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || !isCrowdsecStreamStartup),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
@@ -616,7 +620,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
-	lapiStreamInitialized = true
+	isCrowdsecStreamStartup = false
 	return nil
 }
 
