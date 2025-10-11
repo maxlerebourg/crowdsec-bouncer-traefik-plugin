@@ -590,7 +590,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || !isCrowdsecStreamStartup),
+		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
