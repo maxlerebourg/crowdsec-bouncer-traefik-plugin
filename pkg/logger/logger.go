@@ -24,6 +24,8 @@ type Log struct {
 }
 
 // Trace logs at TRACE level using the custom LevelTrace.
+//
+//nolint:contextcheck
 func (l *Log) Trace(msg string) {
 	l.Logger.Log(context.Background(), LevelTrace, msg)
 }
