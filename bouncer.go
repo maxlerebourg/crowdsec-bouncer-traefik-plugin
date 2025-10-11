@@ -620,7 +620,9 @@ func handleStreamCache(bouncer *Bouncer) error {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
-	isCrowdsecStreamStartup = false
+	if isCrowdsecStreamStartup {
+		isCrowdsecStreamStartup = false
+	}
 	return nil
 }
 
