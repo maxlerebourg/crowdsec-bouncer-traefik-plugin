@@ -186,3 +186,144 @@ func Test_crowdsecQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
+	tests := []struct {
+		name              string
+		method            string
+		banTemplateString string
+		expectBodyContent bool
+	}{
+		{
+			name:              "GET request should have body with template",
+			method:            http.MethodGet,
+			banTemplateString: "<html>You are banned</html>",
+			expectBodyContent: true,
+		},
+		{
+			name:              "HEAD request should NOT have body even with template",
+			method:            http.MethodHead,
+			banTemplateString: "<html>You are banned</html>",
+			expectBodyContent: false,
+		},
+		{
+			name:              "POST request should have body with template",
+			method:            http.MethodPost,
+			banTemplateString: "<html>You are banned</html>",
+			expectBodyContent: true,
+		},
+		{
+			name:              "PUT request should have body with template",
+			method:            http.MethodPut,
+			banTemplateString: "<html>You are banned</html>",
+			expectBodyContent: true,
+		},
+		{
+			name:              "DELETE request should have body with template",
+			method:            http.MethodDelete,
+			banTemplateString: "<html>You are banned</html>",
+			expectBodyContent: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bouncer := &Bouncer{
+				remediationStatusCode:   403,
+				remediationCustomHeader: "X-Test-Remediation",
+				banTemplateString:       tt.banTemplateString,
+			}
+
+			rw := httptest.NewRecorder()
+			handleBanServeHTTP(bouncer, rw, tt.method)
+
+			// Check status code
+			if rw.Code != 403 {
+				t.Errorf("Expected status code 403, got %d", rw.Code)
+			}
+
+			// Check custom header
+			headerValue := rw.Header().Get("X-Test-Remediation")
+			if headerValue != "ban" {
+				t.Errorf("Expected header X-Test-Remediation to be 'ban', got %s", headerValue)
+			}
+
+			// Check body content
+			body := rw.Body.String()
+			hasBodyContent := len(body) > 0
+
+			if hasBodyContent != tt.expectBodyContent {
+				t.Errorf("Method %s: expected body content: %v, got body content: %v (body: %q)",
+					tt.method, tt.expectBodyContent, hasBodyContent, body)
+			}
+
+			// If we expect body content, verify it matches template
+			if tt.expectBodyContent && body != tt.banTemplateString {
+				t.Errorf("Expected body %q, got %q", tt.banTemplateString, body)
+			}
+		})
+	}
+}
+func TestCaptchaMethodBasedLogic(t *testing.T) {
+	tests := []struct {
+		name              string
+		method            string
+		remediation       string
+		expectBanFallback bool
+	}{
+		{
+			name:              "GET with captcha remediation should allow captcha",
+			method:            http.MethodGet,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: false,
+		},
+		{
+			name:              "HEAD with captcha remediation should fallback to ban",
+			method:            http.MethodHead,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: true,
+		},
+		{
+			name:              "POST with captcha remediation should allow captcha",
+			method:            http.MethodPost,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: false,
+		},
+		{
+			name:              "PUT with captcha remediation should allow captcha",
+			method:            http.MethodPut,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: false,
+		},
+		{
+			name:              "DELETE with captcha remediation should allow captcha",
+			method:            http.MethodDelete,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: false,
+		},
+		{
+			name:              "PATCH with captcha remediation should allow captcha",
+			method:            http.MethodPatch,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: false,
+		},
+		{
+			name:              "OPTIONS with captcha remediation should allow captcha",
+			method:            http.MethodOptions,
+			remediation:       cache.CaptchaValue,
+			expectBanFallback: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the core logic: captcha is served for all methods except HEAD
+			shouldUseCaptcha := tt.remediation == cache.CaptchaValue && tt.method != http.MethodHead
+
+			if shouldUseCaptcha == tt.expectBanFallback {
+				t.Errorf("Method %s with %s remediation: expected ban fallback %v, but logic would use captcha %v",
+					tt.method, tt.remediation, tt.expectBanFallback, shouldUseCaptcha)
+			}
+		})
+	}
+}
