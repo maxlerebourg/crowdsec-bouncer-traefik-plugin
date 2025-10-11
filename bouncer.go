@@ -233,7 +233,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
 	err = bouncer.captchaClient.New(
-		log.Logger,
+		log,
 		bouncer.cacheClient,
 		&http.Client{
 			Transport: &http.Transport{MaxIdleConns: 10, IdleConnTimeout: 30 * time.Second},

@@ -342,7 +342,7 @@ func validateParamsTLS(config *Config) error {
 
 func validateParamsIPs(listIP []string, key string) error {
 	if len(listIP) > 0 {
-		if _, err := ip.NewChecker(logger.New(LogINFO, ""), listIP); err != nil {
+		if _, err := ip.NewChecker(logger.New(LogINFO, "").Logger, listIP); err != nil {
 			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
 		}
 	}
