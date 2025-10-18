@@ -524,7 +524,6 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	default:
 		bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
 	}
-	// If bouncer.defaultDecisionTimeout <= 0, we don't cache the decision.
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
 		durationSecond := int64(duration.Seconds())
 		if bouncer.defaultDecisionTimeout < durationSecond {
