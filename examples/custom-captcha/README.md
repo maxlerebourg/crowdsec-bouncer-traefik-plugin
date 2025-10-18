@@ -5,7 +5,7 @@ Read the example captcha before this, to better understand what is done here.
 ### Traefik configuration
 
 The minimal configuration is defined below to implement custom captcha.  
-This documentation use https://github.com/a-ve/wicketpeeker, a self-hosted captcha provider that have a similar API than big providers.
+This documentation use https://github.com/a-ve/wicketkeeper, a self-hosted captcha provider that have a similar API than big providers.
 
 Minimal API requirement:
 
