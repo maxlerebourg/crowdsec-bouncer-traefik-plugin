@@ -120,15 +120,15 @@ type Bouncer struct {
 //nolint:gocyclo
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
-	log := logger.New(config.LogLevel, config.LogFilePath)
+	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
 	err := configuration.ValidateParams(config)
 	if err != nil {
 		log.Error("New:validateParams " + err.Error())
 		return nil, err
 	}
 
-	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
-	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
+	serverChecker, _ := ip.NewChecker(log.Logger, config.ForwardedHeadersTrustedIPs)
+	clientChecker, _ := ip.NewChecker(log.Logger, config.ClientTrustedIPs)
 
 	var tlsConfig *tls.Config
 	crowdsecStreamRoute := ""
@@ -146,7 +146,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	} else {
 		crowdsecStreamRoute = crowdsecLapiStreamRoute
 		crowdsecHeader = crowdsecLapiHeader
-		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log)
+		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log.Logger)
 		if err != nil {
 			log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
 			return nil, err
@@ -306,7 +306,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
-	bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
+	bouncer.log.Trace(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 	if isTrusted {
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -322,7 +322,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
 		if cacheErr != nil {
 			cacheErrString := cacheErr.Error()
-			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
+			bouncer.log.Trace(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
 			if !bouncer.redisUnreachableBlock && cacheErrString == cache.CacheUnreachable {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", remoteIP))
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
@@ -334,7 +334,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 		} else {
-			bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
+			bouncer.log.Trace(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
 			if value == cache.NoBannedValue {
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			} else {
@@ -410,13 +410,12 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter, method string)
 	}
 	_, err := fmt.Fprint(rw, bouncer.banTemplateString)
 	if err != nil {
-		// use warn when https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/276 is completed
-		bouncer.log.Error("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
+		bouncer.log.Warn("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
 	}
 }
 
 func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw http.ResponseWriter, req *http.Request) {
-	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
+	bouncer.log.Trace(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
@@ -432,7 +431,7 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
 	if bouncer.appsecEnabled {
 		if err := appsecQuery(bouncer, remoteIP, req); err != nil {
-			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
+			bouncer.log.Trace(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
 			handleBanServeHTTP(bouncer, rw, req.Method)
 			return
 		}
@@ -442,7 +441,7 @@ func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWrit
 
 func handleStreamTicker(bouncer *Bouncer) {
 	if err := handleStreamCache(bouncer); err != nil {
-		bouncer.log.Debug(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
+		bouncer.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
 		if bouncer.updateMaxFailure != -1 && updateFailure >= bouncer.updateMaxFailure && isCrowdsecStreamHealthy {
 			isCrowdsecStreamHealthy = false
 			bouncer.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", updateFailure, err.Error()))

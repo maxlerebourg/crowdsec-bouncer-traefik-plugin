@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,8 +29,10 @@ const (
 	AppsecMode        = "appsec"
 	HTTPS             = "https"
 	HTTP              = "http"
+	LogTRACE          = "TRACE"
 	LogDEBUG          = "DEBUG"
 	LogINFO           = "INFO"
+	LogWARN           = "WARN"
 	LogERROR          = "ERROR"
 	HcaptchaProvider  = "hcaptcha"
 	RecaptchaProvider = "recaptcha"
@@ -41,6 +44,7 @@ const (
 type Config struct {
 	Enabled                                  bool     `json:"enabled,omitempty"`
 	LogLevel                                 string   `json:"logLevel,omitempty"`
+	LogFormat                                string   `json:"logFormat,omitempty"`
 	LogFilePath                              string   `json:"logFilePath,omitempty"`
 	CrowdsecMode                             string   `json:"crowdsecMode,omitempty"`
 	CrowdsecAppsecEnabled                    bool     `json:"crowdsecAppsecEnabled,omitempty"`
@@ -110,6 +114,7 @@ func New() *Config {
 	return &Config{
 		Enabled:                        false,
 		LogLevel:                       LogINFO,
+		LogFormat:                      "common",
 		LogFilePath:                    "",
 		CrowdsecMode:                   LiveMode,
 		CrowdsecAppsecEnabled:          false,
@@ -286,8 +291,8 @@ func ValidateParams(config *Config) error {
 
 	// Check logging configuration
 	// to upper allow of anycase of log level
-	if !contains([]string{LogERROR, LogDEBUG, LogINFO}, strings.ToUpper(config.LogLevel)) {
-		return fmt.Errorf("LogLevel should be one of (%s,%s,%s)", LogDEBUG, LogINFO, LogERROR)
+	if !contains([]string{LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s,%s)", LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR)
 	}
 	if config.LogFilePath != "" {
 		_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
@@ -337,7 +342,7 @@ func validateParamsTLS(config *Config) error {
 
 func validateParamsIPs(listIP []string, key string) error {
 	if len(listIP) > 0 {
-		if _, err := ip.NewChecker(logger.New(LogINFO, ""), listIP); err != nil {
+		if _, err := ip.NewChecker(logger.New(LogINFO, "").Logger, listIP); err != nil {
 			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
 		}
 	}
@@ -415,7 +420,7 @@ func validateParamsRequired(config *Config) error {
 // GetTLSConfigCrowdsec get TLS config from Config.
 //
 //nolint:nestif
-func GetTLSConfigCrowdsec(config *Config, log *logger.Log) (*tls.Config, error) {
+func GetTLSConfigCrowdsec(config *Config, log *slog.Logger) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	//nolint:gocritic
