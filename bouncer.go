@@ -62,7 +62,7 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isStartup               = true
+	isCrowdsecStreamStartup = true
 	isCrowdsecStreamHealthy = true
 	updateFailure           int64
 	streamTicker            chan bool
@@ -262,8 +262,11 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 				return nil, err
 			}
 		}
-		handleStreamTicker(bouncer)
-		isStartup = false
+		if config.StreamStartupBlock {
+			handleStreamTicker(bouncer)
+		} else {
+			go handleStreamTicker(bouncer)
+		}
 		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
 		})
@@ -272,7 +275,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	// Start metrics ticker if not already running
 	if metricsTicker == nil && config.MetricsUpdateIntervalSeconds > 0 {
 		lastMetricsPush = time.Now() // Initialize lastMetricsPush when starting the metrics ticker
-		handleMetricsTicker(bouncer)
+		go handleMetricsTicker(bouncer)
 		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
 			handleMetricsTicker(bouncer)
 		})
@@ -589,7 +592,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isStartup),
+		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
@@ -619,6 +622,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
+	isCrowdsecStreamStartup = false
 	return nil
 }
 
