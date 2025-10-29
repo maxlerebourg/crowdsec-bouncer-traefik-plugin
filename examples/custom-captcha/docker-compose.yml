@@ -94,10 +94,10 @@ services:
     labels:
       - "traefik.enable=true"
       # Definition of the router
-      - "traefik.http.routers.router-wicketpeeker.rule=Host(`captcha.localhost`)"
-      - "traefik.http.routers.router-wicketpeeker.entrypoints=web"
+      - "traefik.http.routers.router-wicketkeeper.rule=Host(`captcha.localhost`)"
+      - "traefik.http.routers.router-wicketkeeper.entrypoints=web"
       # Definition of the service
-      - "traefik.http.services.service-whitekeeper.loadbalancer.server.port=8080"
+      - "traefik.http.services.service-wicketkeeper.loadbalancer.server.port=8080"
     depends_on:
       - redis
 
