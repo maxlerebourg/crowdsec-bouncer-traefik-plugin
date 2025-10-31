@@ -447,6 +447,11 @@ make run
   - int64
   - default: 0
   - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
+- StreamStartupBlock
+  - bool
+  - default: true
+  - Used only in `stream` and `alone` mode, controls whether the initial stream update runs synchronously (blocking) or asynchronously during plugin initialization
+  - **Warning**: When `true`, Traefik availability might be impacted during startup as the plugin waits for the initial CrowdSec data fetch to complete
 - DefaultDecisionSeconds
   - int64
   - default: 60
@@ -545,6 +550,7 @@ http:
           LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0
+          streamStartupBlock: true
           defaultDecisionSeconds: 60
           remediationStatusCode: 403
           httpTimeoutSeconds: 10
