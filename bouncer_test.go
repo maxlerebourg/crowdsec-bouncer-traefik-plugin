@@ -193,7 +193,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	tests := []struct {
 		name              string
 		method            string
-		banTemplateString string
+		banTemplate       *httptemplate.Template
 		expectBodyContent bool
 	}{
 		{
@@ -231,9 +231,9 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bouncer := &Bouncer{
-				remediationStatusCode: http.StatusForbidden,
+				remediationStatusCode:   http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
-				banTemplate:       tt.banTemplateString,
+				banTemplate:             tt.banTemplateString,
 			}
 
 			rw := httptest.NewRecorder()
