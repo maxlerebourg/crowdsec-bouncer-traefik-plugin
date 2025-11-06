@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	httptemplate "html/template"
+	htmltemplate "html/template"
 	"io"
 	"net/http"
 	"net/url"
@@ -107,7 +107,7 @@ type Bouncer struct {
 	crowdsecStreamRoute     string
 	crowdsecHeader          string
 	redisUnreachableBlock   bool
-	banTemplate             *httptemplate.Template
+	banTemplate             *htmltemplate.Template
 	clientPoolStrategy      *ip.PoolStrategy
 	serverPoolStrategy      *ip.PoolStrategy
 	httpClient              *http.Client
@@ -160,7 +160,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CrowdsecLapiKey = apiKey
 	}
 
-	var banTemplate *httptemplate.Template
+	var banTemplate *htmltemplate.Template
     if config.BanHTMLFilePath != "" {
         banTemplate, _ = configuration.GetHTMLTemplate(config.BanHTMLFilePath)
     }

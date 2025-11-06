@@ -2,7 +2,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	httptemplate "http/template"
+	htmltemplate "html/template"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
