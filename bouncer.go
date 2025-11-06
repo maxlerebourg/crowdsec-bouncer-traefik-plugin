@@ -331,7 +331,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
 			if value == cache.NoBannedValue {
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
-				} else {
+			} else {
 				handleRemediationServeHTTP(bouncer, remoteIP, value, rw, req)
 			}
 			return
