@@ -2,6 +2,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	httptemplate "http/template"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -188,6 +189,7 @@ func Test_crowdsecQuery(t *testing.T) {
 }
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
+	banTemplate := httptemplate.New("html").parse("<html>You are banned</html>")
 	tests := []struct {
 		name              string
 		method            string
@@ -197,31 +199,31 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 		{
 			name:              "GET request should have body with template",
 			method:            http.MethodGet,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: true,
 		},
 		{
 			name:              "HEAD request should NOT have body even with template",
 			method:            http.MethodHead,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: false,
 		},
 		{
 			name:              "POST request should have body with template",
 			method:            http.MethodPost,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: true,
 		},
 		{
 			name:              "PUT request should have body with template",
 			method:            http.MethodPut,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: true,
 		},
 		{
 			name:              "DELETE request should have body with template",
 			method:            http.MethodDelete,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: true,
 		},
 	}
@@ -229,16 +231,16 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bouncer := &Bouncer{
-				remediationStatusCode:   403,
+				remediationStatusCode: http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
-				banTemplateString:       tt.banTemplateString,
+				banTemplate:       tt.banTemplateString,
 			}
 
 			rw := httptest.NewRecorder()
 			handleBanServeHTTP(bouncer, rw, tt.method)
 
 			// Check status code
-			if rw.Code != 403 {
+			if rw.Code != http.StatusForbidden {
 				t.Errorf("Expected status code 403, got %d", rw.Code)
 			}
 

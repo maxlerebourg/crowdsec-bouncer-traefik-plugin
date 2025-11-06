@@ -168,7 +168,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	bouncer := &Bouncer{
 		next:     next,
 		name:     name,
-		template: texttemplate.New("CrowdsecBouncer").Delims("[[", "]]"),
+		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
 		enabled:                 config.Enabled,
 		crowdsecMode:            config.CrowdsecMode,
