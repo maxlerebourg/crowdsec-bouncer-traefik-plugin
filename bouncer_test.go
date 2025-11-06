@@ -237,7 +237,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 
 			rw := httptest.NewRecorder()
-			handleBanServeHTTP(bouncer, rw, tt.method)
+			handleBanServeHTTP(bouncer, rw, tt.method, "TEST")
 
 			// Check status code
 			if rw.Code != http.StatusForbidden {
