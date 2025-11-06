@@ -305,12 +305,12 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
-	
+
 	if bouncer.crowdsecMode == configuration.AppsecMode {
 		handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		return
 	}
-	
+
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
 		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
@@ -337,7 +337,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	
+
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
@@ -388,7 +388,7 @@ type Login struct {
 // To append Headers we need to call rw.WriteHeader after set any header.
 func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter, method, reason string) {
 	atomic.AddInt64(&blockedRequests, 1)
-	
+
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
