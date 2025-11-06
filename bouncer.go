@@ -161,9 +161,9 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	}
 
 	var banTemplate *htmltemplate.Template
-    if config.BanHTMLFilePath != "" {
-        banTemplate, _ = configuration.GetHTMLTemplate(config.BanHTMLFilePath)
-    }
+	if config.BanHTMLFilePath != "" {
+		banTemplate, _ = configuration.GetHTMLTemplate(config.BanHTMLFilePath)
+	}
 
 	bouncer := &Bouncer{
 		next:     next,
