@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	httptemplate "html/template"
 	"io"
 	"net/http"
 	"net/url"
@@ -106,7 +107,7 @@ type Bouncer struct {
 	crowdsecStreamRoute     string
 	crowdsecHeader          string
 	redisUnreachableBlock   bool
-	banTemplateString       string
+	banTemplate             *httptemplate.Template
 	clientPoolStrategy      *ip.PoolStrategy
 	serverPoolStrategy      *ip.PoolStrategy
 	httpClient              *http.Client
@@ -159,22 +160,15 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CrowdsecLapiKey = apiKey
 	}
 
-	var banTemplateString string
-	if config.BanHTMLFilePath != "" {
-		var buf bytes.Buffer
-		banTemplate, _ := configuration.GetHTMLTemplate(config.BanHTMLFilePath)
-		err = banTemplate.Execute(&buf, nil)
-		if err != nil {
-			log.Error("New:banTemplate is bad formatted " + err.Error())
-			return nil, err
-		}
-		banTemplateString = buf.String()
-	}
+	var banTemplate *httptemplate.Template
+    if config.BanHTMLFilePath != "" {
+        banTemplate, _ = configuration.GetHTMLTemplate(config.BanHTMLFilePath)
+    }
 
 	bouncer := &Bouncer{
 		next:     next,
 		name:     name,
-		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
+		template: texttemplate.New("CrowdsecBouncer").Delims("[[", "]]"),
 
 		enabled:                 config.Enabled,
 		crowdsecMode:            config.CrowdsecMode,
@@ -198,7 +192,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
 		remediationStatusCode:   config.RemediationStatusCode,
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
-		banTemplateString:       banTemplateString,
+		banTemplate:             banTemplate,
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
@@ -296,13 +290,13 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.forwardedCustomHeader)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
-		handleBanServeHTTP(bouncer, rw, req.Method)
+		handleBanServeHTTP(bouncer, rw, req.Method, "TECHNICAL_ISSUE")
 		return
 	}
 	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
-		handleBanServeHTTP(bouncer, rw, req.Method)
+		handleBanServeHTTP(bouncer, rw, req.Method, "TECHNICAL_ISSUE")
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
@@ -311,12 +305,12 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		bouncer.next.ServeHTTP(rw, req)
 		return
 	}
-
+	
 	if bouncer.crowdsecMode == configuration.AppsecMode {
 		handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		return
 	}
-
+	
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
 		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
@@ -330,27 +324,27 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 			if cacheErrString != cache.CacheMiss {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
-				handleBanServeHTTP(bouncer, rw, req.Method)
+				handleBanServeHTTP(bouncer, rw, req.Method, "TECHNICAL_ISSUE")
 				return
 			}
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
 			if value == cache.NoBannedValue {
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
-			} else {
+				} else {
 				handleRemediationServeHTTP(bouncer, remoteIP, value, rw, req)
 			}
 			return
 		}
 	}
-
+	
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
-			handleBanServeHTTP(bouncer, rw, req.Method)
+			handleBanServeHTTP(bouncer, rw, req.Method, "TECHNICAL_ISSUE")
 		}
 	} else {
 		value, err := handleNoStreamCache(bouncer, remoteIP)
@@ -392,13 +386,13 @@ type Login struct {
 }
 
 // To append Headers we need to call rw.WriteHeader after set any header.
-func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter, method string) {
+func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter, method, reason string) {
 	atomic.AddInt64(&blockedRequests, 1)
-
+	
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
-	if bouncer.banTemplateString == "" {
+	if bouncer.banTemplate == nil {
 		rw.WriteHeader(bouncer.remediationStatusCode)
 		return
 	}
@@ -408,10 +402,9 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter, method string)
 	if method == http.MethodHead {
 		return
 	}
-	_, err := fmt.Fprint(rw, bouncer.banTemplateString)
+	err := bouncer.banTemplate.Execute(rw, map[string]string{"RemediationReason": reason})
 	if err != nil {
-		// use warn when https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/276 is completed
-		bouncer.log.Error("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
+		bouncer.log.Error("handleBanServeHTTP banTemplateServe " + err.Error())
 	}
 }
 
@@ -426,14 +419,14 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
-	handleBanServeHTTP(bouncer, rw, req.Method)
+	handleBanServeHTTP(bouncer, rw, req.Method, "LAPI")
 }
 
 func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
 	if bouncer.appsecEnabled {
 		if err := appsecQuery(bouncer, remoteIP, req); err != nil {
 			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
-			handleBanServeHTTP(bouncer, rw, req.Method)
+			handleBanServeHTTP(bouncer, rw, req.Method, "APPSEC")
 			return
 		}
 	}
