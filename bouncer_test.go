@@ -189,7 +189,8 @@ func Test_crowdsecQuery(t *testing.T) {
 }
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
-	banTemplate := htmltemplate.New("html").parse("<html>You are banned</html>")
+	html := "<html>You are banned</html>"
+	banTemplate := htmltemplate.New("html").parse(html)
 	tests := []struct {
 		name              string
 		method            string
@@ -233,7 +234,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			bouncer := &Bouncer{
 				remediationStatusCode:   http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
-				banTemplate:             tt.banTemplateString,
+				banTemplate:             tt.banTemplate,
 			}
 
 			rw := httptest.NewRecorder()
@@ -260,8 +261,8 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 
 			// If we expect body content, verify it matches template
-			if tt.expectBodyContent && body != tt.banTemplateString {
-				t.Errorf("Expected body %q, got %q", tt.banTemplateString, body)
+			if tt.expectBodyContent && body != html {
+				t.Errorf("Expected body %q, got %q", html, body)
 			}
 		})
 	}
