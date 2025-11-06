@@ -189,11 +189,11 @@ func Test_crowdsecQuery(t *testing.T) {
 }
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
-	banTemplate := httptemplate.New("html").parse("<html>You are banned</html>")
+	banTemplate := htmltemplate.New("html").parse("<html>You are banned</html>")
 	tests := []struct {
 		name              string
 		method            string
-		banTemplate       *httptemplate.Template
+		banTemplate       *htmltemplate.Template
 		expectBodyContent bool
 	}{
 		{
