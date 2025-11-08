@@ -290,13 +290,13 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.forwardedCustomHeader)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
-		handleBanServeHTTP(bouncer, rw, req.Method, "TECHNICAL_ISSUE")
+		handleBanServeHTTP(bouncer, rw, req.Method, configuration.ReasonTECH)
 		return
 	}
 	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
-		handleBanServeHTTP(bouncer, rw, req.Method, "TECHNICAL_ISSUE")
+		handleBanServeHTTP(bouncer, rw, req.Method, configuration.ReasonTECH)
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
@@ -324,7 +324,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 			if cacheErrString != cache.CacheMiss {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
-				handleBanServeHTTP(bouncer, rw, req.Method, "TECHNICAL_ISSUE")
+				handleBanServeHTTP(bouncer, rw, req.Method, configuration.ReasonTECH)
 				return
 			}
 		} else {
@@ -344,7 +344,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
-			handleBanServeHTTP(bouncer, rw, req.Method, "TECHNICAL_ISSUE")
+			handleBanServeHTTP(bouncer, rw, req.Method, configuration.ReasonTECH)
 		}
 	} else {
 		value, err := handleNoStreamCache(bouncer, remoteIP)
@@ -419,14 +419,14 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
-	handleBanServeHTTP(bouncer, rw, req.Method, "LAPI")
+	handleBanServeHTTP(bouncer, rw, req.Method, configuration.ReasonLAPI)
 }
 
 func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
 	if bouncer.appsecEnabled {
 		if err := appsecQuery(bouncer, remoteIP, req); err != nil {
 			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
-			handleBanServeHTTP(bouncer, rw, req.Method, "APPSEC")
+			handleBanServeHTTP(bouncer, rw, req.Method, configuration.ReasonAPPSEC)
 			return
 		}
 	}

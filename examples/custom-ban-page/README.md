@@ -49,7 +49,7 @@ make run_custom_ban_page
 ## Another thing to note
 In the html of the ban page, you can use {{ .RemediationReason }} that convert on runtime into why the ban page is served.
 It's an enum with "APPSEC", "LAPI", "TECHNICAL_ISSUE".
-It is useful to help user understand why its request is blocked.
+It is useful to help user understand why the request is blocked.
 ```
 <script>var remediation = "{{ .RemediationReason }}"</script>
 ```
