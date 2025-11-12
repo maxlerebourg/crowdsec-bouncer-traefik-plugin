@@ -47,10 +47,11 @@ make run_custom_ban_page
 ```
 
 ## Another thing to note
-In the html of the ban page, you can use {{ .RemediationReason }} that convert on runtime into why the ban page is served.
-It's an enum with "APPSEC", "LAPI", "TECHNICAL_ISSUE".
-It is useful to help user understand why the request is blocked.
+In the html of the ban page, you can use:  
+- {{ .ClientIP }} to display the IP used to ban the request.  
+- {{ .RemediationReason }} that convert on runtime into why the ban page is served. It's an enum with "APPSEC", "LAPI", "TECHNICAL_ISSUE" and it is useful to help user understand why the request is blocked.  
 ```
 <script>var remediation = "{{ .RemediationReason }}"</script>
+<script>var clientIp = "{{ .ClientIP }}"</script>
 ```
 With the above tweak and some other js, you can customize your ban page on runtime.

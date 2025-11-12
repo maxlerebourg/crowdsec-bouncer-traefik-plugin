@@ -238,7 +238,8 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 
 			rw := httptest.NewRecorder()
-			handleBanServeHTTP(bouncer, rw, tt.method, "TEST")
+			req := &http.Request{Method: tt.method}
+			bouncer.handleBanServeHTTP(rw, req, "TEST")
 
 			// Check status code
 			if rw.Code != http.StatusForbidden {
@@ -267,6 +268,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 		})
 	}
 }
+
 func TestCaptchaMethodBasedLogic(t *testing.T) {
 	tests := []struct {
 		name              string
