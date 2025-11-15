@@ -41,7 +41,6 @@ wicketkeeper:
   ports:
     - "8080:8080"
   environment:
-    - ROOT_URL=http://localhost:8080
     - LISTEN_PORT=8080
     - REDIS_ADDR=redis:6379
     - DIFFICULTY=4
@@ -53,6 +52,10 @@ wicketkeeper:
     - redis
 redis:
   image: redis/redis-stack-server:latest
+```
+
+```html
+<div id="captcha" class="{{ .FrontendKey }}" data-sitekey="{{ .SiteKey }}" data-callback="captchaCallback" data-challenge-url="http://captcha.localhost:8000/v0/challenge">
 ```
 
 ## Exemple navigation
