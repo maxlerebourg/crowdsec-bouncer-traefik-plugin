@@ -2,6 +2,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	htmltemplate "html/template"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -188,40 +189,42 @@ func Test_crowdsecQuery(t *testing.T) {
 }
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
+	html := "<html>You are banned</html>"
+	banTemplate, _ := htmltemplate.New("html").Parse(html)
 	tests := []struct {
 		name              string
 		method            string
-		banTemplateString string
+		banTemplate       *htmltemplate.Template
 		expectBodyContent bool
 	}{
 		{
 			name:              "GET request should have body with template",
 			method:            http.MethodGet,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: true,
 		},
 		{
 			name:              "HEAD request should NOT have body even with template",
 			method:            http.MethodHead,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: false,
 		},
 		{
 			name:              "POST request should have body with template",
 			method:            http.MethodPost,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: true,
 		},
 		{
 			name:              "PUT request should have body with template",
 			method:            http.MethodPut,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: true,
 		},
 		{
 			name:              "DELETE request should have body with template",
 			method:            http.MethodDelete,
-			banTemplateString: "<html>You are banned</html>",
+			banTemplate:       banTemplate,
 			expectBodyContent: true,
 		},
 	}
@@ -229,16 +232,17 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bouncer := &Bouncer{
-				remediationStatusCode:   403,
+				remediationStatusCode:   http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
-				banTemplateString:       tt.banTemplateString,
+				banTemplate:             tt.banTemplate,
 			}
 
 			rw := httptest.NewRecorder()
-			handleBanServeHTTP(bouncer, rw, tt.method)
+			req := &http.Request{Method: tt.method}
+			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
 
 			// Check status code
-			if rw.Code != 403 {
+			if rw.Code != http.StatusForbidden {
 				t.Errorf("Expected status code 403, got %d", rw.Code)
 			}
 
@@ -258,12 +262,13 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 
 			// If we expect body content, verify it matches template
-			if tt.expectBodyContent && body != tt.banTemplateString {
-				t.Errorf("Expected body %q, got %q", tt.banTemplateString, body)
+			if tt.expectBodyContent && body != html {
+				t.Errorf("Expected body %q, got %q", html, body)
 			}
 		})
 	}
 }
+
 func TestCaptchaMethodBasedLogic(t *testing.T) {
 	tests := []struct {
 		name              string
