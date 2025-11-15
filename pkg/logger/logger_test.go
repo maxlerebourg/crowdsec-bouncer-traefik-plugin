@@ -31,10 +31,6 @@ func TestNew(t *testing.T) {
 			logLevel: "DEBUG",
 		},
 		{
-			name:     "TRACE level",
-			logLevel: "TRACE",
-		},
-		{
 			name:     "Default level (INFO)",
 			logLevel: "INVALID",
 		},

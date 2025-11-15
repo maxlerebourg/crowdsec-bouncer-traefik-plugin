@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // Enums for crowdsec mode.
@@ -29,7 +28,6 @@ const (
 	AppsecMode        = "appsec"
 	HTTPS             = "https"
 	HTTP              = "http"
-	LogTRACE          = "TRACE"
 	LogDEBUG          = "DEBUG"
 	LogINFO           = "INFO"
 	LogWARN           = "WARN"
@@ -205,7 +203,7 @@ func GetHTMLTemplate(path string) (*template.Template, error) {
 // ValidateParams validate all the param gave by user.
 //
 //nolint:gocyclo,gocognit
-func ValidateParams(config *Config) error {
+func ValidateParams(config *Config, log *slog.Logger) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err
 	}
@@ -214,10 +212,10 @@ func ValidateParams(config *Config) error {
 		return err
 	}
 
-	if err := validateParamsIPs(config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
+	if err := validateParamsIPs(log, config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
 		return err
 	}
-	if err := validateParamsIPs(config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
+	if err := validateParamsIPs(log, config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
 		return err
 	}
 
@@ -291,8 +289,8 @@ func ValidateParams(config *Config) error {
 
 	// Check logging configuration
 	// to upper allow of anycase of log level
-	if !contains([]string{LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
-		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s,%s)", LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR)
+	if !contains([]string{LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogWARN, LogERROR)
 	}
 	if config.LogFilePath != "" {
 		_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
@@ -340,9 +338,9 @@ func validateParamsTLS(config *Config) error {
 	return nil
 }
 
-func validateParamsIPs(listIP []string, key string) error {
+func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 	if len(listIP) > 0 {
-		if _, err := ip.NewChecker(logger.New(LogINFO, "").Logger, listIP); err != nil {
+		if _, err := ip.NewChecker(log, listIP); err != nil {
 			return fmt.Errorf("%s must be a list of IP/CIDR :%w", key, err)
 		}
 	}
@@ -425,11 +423,11 @@ func GetTLSConfigCrowdsec(config *Config, log *slog.Logger) (*tls.Config, error)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	//nolint:gocritic
 	if config.CrowdsecLapiScheme != HTTPS {
-		log.Debug("getTLSConfigCrowdsec:CrowdsecLapiScheme https:no")
+		log.Info("getTLSConfigCrowdsec:CrowdsecLapiScheme https:no")
 		return tlsConfig, nil
 	} else if config.CrowdsecLapiTLSInsecureVerify {
 		tlsConfig.InsecureSkipVerify = true
-		log.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify tlsInsecure:true")
+		log.Info("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify tlsInsecure:true")
 		// If we return here and still want to use client auth this won't work
 		// return tlsConfig, nil
 	} else {
@@ -443,7 +441,7 @@ func GetTLSConfigCrowdsec(config *Config, log *slog.Logger) (*tls.Config, error)
 				// and CA not load, we can't communicate with https
 				return nil, errors.New("getTLSConfigCrowdsec:cannot load CA and verify cert is enabled")
 			}
-			log.Debug("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority CA added successfully")
+			log.Info("getTLSConfigCrowdsec:CrowdsecLapiTLSCertificateAuthority CA added successfully")
 		}
 	}
 

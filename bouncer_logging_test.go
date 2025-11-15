@@ -193,12 +193,6 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 		forbiddenLevels []string // Levels that should NOT appear
 	}{
 		{
-			name:            "TRACE level should show TRACE and DEBUG (bouncer's actual log levels)",
-			logLevel:        "TRACE",
-			expectedLevels:  []string{"TRACE", "DEBUG"},
-			forbiddenLevels: []string{}, // All levels that appear should be allowed
-		},
-		{
 			name:            "DEBUG level should show DEBUG only (no TRACE)",
 			logLevel:        "DEBUG",
 			expectedLevels:  []string{"DEBUG"},

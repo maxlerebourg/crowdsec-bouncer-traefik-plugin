@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -112,7 +113,7 @@ type Bouncer struct {
 	httpClient              *http.Client
 	cacheClient             *cache.Client
 	captchaClient           *captcha.Client
-	log                     *logger.Log
+	log                     *slog.Logger
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -121,14 +122,14 @@ type Bouncer struct {
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
-	err := configuration.ValidateParams(config)
+	err := configuration.ValidateParams(config, log)
 	if err != nil {
 		log.Error("New:validateParams " + err.Error())
 		return nil, err
 	}
 
-	serverChecker, _ := ip.NewChecker(log.Logger, config.ForwardedHeadersTrustedIPs)
-	clientChecker, _ := ip.NewChecker(log.Logger, config.ClientTrustedIPs)
+	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
+	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
 
 	var tlsConfig *tls.Config
 	crowdsecStreamRoute := ""
@@ -146,7 +147,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	} else {
 		crowdsecStreamRoute = crowdsecLapiStreamRoute
 		crowdsecHeader = crowdsecLapiHeader
-		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log.Logger)
+		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log)
 		if err != nil {
 			log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
 			return nil, err
@@ -306,7 +307,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
-	bouncer.log.Trace(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
+	bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 	if isTrusted {
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -322,7 +323,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
 		if cacheErr != nil {
 			cacheErrString := cacheErr.Error()
-			bouncer.log.Trace(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
+			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
 			if !bouncer.redisUnreachableBlock && cacheErrString == cache.CacheUnreachable {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", remoteIP))
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
@@ -334,7 +335,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 		} else {
-			bouncer.log.Trace(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
+			bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
 			if value == cache.NoBannedValue {
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			} else {
@@ -415,7 +416,7 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter, method string)
 }
 
 func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw http.ResponseWriter, req *http.Request) {
-	bouncer.log.Trace(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
+	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
@@ -431,7 +432,7 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
 	if bouncer.appsecEnabled {
 		if err := appsecQuery(bouncer, remoteIP, req); err != nil {
-			bouncer.log.Trace(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
+			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
 			handleBanServeHTTP(bouncer, rw, req.Method)
 			return
 		}
@@ -459,7 +460,7 @@ func handleMetricsTicker(bouncer *Bouncer) {
 	}
 }
 
-func startTicker(name string, updateInterval int64, log *logger.Log, work func()) chan bool {
+func startTicker(name string, updateInterval int64, log *slog.Logger, work func()) chan bool {
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
@@ -526,7 +527,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	case "captcha":
 		value = cache.CaptchaValue
 	default:
-		bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
+		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 	}
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
 		durationSecond := int64(duration.Seconds())
@@ -564,9 +565,9 @@ func getToken(bouncer *Bouncer) error {
 	}
 	if login.Code == 200 && len(login.Token) > 0 {
 		bouncer.crowdsecKey = login.Token
-		bouncer.log.Debug(fmt.Sprintf("getToken statusCode:%d", login.Code))
 		return nil
 	}
+	bouncer.log.Warn(fmt.Sprintf("getToken statusCode:%d", login.Code))
 	return fmt.Errorf("getToken statusCode:%d", login.Code)
 }
 
@@ -577,7 +578,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	// because updated routine information is in the cache
 	_, err := bouncer.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
-		bouncer.log.Debug("handleStreamCache:alreadyUpdated")
+		bouncer.log.Info("handleStreamCache:alreadyUpdated")
 		return nil
 	}
 	if err.Error() != cache.CacheMiss {
@@ -609,7 +610,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 			case "captcha":
 				value = cache.CaptchaValue
 			default:
-				bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
+				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 			}
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
 		}
@@ -617,7 +618,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
-	bouncer.log.Debug("handleStreamCache:updated")
+	bouncer.log.Info("handleStreamCache:updated")
 	return nil
 }
 
@@ -729,7 +730,7 @@ func reportMetrics(bouncer *Bouncer) error {
 	currentCount := atomic.LoadInt64(&blockedRequests)
 	windowSizeSeconds := int(now.Sub(lastMetricsPush).Seconds())
 
-	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
+	bouncer.log.Info(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
 
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{

@@ -27,7 +27,7 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 		ipMask := strings.TrimSpace(ipMaskRaw)
 		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
 			checker.authorizedIPs = append(checker.authorizedIPs, &ipAddr)
-			log.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
+			log.Info(fmt.Sprintf("IP %v is trusted", ipAddr))
 			continue
 		}
 
@@ -36,7 +36,7 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipAddr, err)
 		}
 		checker.authorizedIPsNet = append(checker.authorizedIPsNet, ipAddr)
-		log.Debug(fmt.Sprintf("IP network %v is trusted", ipAddr))
+		log.Info(fmt.Sprintf("IP network %v is trusted", ipAddr))
 	}
 
 	return checker, nil

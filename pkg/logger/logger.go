@@ -11,30 +11,19 @@ import (
 
 // Custom log levels following slog best practices.
 const (
-	LevelTrace = slog.Level(-8) // More verbose than DEBUG
 	LevelDebug = slog.LevelDebug
 	LevelInfo  = slog.LevelInfo
 	LevelWarn  = slog.LevelWarn
 	LevelError = slog.LevelError
 )
 
-// Log wraps slog.Logger to add a Trace method for consistent logging interface.
-type Log struct {
-	*slog.Logger
-}
-
-// Trace logs at TRACE level using the custom LevelTrace.
-func (l *Log) Trace(msg string) {
-	l.Logger.Log(context.Background(), LevelTrace, msg)
-}
-
 // New creates a Log wrapper with default format (common).
-func New(logLevel string, logFilePath string) *Log {
+func New(logLevel string, logFilePath string) *slog.Logger {
 	return NewWithFormat(logLevel, logFilePath, "common")
 }
 
 // NewWithFormat creates a Log wrapper with specified format (common or json).
-func NewWithFormat(logLevel string, logFilePath string, logFormat string) *Log {
+func NewWithFormat(logLevel string, logFilePath string, logFormat string) *slog.Logger {
 	// Determine log level
 	var level slog.Level
 	switch logLevel {
@@ -46,8 +35,6 @@ func NewWithFormat(logLevel string, logFilePath string, logFormat string) *Log {
 		level = LevelInfo
 	case "DEBUG":
 		level = LevelDebug
-	case "TRACE":
-		level = LevelTrace
 	default:
 		// Default to INFO level
 		level = LevelInfo
@@ -75,18 +62,16 @@ func NewWithFormat(logLevel string, logFilePath string, logFormat string) *Log {
 		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			// Customize level names to match our expected format
 			if a.Key == slog.LevelKey {
-				level, ok := a.Value.Any().(slog.Level)
+				lvl, ok := a.Value.Any().(slog.Level)
 				if !ok {
 					return a
 				}
 				switch {
-				case level < LevelDebug:
-					a.Value = slog.StringValue("TRACE")
-				case level < LevelInfo:
+				case lvl < LevelInfo:
 					a.Value = slog.StringValue("DEBUG")
-				case level < LevelWarn:
+				case lvl < LevelWarn:
 					a.Value = slog.StringValue("INFO")
-				case level < LevelError:
+				case lvl < LevelError:
 					a.Value = slog.StringValue("WARN")
 				default:
 					a.Value = slog.StringValue("ERROR")
@@ -104,7 +89,5 @@ func NewWithFormat(logLevel string, logFilePath string, logFormat string) *Log {
 	}
 
 	// Create logger with component attribute
-	logger := slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
-
-	return &Log{Logger: logger}
+	return slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
 }
