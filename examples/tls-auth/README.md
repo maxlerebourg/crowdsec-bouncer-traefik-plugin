@@ -90,3 +90,7 @@ make run_tlsauth
 
 Note:
 > Traefik need to be restart if certificates are regenerated after his launch
+
+## Separate LAPI and Appsec HTTP/S config
+To separate TLS config for LAPI and Appsec, you can use all the TLS LAPI variable beginning with `CrowdsecLapi...` into `CrowdsecAppsec...`.
+Don't forget to set `CrowdsecAppsecScheme: HTTP` or `HTTPS` to trigger the separate setup.
