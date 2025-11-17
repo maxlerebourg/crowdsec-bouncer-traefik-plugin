@@ -85,8 +85,10 @@ type Bouncer struct {
 
 	enabled                 bool
 	appsecEnabled           bool
+	appsecScheme            string
 	appsecHost              string
 	appsecPath              string
+	appsecKey               string
 	appsecFailureBlock      bool
 	appsecUnreachableBlock  bool
 	appsecBodyLimit         int64
@@ -111,6 +113,7 @@ type Bouncer struct {
 	clientPoolStrategy      *ip.PoolStrategy
 	serverPoolStrategy      *ip.PoolStrategy
 	httpClient              *http.Client
+	httpAppsecClient        *http.Client
 	cacheClient             *cache.Client
 	captchaClient           *captcha.Client
 	log                     *logger.Log
@@ -130,6 +133,17 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
+	tlsAppsecConfig, err := configuration.GetTLSConfigCrowdsec(config, log, true)
+	if err != nil {
+		log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
+		return nil, err
+	}
+	apiAppsecKey, errAppsecKey := configuration.GetVariable(config, "CrowdsecAppsecKey")
+	if errAppsecKey != nil && len(tlsAppsecConfig.Certificates) == 0 {
+		log.Error("New:crowdsecLapiKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
+		return nil, errAppsecKey
+	}
+	config.CrowdsecAppsecKey = apiAppsecKey
 
 	var tlsConfig *tls.Config
 	crowdsecStreamRoute := ""
@@ -140,22 +154,22 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CrowdsecLapiScheme = configuration.HTTPS
 		config.CrowdsecLapiHost = crowdsecCapiHost
 		config.CrowdsecLapiPath = "/"
-		config.CrowdsecAppsecEnabled = false
+		config.CrowdsecAppsecEnabled = config.CrowdsecAppsecEnabled && config.CrowdsecAppsecScheme != ""
 		config.UpdateIntervalSeconds = 7200 // 2 hours
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
 		crowdsecHeader = crowdsecCapiHeader
 	} else {
 		crowdsecStreamRoute = crowdsecLapiStreamRoute
 		crowdsecHeader = crowdsecLapiHeader
-		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log)
+		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log, false)
 		if err != nil {
 			log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
 			return nil, err
 		}
-		apiKey, errAPIKey := configuration.GetVariable(config, "CrowdsecLapiKey")
-		if errAPIKey != nil && len(tlsConfig.Certificates) == 0 {
-			log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup " + errAPIKey.Error())
-			return nil, errAPIKey
+		apiKey, errKey := configuration.GetVariable(config, "CrowdsecLapiKey")
+		if errKey != nil && len(tlsConfig.Certificates) == 0 {
+			log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup " + errKey.Error())
+			return nil, errKey
 		}
 		config.CrowdsecLapiKey = apiKey
 	}
@@ -173,8 +187,10 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		enabled:                 config.Enabled,
 		crowdsecMode:            config.CrowdsecMode,
 		appsecEnabled:           config.CrowdsecAppsecEnabled,
+		appsecScheme:            config.CrowdsecAppsecScheme,
 		appsecHost:              config.CrowdsecAppsecHost,
 		appsecPath:              config.CrowdsecAppsecPath,
+		appsecKey:               config.CrowdsecAppsecKey,
 		appsecFailureBlock:      config.CrowdsecAppsecFailureBlock,
 		appsecUnreachableBlock:  config.CrowdsecAppsecUnreachableBlock,
 		appsecBodyLimit:         config.CrowdsecAppsecBodyLimit,
@@ -207,6 +223,14 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 				MaxIdleConns:    10,
 				IdleConnTimeout: 30 * time.Second,
 				TLSClientConfig: tlsConfig,
+			},
+			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+		},
+		httpAppsecClient: &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConns:    10,
+				IdleConnTimeout: 30 * time.Second,
+				TLSClientConfig: tlsAppsecConfig,
 			},
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
@@ -656,7 +680,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	routeURL := url.URL{
-		Scheme: bouncer.crowdsecScheme,
+		Scheme: bouncer.appsecScheme,
 		Host:   bouncer.appsecHost,
 		Path:   bouncer.appsecPath,
 	}
@@ -681,14 +705,14 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 			req.Header.Add(key, value)
 		}
 	}
-	req.Header.Set(crowdsecAppsecHeader, bouncer.crowdsecKey)
+	req.Header.Set(crowdsecAppsecHeader, bouncer.appsecKey)
 	req.Header.Set(crowdsecAppsecIPHeader, ip)
 	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
 	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
 	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
 	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
 
-	res, err := bouncer.httpClient.Do(req)
+	res, err := bouncer.httpAppsecClient.Do(req)
 	if err != nil {
 		bouncer.log.Error("appsecQuery:unreachable")
 		if bouncer.appsecUnreachableBlock {
