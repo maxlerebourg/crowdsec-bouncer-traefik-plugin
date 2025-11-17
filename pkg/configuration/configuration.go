@@ -478,8 +478,6 @@ func getTLSConfig(config *Config, log *logger.Log, prefix, scheme string, insecu
 // GetTLSConfigCrowdsec get TLS config from Config.
 func GetTLSConfigCrowdsec(config *Config, log *logger.Log, isAppsec bool) (*tls.Config, error) {
 	var prefix string
-	var tlsConfig *tls.Config
-	var err error
 	if isAppsec && config.CrowdsecAppsecScheme != "" {
 		prefix = "CrowdsecAppsec"
 		return getTLSConfig(config, log, prefix, config.CrowdsecAppsecScheme, config.CrowdsecAppsecTLSInsecureVerify)
