@@ -433,9 +433,10 @@ func validateParamsRequired(config *Config) error {
 func getTLSConfig(config *Config, log *logger.Log, prefix, scheme string, insecureVerify bool) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
+	//nolint:gocritic
 	if scheme != HTTPS {
-		log.Debug("getTLSConfigCrowdsec:" + prefix + "Scheme https:no")
-		return tlsConfig, nil
+			log.Debug("getTLSConfigCrowdsec:" + prefix + "Scheme https:no")
+			return tlsConfig, nil
 	} else if insecureVerify {
 		tlsConfig.InsecureSkipVerify = true
 		log.Debug("getTLSConfigCrowdsec:" + prefix + "TLSInsecureVerify tlsInsecure:true")
@@ -481,9 +482,7 @@ func GetTLSConfigCrowdsec(config *Config, log *logger.Log, isAppsec bool) (*tls.
 	if isAppsec && config.CrowdsecAppsecScheme != "" {
 		prefix = "CrowdsecAppsec"
 		return getTLSConfig(config, log, prefix, config.CrowdsecAppsecScheme, config.CrowdsecAppsecTLSInsecureVerify)
-	} else {
-		prefix = "CrowdsecLapi"
-		return getTLSConfig(config, log, prefix, config.CrowdsecLapiScheme, config.CrowdsecLapiTLSInsecureVerify)
-	}
-	
+	} 
+	prefix = "CrowdsecLapi"
+	return getTLSConfig(config, log, prefix, config.CrowdsecLapiScheme, config.CrowdsecLapiTLSInsecureVerify)
 }
