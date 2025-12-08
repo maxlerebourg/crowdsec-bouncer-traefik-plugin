@@ -483,7 +483,7 @@ func GetTLSConfigCrowdsec(config *Config, log *logger.Log, isAppsec bool) (*tls.
 	if isAppsec && config.CrowdsecAppsecScheme != "" {
 		prefix = "CrowdsecAppsec"
 		return getTLSConfig(config, log, prefix, config.CrowdsecAppsecScheme, config.CrowdsecAppsecTLSInsecureVerify)
-	} 
+	}
 	prefix = "CrowdsecLapi"
 	return getTLSConfig(config, log, prefix, config.CrowdsecLapiScheme, config.CrowdsecLapiTLSInsecureVerify)
 }
