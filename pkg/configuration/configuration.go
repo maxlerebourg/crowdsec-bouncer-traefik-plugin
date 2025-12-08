@@ -437,7 +437,7 @@ func getTLSConfig(config *Config, log *logger.Log, prefix, scheme string, insecu
 		log.Debug("getTLSConfigCrowdsec:" + prefix + "Scheme https:no")
 		return tlsConfig, nil
 	}
-	//nolint:gocritic
+	//nolint:nestif
 	if insecureVerify {
 		tlsConfig.InsecureSkipVerify = true
 		log.Debug("getTLSConfigCrowdsec:" + prefix + "TLSInsecureVerify tlsInsecure:true")
