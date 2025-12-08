@@ -444,7 +444,7 @@ func getTLSConfig(config *Config, log *logger.Log, prefix, scheme string, insecu
 		// If we return here and still want to use client auth this won't work
 		// return tlsConfig, nil
 	} else {
-		certAuthority, err := GetVariable(config, prefix + "TLSCertificateAuthority")
+		certAuthority, err := GetVariable(config, prefix+"TLSCertificateAuthority")
 		if err != nil {
 			return nil, err
 		}
@@ -457,11 +457,11 @@ func getTLSConfig(config *Config, log *logger.Log, prefix, scheme string, insecu
 			log.Debug("getTLSConfigCrowdsec:" + prefix + "TLSCertificateAuthority CA added successfully")
 		}
 	}
-	certBouncer, err := GetVariable(config, prefix + "TLSCertificateBouncer")
+	certBouncer, err := GetVariable(config, prefix+"TLSCertificateBouncer")
 	if err != nil {
 		return nil, err
 	}
-	certBouncerKey, err := GetVariable(config, prefix + "TLSCertificateBouncerKey")
+	certBouncerKey, err := GetVariable(config, prefix+"TLSCertificateBouncerKey")
 	if err != nil {
 		return nil, err
 	}
