@@ -433,11 +433,12 @@ func validateParamsRequired(config *Config) error {
 func getTLSConfig(config *Config, log *logger.Log, prefix, scheme string, insecureVerify bool) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
-	//nolint:gocritic
 	if scheme != HTTPS {
-			log.Debug("getTLSConfigCrowdsec:" + prefix + "Scheme https:no")
-			return tlsConfig, nil
-	} else if insecureVerify {
+		log.Debug("getTLSConfigCrowdsec:" + prefix + "Scheme https:no")
+		return tlsConfig, nil
+	}
+	//nolint:gocritic
+	if insecureVerify {
 		tlsConfig.InsecureSkipVerify = true
 		log.Debug("getTLSConfigCrowdsec:" + prefix + "TLSInsecureVerify tlsInsecure:true")
 		// If we return here and still want to use client auth this won't work
