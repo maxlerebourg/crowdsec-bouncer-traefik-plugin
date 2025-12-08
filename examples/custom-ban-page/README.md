@@ -54,6 +54,6 @@ In the html of the ban page, you can use:
 ```
 <script>var remediation = "{{ .RemediationReason }}"</script>
 <script>var clientIp = "{{ .ClientIP }}"</script>
-<script>var clientIp = "{{ .CustomHeader }}"</script>
+<script>var customHeader = "{{ .CustomHeader }}"</script>
 ```
 With the above tweak and some other js, you can customize your ban page on runtime.
