@@ -497,7 +497,7 @@ make run
   - string
   - default: ""
   - Path where the ban html file is stored (default empty ""=disabled)
-- TraceCustomHeader
+- TraceHeadersCustomName
   - string
   - default: ""
   - Request Header name whose value to inject in ban HTML response (default empty ""=disabled)
@@ -607,7 +607,7 @@ http:
           captchaGracePeriodSeconds: 1800
           captchaHTMLFilePath: /captcha.html
           banHTMLFilePath: /ban.html
-          traceCustomHeader: X-Request-ID
+          traceHeadersCustomName: X-Request-ID
           metricsUpdateIntervalSeconds: 600
 ```
 

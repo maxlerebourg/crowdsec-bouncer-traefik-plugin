@@ -194,7 +194,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		remediationStatusCode:   config.RemediationStatusCode,
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		banTemplate:             banTemplate,
-		traceCustomHeader:       config.TraceCustomHeader,
+		traceCustomHeader:       config.TraceHeadersCustomName,
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
@@ -411,8 +411,9 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 
 	if bouncer.traceCustomHeader != "" {
 		headerVal := req.Header.Get(bouncer.traceCustomHeader)
+
 		if headerVal != "" {
-			templateData["CustomHeader"] = headerVal
+			templateData["TraceID"] = headerVal
 		}
 	}
 
