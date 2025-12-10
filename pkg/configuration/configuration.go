@@ -84,6 +84,7 @@ type Config struct {
 	DefaultDecisionSeconds                    int64    `json:"defaultDecisionSeconds,omitempty"`
 	RemediationStatusCode                     int      `json:"remediationStatusCode,omitempty"`
 	HTTPTimeoutSeconds                        int64    `json:"httpTimeoutSeconds,omitempty"`
+	TraceHeadersCustomName                    string   `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName              string   `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName                string   `json:"forwardedHeadersCustomName,omitempty"`
 	ForwardedHeadersTrustedIPs                []string `json:"forwardedHeadersTrustedIps,omitempty"`

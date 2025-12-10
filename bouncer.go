@@ -110,6 +110,7 @@ type Bouncer struct {
 	crowdsecHeader          string
 	redisUnreachableBlock   bool
 	banTemplate             *htmltemplate.Template
+	traceCustomHeader       string
 	clientPoolStrategy      *ip.PoolStrategy
 	serverPoolStrategy      *ip.PoolStrategy
 	httpClient              *http.Client
@@ -209,6 +210,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		remediationStatusCode:   config.RemediationStatusCode,
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		banTemplate:             banTemplate,
+		traceCustomHeader:       config.TraceHeadersCustomName,
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
@@ -426,7 +428,21 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 	if req.Method == http.MethodHead {
 		return
 	}
-	err := bouncer.banTemplate.Execute(rw, map[string]string{"RemediationReason": reason, "ClientIP": remoteIP})
+	templateData := map[string]string{
+		"RemediationReason": reason,
+		"ClientIP":          remoteIP,
+	}
+
+	if bouncer.traceCustomHeader != "" {
+		headerVal := req.Header.Get(bouncer.traceCustomHeader)
+
+		if headerVal != "" {
+			templateData["TraceID"] = headerVal
+		}
+	}
+
+	err := bouncer.banTemplate.Execute(rw, templateData)
+
 	if err != nil {
 		bouncer.log.Error("handleBanServeHTTP banTemplateServe " + err.Error())
 	}
