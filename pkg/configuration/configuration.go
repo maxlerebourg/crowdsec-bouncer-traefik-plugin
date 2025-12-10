@@ -72,6 +72,7 @@ type Config struct {
 	UpdateIntervalSeconds                    int64    `json:"updateIntervalSeconds,omitempty"`
 	MetricsUpdateIntervalSeconds             int64    `json:"metricsUpdateIntervalSeconds,omitempty"`
 	UpdateMaxFailure                         int64    `json:"updateMaxFailure,omitempty"`
+	StreamStartupBlock                       bool     `json:"streamStartupBlock,omitempty"`
 	DefaultDecisionSeconds                   int64    `json:"defaultDecisionSeconds,omitempty"`
 	RemediationStatusCode                    int      `json:"remediationStatusCode,omitempty"`
 	HTTPTimeoutSeconds                       int64    `json:"httpTimeoutSeconds,omitempty"`
@@ -130,6 +131,7 @@ func New() *Config {
 		UpdateIntervalSeconds:          60,
 		MetricsUpdateIntervalSeconds:   600,
 		UpdateMaxFailure:               0,
+		StreamStartupBlock:             true,
 		DefaultDecisionSeconds:         60,
 		RemediationStatusCode:          http.StatusForbidden,
 		HTTPTimeoutSeconds:             10,
