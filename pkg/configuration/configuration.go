@@ -155,6 +155,7 @@ func New() *Config {
 		CaptchaGracePeriodSeconds:       1800,
 		CaptchaHTMLFilePath:             "/captcha.html",
 		BanHTMLFilePath:                 "",
+		TraceHeadersCustomName:          "",
 		RemediationHeadersCustomName:    "",
 		ForwardedHeadersCustomName:      "X-Forwarded-For",
 		ForwardedHeadersTrustedIPs:      []string{},
