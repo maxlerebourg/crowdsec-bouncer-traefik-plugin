@@ -330,8 +330,12 @@ make run
   - Enable the plugin
 - LogLevel
   - string
-  - default: `INFO`, expected values are: `INFO`, `DEBUG`, `ERROR`
+  - default: `INFO`, expected values are: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`
   - Log are written to `stdout` / `stderr` or file if LogFilePath is provided
+- LogFormat
+  - string
+  - default: `common`, expected values are: `common`, `json`
+  - Log format: `common` for traditional text logs, `json` for structured JSON logs
 - LogFilePath
   - string
   - default: ""
@@ -546,6 +550,7 @@ http:
         bouncer:
           enabled: false
           logLevel: DEBUG
+          logFormat: common
           LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0

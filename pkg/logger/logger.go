@@ -1,79 +1,93 @@
 // Package logger implements utility routines to write to stdout and stderr.
-// It supports trace, debug, info and error level
+// It supports trace, debug, info, warn and error level using Go's standard log/slog
 package logger
 
 import (
-	"fmt"
-	"io"
-	"log"
+	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
 
-// Log Logger struct.
-type Log struct {
-	logError *log.Logger
-	logInfo  *log.Logger
-	logDebug *log.Logger
+// Custom log levels following slog best practices.
+const (
+	LevelDebug = slog.LevelDebug
+	LevelInfo  = slog.LevelInfo
+	LevelWarn  = slog.LevelWarn
+	LevelError = slog.LevelError
+)
+
+// New creates a Log wrapper with default format (common).
+func New(logLevel string, logFilePath string) *slog.Logger {
+	return NewWithFormat(logLevel, logFilePath, "common")
 }
 
-// New Set Default log level to info in case log level to defined.
-func New(logLevel string, logFilePath string) *Log {
-	// Initialize loggers with discard output
-	logError := log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	logInfo := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
+// NewWithFormat creates a Log wrapper with specified format (common or json).
+func NewWithFormat(logLevel string, logFilePath string, logFormat string) *slog.Logger {
+	// Determine log level
+	var level slog.Level
+	switch logLevel {
+	case "ERROR":
+		level = LevelError
+	case "WARN":
+		level = LevelWarn
+	case "INFO":
+		level = LevelInfo
+	case "DEBUG":
+		level = LevelDebug
+	default:
+		// Default to INFO level
+		level = LevelInfo
+	}
 
-	// we initialize logger to STDOUT/STDERR first so if the file logger cannot be initialized we can inform the user
-	output := os.Stdout
-	errorOutput := os.Stderr
-
-	// prepare file logging if specified
+	// Set output destination
+	var output *os.File
 	if logFilePath != "" {
 		logFile, err := os.OpenFile(filepath.Clean(logFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err == nil {
 			output = logFile
-			errorOutput = logFile
 		} else {
-			_ = fmt.Errorf("LogFilePath is not writable %w", err)
+			// Fall back to stdout and log the error
+			output = os.Stdout
+			slog.Warn("LogFilePath is not writable, using stdout", "error", err)
 		}
+	} else {
+		output = os.Stdout
 	}
 
-	// Set error logger output
-	logError.SetOutput(errorOutput)
-
-	// Configure log levels
-	switch logLevel {
-	case "ERROR":
-		// Only error logging is enabled
-	case "INFO":
-		logInfo.SetOutput(output)
-	case "DEBUG":
-		logInfo.SetOutput(output)
-		logDebug.SetOutput(output)
-	default:
-		// Default to INFO level
-		logInfo.SetOutput(output)
+	// Create handler based on format with custom level names
+	var handler slog.Handler
+	opts := &slog.HandlerOptions{
+		Level: level,
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			// Customize level names to match our expected format
+			if a.Key == slog.LevelKey {
+				lvl, ok := a.Value.Any().(slog.Level)
+				if !ok {
+					return a
+				}
+				switch {
+				case lvl < LevelInfo:
+					a.Value = slog.StringValue("DEBUG")
+				case lvl < LevelWarn:
+					a.Value = slog.StringValue("INFO")
+				case lvl < LevelError:
+					a.Value = slog.StringValue("WARN")
+				default:
+					a.Value = slog.StringValue("ERROR")
+				}
+			}
+			return a
+		},
 	}
 
-	return &Log{
-		logError: logError,
-		logInfo:  logInfo,
-		logDebug: logDebug,
+	if logFormat == "json" {
+		handler = slog.NewJSONHandler(output, opts)
+	} else {
+		// Common format (default)
+		handler = slog.NewTextHandler(output, opts)
 	}
-}
 
-// Info log to Stdout.
-func (l *Log) Info(str string) {
-	l.logInfo.Printf("%s", str)
-}
-
-// Debug log to Stdout.
-func (l *Log) Debug(str string) {
-	l.logDebug.Printf("%s", str)
-}
-
-// Error log to Stderr.
-func (l *Log) Error(str string) {
-	l.logError.Printf("%s", str)
+	// Create logger with component attribute
+	return slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
 }

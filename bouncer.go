@@ -11,6 +11,7 @@ import (
 	"fmt"
 	htmltemplate "html/template"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -114,7 +115,7 @@ type Bouncer struct {
 	httpClient              *http.Client
 	cacheClient             *cache.Client
 	captchaClient           *captcha.Client
-	log                     *logger.Log
+	log                     *slog.Logger
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -122,8 +123,8 @@ type Bouncer struct {
 //nolint:gocyclo
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
-	log := logger.New(config.LogLevel, config.LogFilePath)
-	err := configuration.ValidateParams(config)
+	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
+	err := configuration.ValidateParams(config, log)
 	if err != nil {
 		log.Error("New:validateParams " + err.Error())
 		return nil, err
@@ -420,7 +421,7 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 	err := bouncer.banTemplate.Execute(rw, templateData)
 
 	if err != nil {
-		bouncer.log.Error("handleBanServeHTTP banTemplateServe " + err.Error())
+		bouncer.log.Warn("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
 	}
 }
 
@@ -451,7 +452,7 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 
 func handleStreamTicker(bouncer *Bouncer) {
 	if err := handleStreamCache(bouncer); err != nil {
-		bouncer.log.Debug(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
+		bouncer.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
 		if bouncer.updateMaxFailure != -1 && updateFailure >= bouncer.updateMaxFailure && isCrowdsecStreamHealthy {
 			isCrowdsecStreamHealthy = false
 			bouncer.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", updateFailure, err.Error()))
@@ -469,7 +470,7 @@ func handleMetricsTicker(bouncer *Bouncer) {
 	}
 }
 
-func startTicker(name string, updateInterval int64, log *logger.Log, work func()) chan bool {
+func startTicker(name string, updateInterval int64, log *slog.Logger, work func()) chan bool {
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
@@ -536,7 +537,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	case "captcha":
 		value = cache.CaptchaValue
 	default:
-		bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
+		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 	}
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
 		durationSecond := int64(duration.Seconds())
@@ -574,9 +575,9 @@ func getToken(bouncer *Bouncer) error {
 	}
 	if login.Code == 200 && len(login.Token) > 0 {
 		bouncer.crowdsecKey = login.Token
-		bouncer.log.Debug(fmt.Sprintf("getToken statusCode:%d", login.Code))
 		return nil
 	}
+	bouncer.log.Warn(fmt.Sprintf("getToken statusCode:%d", login.Code))
 	return fmt.Errorf("getToken statusCode:%d", login.Code)
 }
 
@@ -587,7 +588,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	// because updated routine information is in the cache
 	_, err := bouncer.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
-		bouncer.log.Debug("handleStreamCache:alreadyUpdated")
+		bouncer.log.Info("handleStreamCache:alreadyUpdated")
 		return nil
 	}
 	if err.Error() != cache.CacheMiss {
@@ -619,7 +620,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 			case "captcha":
 				value = cache.CaptchaValue
 			default:
-				bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
+				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 			}
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
 		}
@@ -627,7 +628,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
-	bouncer.log.Debug("handleStreamCache:updated")
+	bouncer.log.Info("handleStreamCache:updated")
 	return nil
 }
 
@@ -739,7 +740,7 @@ func reportMetrics(bouncer *Bouncer) error {
 	currentCount := atomic.LoadInt64(&blockedRequests)
 	windowSizeSeconds := int(now.Sub(lastMetricsPush).Seconds())
 
-	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
+	bouncer.log.Info(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
 
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{
