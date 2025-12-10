@@ -86,6 +86,7 @@ type Config struct {
 	RedisCacheDatabase                       string   `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock               bool     `json:"redisCacheUnreachableBlock,omitempty"`
 	BanHTMLFilePath                          string   `json:"banHtmlFilePath,omitempty"`
+	TraceHeadersCustomName                   string   `json:"traceHeadersCustomName,omitempty"`
 	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
 	CaptchaProvider                          string   `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                       string   `json:"captchaCustomJsUrl,omitempty"`
