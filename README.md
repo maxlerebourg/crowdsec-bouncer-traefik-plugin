@@ -554,6 +554,7 @@ http:
           httpTimeoutSeconds: 10
           crowdsecMode: live
           crowdsecAppsecEnabled: false
+          crowdsecAppsecScheme: ""
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecPath: "/"
           crowdsecAppsecFailureBlock: true
