@@ -179,7 +179,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 		config.CrowdsecLapiKey = apiKey
 		if config.CrowdsecAppsecKey == "" {
-				config.CrowdsecAppsecKey = apiKey
+			config.CrowdsecAppsecKey = apiKey
 		}
 	}
 
