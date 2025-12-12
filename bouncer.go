@@ -151,7 +151,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 		config.CrowdsecAppsecKey = apiAppsecKey
 	}
-	
 
 	var tlsConfig *tls.Config
 	crowdsecStreamRoute := ""
