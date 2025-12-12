@@ -140,7 +140,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		if config.CrowdsecAppsecScheme == "" {
 			config.CrowdsecAppsecScheme = config.CrowdsecLapiScheme
 		}
-		tlsAppsecConfig, err := configuration.GetTLSConfigCrowdsec(config, log, true)
+		tlsAppsecConfig, err = configuration.GetTLSConfigCrowdsec(config, log, true)
 		if err != nil {
 			log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
 			return nil, err
