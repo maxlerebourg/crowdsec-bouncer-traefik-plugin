@@ -310,17 +310,16 @@ make run
 ### Note
 
 > [!IMPORTANT]  
-> Some of the behaviours and configuration parameters are shared globally across *all* crowdsec middlewares even if you declare different middlewares with different settings. 
+> Some of the behaviours and configuration parameters are shared globally across _all_ crowdsec middlewares even if you declare different middlewares with different settings.
 >
 > **Cache is shared by all services**: This means if an IP is banned, all services which are protected by an instance of the plugin will deny requests from that IP
 >
 > If you define different caches for different middlewares, only the first one to be instantiated will be bound to the crowdsec stream.
 >
-> Overall, this middleware is designed in such a way that **only one instance of the plugin is *possible*.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, CrowdsecAppsecEnabled, etc.)
+> Overall, this middleware is designed in such a way that **only one instance of the plugin is _possible_.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, CrowdsecAppsecEnabled, etc.)
 
 > [!WARNING]  
-> **Appsec maximum body limit is defaulted to 10MB**
-> *Be careful when you upgrade to >1.4.x*
+> **Appsec maximum body limit is defaulted to 10MB** > _Be careful when you upgrade to >1.4.x_
 
 ### Variables
 
@@ -351,7 +350,26 @@ make run
 - CrowdsecAppsecHost
   - string
   - default: "crowdsec:7422"
-  - Crowdsec Appsec Server available on which host and port. The scheme will be handled by the CrowdsecLapiScheme var.
+  - Crowdsec Appsec Server available on which host and port.
+- CrowdsecAppsecTlsInsecureVerify
+  - bool
+  - default: false
+  - Disable verification of certificate presented by Appsec
+- CrowdsecAppsecTlsCertificateAuthority
+  - string
+  - default: ""
+  - PEM-encoded Certificate Authority of Appsec
+- CrowdsecAppsecTlsCertificateBouncer
+  - string
+  - default: ""
+  - PEM-encoded client Certificate of Appsec
+- CrowdsecAppsecTlsCertificateBouncerKey
+  - string
+  - default: ""
+  - PEM-encoded client private key of Appsec
+- CrowdsecAppsecScheme
+  - string
+  - default: value of `CrowdsecLapiScheme`, expected values are: `http`, `https`
 - CrowdsecAppsecPath
   - string
   - default: "/"
@@ -368,6 +386,10 @@ make run
   - int64
   - default: 10485760 (= 10MB)
   - Transmit only the first number of bytes to Crowdsec Appsec Server.
+- CrowdsecAppsecKey
+  - string
+  - default: value of `CrowdsecLapiKey`
+  - Crowdsec AppSec key for the bouncer.
 - CrowdsecLapiScheme
   - string
   - default: `http`, expected values are: `http`, `https`
@@ -614,7 +636,8 @@ http:
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CaptchaSiteKey`, `CaptchaSecretKey` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`,
+`CrowdsecAppsecTlsCertificateBouncerKey`, `CrowdsecAppsecTlsCertificateBouncer`, `CrowdsecAppsecTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CrowdsecAppsecKey`, `CaptchaSiteKey`, `CaptchaSecretKey` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:
