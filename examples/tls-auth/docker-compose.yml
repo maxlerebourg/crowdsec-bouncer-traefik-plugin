@@ -17,7 +17,6 @@ services:
       # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./LAPIKEY:/etc/traefik/LAPIKEY:ro
       - logs-tls-auth:/var/log/traefik
       - crowdsec-certs-tls-auth:/etc/traefik/crowdsec-certs
       # - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin

@@ -137,10 +137,10 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 	var tlsAppsecConfig *tls.Config
 	if config.CrowdsecAppsecEnabled {
+		tlsAppsecConfig, err = configuration.GetTLSConfigCrowdsec(config, log, true)
 		if config.CrowdsecAppsecScheme == "" {
 			config.CrowdsecAppsecScheme = config.CrowdsecLapiScheme
 		}
-		tlsAppsecConfig, err = configuration.GetTLSConfigCrowdsec(config, log, true)
 		if err != nil {
 			log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
 			return nil, err
@@ -382,6 +382,9 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	} else {
 		value, err := handleNoStreamCache(bouncer, remoteIP)
+		if err != nil {
+			bouncer.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
+		}
 		if value == cache.NoBannedValue {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 		} else {

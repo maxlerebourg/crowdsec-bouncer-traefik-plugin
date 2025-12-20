@@ -359,14 +359,6 @@ make run
   - string
   - default: ""
   - PEM-encoded Certificate Authority of Appsec
-- CrowdsecAppsecTlsCertificateBouncer
-  - string
-  - default: ""
-  - PEM-encoded client Certificate of Appsec
-- CrowdsecAppsecTlsCertificateBouncerKey
-  - string
-  - default: ""
-  - PEM-encoded client private key of Appsec
 - CrowdsecAppsecScheme
   - string
   - default: value of `CrowdsecLapiScheme`, expected values are: `http`, `https`
@@ -636,8 +628,7 @@ http:
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`,
-`CrowdsecAppsecTlsCertificateBouncerKey`, `CrowdsecAppsecTlsCertificateBouncer`, `CrowdsecAppsecTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CrowdsecAppsecKey`, `CaptchaSiteKey`, `CaptchaSecretKey` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecAppsecTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CrowdsecAppsecKey`, `CaptchaSiteKey`, `CaptchaSecretKey` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:
@@ -699,6 +690,13 @@ Set the `crowdsecLapiScheme` to https.
 
 Crowdsec must be listening in HTTPS for this to work.
 Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/tls-auth/README.md) or the official documentation: [docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
+
+#### Use HTTPS to communicate with the Appsec
+
+To communicate with the Appsec in HTTPS you need to either accept any certificates by setting the `crowdsecAppsecTLSInsecureVerify` to true or add the CA used by the server certificate of Crowdsec using `crowdsecAppsecTLSCertificateAuthority` or `crowdsecAppsecTLSCertificateAuthorityFile`.
+Set the `crowdsecAppsecScheme` to https.
+
+Currently AppSec does not support mTLS authentication for the AppSec Component.
 
 #### Manually add an IP to the blocklist (for testing purposes)
 

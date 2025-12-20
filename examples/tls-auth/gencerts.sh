@@ -1,5 +1,8 @@
 #!/bin/bash
 
+if [ -f "/out/inter-key.pem" ]; then
+  exit 0
+fi
 stdout=/out/res.log
 cfssl gencert --initca /in/ca.json 2>${stdout} | cfssljson --bare "/out/ca" && \
 # Generate an intermediate certificate that will be used to sign the client certificates
