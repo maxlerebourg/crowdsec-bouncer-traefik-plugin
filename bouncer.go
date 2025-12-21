@@ -134,17 +134,23 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
-	tlsAppsecConfig, err := configuration.GetTLSConfigCrowdsec(config, log, true)
-	if err != nil {
-		log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
-		return nil, err
+
+	var tlsAppsecConfig *tls.Config
+	if config.CrowdsecAppsecEnabled {
+		tlsAppsecConfig, err = configuration.GetTLSConfigCrowdsec(config, log, true)
+		if config.CrowdsecAppsecScheme == "" {
+			config.CrowdsecAppsecScheme = config.CrowdsecLapiScheme
+		}
+		if err != nil {
+			log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
+			return nil, err
+		}
+		apiAppsecKey, errAppsecKey := configuration.GetVariable(config, "CrowdsecAppsecKey")
+		if errAppsecKey != nil && len(tlsAppsecConfig.Certificates) == 0 {
+			log.Info("New:crowdsecLapiKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
+		}
+		config.CrowdsecAppsecKey = apiAppsecKey
 	}
-	apiAppsecKey, errAppsecKey := configuration.GetVariable(config, "CrowdsecAppsecKey")
-	if errAppsecKey != nil && len(tlsAppsecConfig.Certificates) == 0 {
-		log.Error("New:crowdsecLapiKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
-		return nil, errAppsecKey
-	}
-	config.CrowdsecAppsecKey = apiAppsecKey
 
 	var tlsConfig *tls.Config
 	crowdsecStreamRoute := ""
@@ -155,7 +161,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CrowdsecLapiScheme = configuration.HTTPS
 		config.CrowdsecLapiHost = crowdsecCapiHost
 		config.CrowdsecLapiPath = "/"
-		config.CrowdsecAppsecEnabled = config.CrowdsecAppsecEnabled && config.CrowdsecAppsecScheme != ""
 		config.UpdateIntervalSeconds = 7200 // 2 hours
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
 		crowdsecHeader = crowdsecCapiHeader
@@ -173,6 +178,9 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 			return nil, errKey
 		}
 		config.CrowdsecLapiKey = apiKey
+		if config.CrowdsecAppsecKey == "" {
+			config.CrowdsecAppsecKey = apiKey
+		}
 	}
 
 	var banTemplate *htmltemplate.Template
@@ -374,6 +382,9 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	} else {
 		value, err := handleNoStreamCache(bouncer, remoteIP)
+		if err != nil {
+			bouncer.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
+		}
 		if value == cache.NoBannedValue {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 		} else {

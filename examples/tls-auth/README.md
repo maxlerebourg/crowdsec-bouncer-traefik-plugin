@@ -1,7 +1,9 @@
 # Example
+
 ## Using https communication and tls authentication with Crowdsec
 
 ##### Summary
+
 This example demonstrates the use of https between the Traefik plugin and the Crowdsec LAPI.
 
 It is possible to communicate with the LAPI in https and still authenticate with API key.
@@ -17,7 +19,9 @@ In that case the setting **crowdsecLapiTLSInsecureVerify** must be set to true.
 It is recommended to validate the certificate presented by Crowdsec LAPI using the Certificate Authority which created it.
 
 You can provide the Certificate Authority using:
-* A file path readable by Traefik
+
+- A file path readable by Traefik
+
 ```yaml
 http:
   middlewares:
@@ -26,9 +30,11 @@ http:
         bouncer:
           crowdsecLapiTlsCertificateAuthorityFile: /etc/traefik/certs/crowdsecCA.pem
 ```
-* The PEM encoded certificate as a text variable
+
+- The PEM encoded certificate as a text variable
 
 In the static file configuration of Traefik
+
 ```yaml
 http:
   middlewares:
@@ -36,15 +42,17 @@ http:
       plugin:
         bouncer:
           crowdsecLapiTlsCertificateAuthority: |-
-              -----BEGIN CERTIFICATE-----
-              MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
-              MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
-              ...
-              C6qNieSwcvWL7C03ri0DefTQMY54r5wP33QU5hJ71JoaZI3YTeT0Nf+NRL4hM++w
-              Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
-              -----END CERTIFICATE-----
+            -----BEGIN CERTIFICATE-----
+            MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
+            MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
+            ...
+            C6qNieSwcvWL7C03ri0DefTQMY54r5wP33QU5hJ71JoaZI3YTeT0Nf+NRL4hM++w
+            Q0veeNzBQXg1f/JxfeA39IDIX1kiCf71tGlT
+            -----END CERTIFICATE-----
 ```
+
 In a dynamic configuration of a provider (ex docker) as a Label
+
 ```yaml
 services:
   whoami-foo:
@@ -71,26 +79,34 @@ The service `whoami-foo` will authenticate with an **API key** over HTTPS after 
 The service `whoami-bar` will authenticate with a **client certificate** signed by the CA.
 
 Access to a route that communicate via https and authenticate with API-key:
+
 ```
 curl http://localhost:8000/foo
 ```
+
 Access to a route that communicate via https and authenticate with a client certificate:
+
 ```
 curl http://localhost:8000/bar
 ```
+
 Access to the traefik dashboard
+
 ```
 curl http://localhost:8080/dashboard/#/
 ```
 
 To play the demo environnement run:
+
 ```bash
 make run_tlsauth
 ```
 
 Note:
-> Traefik need to be restarted if certificates are regenerated after his launch
+
+> Traefik need to be restarted if certificates are regenerated after his launch, crowdsec also
 
 ## Separate LAPI and Appsec HTTP/S config
+
 To separate TLS config for LAPI and Appsec, you can use all the TLS LAPI variable beginning with `CrowdsecLapi...` into `CrowdsecAppsec...`.
 Don't forget to set `CrowdsecAppsecScheme: HTTP` or `HTTPS` to trigger the separate setup.

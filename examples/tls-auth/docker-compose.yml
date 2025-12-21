@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.0.0"
+    image: "traefik:v3.5.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -13,15 +13,13 @@ services:
       - "--entrypoints.web.address=:80"
 
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.3.0"
+      - "--experimental.plugins.bouncer.version=v1.5.0"
       # - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./LAPIKEY:/etc/traefik/LAPIKEY:ro
       - logs-tls-auth:/var/log/traefik
       - crowdsec-certs-tls-auth:/etc/traefik/crowdsec-certs
       # - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-
     ports:
       - 8000:80
       - 8080:8080
@@ -29,7 +27,7 @@ services:
       - crowdsec
       - gencert
 
-# Use HTTPS scheme but with lapikey authentication
+  # Use HTTPS scheme but with lapikey authentication
   # whoami-foo:
   #   image: traefik/whoami
   #   container_name: "simple-service-foo"
@@ -38,7 +36,7 @@ services:
   #     - "traefik.enable=true"
   #     - "traefik.http.routers.router-foo.rule=Path(`/foo`)"
   #     - "traefik.http.routers.router-foo.entrypoints=web"
-  #     - "traefik.http.routers.router-foo.middlewares=crowdsec@docker" 
+  #     - "traefik.http.routers.router-foo.middlewares=crowdsec@docker"
   #     - "traefik.http.services.service-foo.loadbalancer.server.port=80"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
@@ -46,34 +44,41 @@ services:
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=https"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
 
-# Use HTTPS scheme with TLS cert authentication
+  # Use HTTPS scheme with TLS cert authentication
   whoami-bar:
     image: traefik/whoami
     container_name: "simple-service-bar"
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.router-bar.rule=Path(`/bar`)"
+      - "traefik.http.routers.router-bar.rule=PathPrefix(`/bar`)"
       - "traefik.http.routers.router-bar.entrypoints=web"
       - "traefik.http.routers.router-bar.middlewares=crowdsec@docker"
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecMode=none"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=https"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecscheme=https"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecAppsecTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
+
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapikey=40796d93c2958f9e58345514e67740e5="
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"      
-
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
+      # Enable AppSec
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+      # Define AppSec host and port informations
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.1-2
+    image: crowdsecurity/crowdsec:latest
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
-      COLLECTIONS: crowdsecurity/traefik
       CUSTOM_HOSTNAME: crowdsec
       # whoami-foo is authenticating with api key over https
       # whoami-bar is authenticating with tls cert over https
-      BOUNCER_KEY_TRAEFIK_FOO: 40796d93c2958f9e58345514e67740e5
+      BOUNCER_KEY_TRAEFIK_FOO: 40796d93c2958f9e58345514e67740e5=
       LOCAL_API_URL: https://127.0.0.1:8080
       USE_TLS: "true"
       CERT_FILE: "/etc/crowdsec/certs/server.pem"
@@ -88,6 +93,7 @@ services:
       # DISABLE_AGENT: "true"
       # Disabled for the examples
       DISABLE_ONLINE_API: "true"
+      COLLECTIONS: crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
     volumes:
       - ./config/acquis.yaml:/etc/crowdsec/acquis.yaml
       # - ./config/config.yaml:/etc/crowdsec/config_local.yaml
@@ -100,7 +106,7 @@ services:
       - "traefik.enable=false"
     depends_on:
       - gencert
-  
+
   gencert:
     build: .
     volumes:

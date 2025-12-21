@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.0.0"
+    image: "traefik:v3.5.0"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -16,8 +16,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - logs-local:/var/log/traefik
-      - './ban.html:/ban.html:ro'
-      - './captcha.html:/captcha.html:ro'
+      - "./ban.html:/ban.html:ro"
+      - "./captcha.html:/captcha.html:ro"
       - ./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     ports:
       - 8000:80
@@ -52,6 +52,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5="
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.ForwardedHeadersTrustedIPs=172.21.0.1/8"
 
   bar2:
     image: traefik/whoami
