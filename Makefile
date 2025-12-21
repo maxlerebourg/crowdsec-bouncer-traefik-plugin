@@ -99,7 +99,7 @@ clean_all_docker:
 	docker compose -f examples/redis-cache/docker-compose.yml down --remove-orphans
 	docker compose -f examples/trusted-ips/docker-compose.yml down --remove-orphans
 	docker compose -f examples/tls-auth/docker-compose.yml down --remove-orphans
-	docker compose -f examples/appsec-enabled/docker-compose.appsec-enabled.yml down --remove-orphans
+	docker compose -f examples/appsec-enabled/docker-compose.yml down --remove-orphans
 	docker compose -f examples/captcha/docker-compose.yml down --remove-orphans
 	docker compose -f examples/custom-captcha/docker-compose.yml down --remove-orphans
 	docker compose -f examples/custom-ban-page/docker-compose.yml down --remove-orphans
