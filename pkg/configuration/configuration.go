@@ -286,7 +286,7 @@ func ValidateParams(config *Config) error {
 		return err
 	}
 	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
-	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
+	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") && config.CrowdsecMode != AppsecMode {
 		return errors.New("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be all empty")
 	} else if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
 		lapiKey = strings.TrimSpace(lapiKey)
