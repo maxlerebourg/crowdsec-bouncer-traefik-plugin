@@ -352,7 +352,7 @@ func validateURL(variable, scheme, host, path string) error {
 func validateParamsAPIKey(key string) error {
 	reg := regexp.MustCompile("^[a-zA-Z0-9 !#$%&'*+-.^_`|~=/]*$")
 	if !reg.MatchString(key) {
-		return fmt.Errorf("Crowdsec API key doesn't validate this regexp: '/%s/'", reg.String())
+		return fmt.Errorf("CrowdsecXkey doesn't validate this regexp: '/%s/'", reg.String())
 	}
 	return nil
 }
