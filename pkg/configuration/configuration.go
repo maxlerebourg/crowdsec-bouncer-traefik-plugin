@@ -277,6 +277,10 @@ func ValidateParams(config *Config) error {
 	if err != nil {
 		return err
 	}
+	appsecKey, err := GetVariable(config, "CrowdsecAppsecKey")
+	if err != nil {
+		return err
+	}
 	certBouncer, err := GetVariable(config, "CrowdsecLapiTLSCertificateBouncer")
 	if err != nil {
 		return err
@@ -285,12 +289,28 @@ func ValidateParams(config *Config) error {
 	if err != nil {
 		return err
 	}
+
+	// Ensure that a Crowdsec key is provided
+	if appsecKey == "" && lapiKey == "" {
+		return errors.New("CrowdsecLapiKey || CrowdsecAppsecKey: cannot be empty")
+	}
+
 	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
 	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") && config.CrowdsecMode != AppsecMode {
 		return errors.New("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be all empty")
 	} else if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
 		lapiKey = strings.TrimSpace(lapiKey)
 		if err = validateParamsAPIKey(lapiKey); err != nil {
+			return err
+		}
+	}
+
+	// CrowdsecAppsecKey must be provided if using bouncer in Appsec mode
+	if appsecKey == "" && config.CrowdsecMode == AppsecMode {
+		return errors.New("CrowdsecAppsecKey: cannot be all empty")
+	} else if appsecKey != "" {
+		appsecKey = strings.TrimSpace(appsecKey)
+		if err = validateParamsAPIKey(appsecKey); err != nil {
 			return err
 		}
 	}
@@ -329,10 +349,10 @@ func validateURL(variable, scheme, host, path string) error {
 // field name. RFC 7230 says:
 // valid ! # $ % & ' * + - . ^ _ ` | ~ DIGIT ALPHA
 // See https://httpwg.github.io/specs/rfc7230.html#rule.token.separators
-func validateParamsAPIKey(lapiKey string) error {
+func validateParamsAPIKey(key string) error {
 	reg := regexp.MustCompile("^[a-zA-Z0-9 !#$%&'*+-.^_`|~=/]*$")
-	if !reg.MatchString(lapiKey) {
-		return fmt.Errorf("CrowdsecLapiKey doesn't valid this regexp: '/%s/'", reg.String())
+	if !reg.MatchString(key) {
+		return fmt.Errorf("Crowdsec API key doesn't validate this regexp: '/%s/'", reg.String())
 	}
 	return nil
 }
