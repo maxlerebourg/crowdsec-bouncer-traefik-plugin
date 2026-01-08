@@ -205,23 +205,24 @@ func Test_validateParamsRequired(t *testing.T) {
 
 func Test_validateParamsAPIKey(t *testing.T) {
 	type args struct {
-		lapiKey string
+		lapiKey   string
+		paramName string
 	}
 	tests := []struct {
 		name    string
 		args    args
 		wantErr bool
 	}{
-		{name: "Validate all the valid characters", args: args{lapiKey: "test!#$%&'*+-.^_`|~"}, wantErr: false},
-		{name: "Not validate a @", args: args{lapiKey: "test@"}, wantErr: true},
-		{name: "Not validate a (", args: args{lapiKey: "test("}, wantErr: true},
-		{name: "Not validate a [", args: args{lapiKey: "test["}, wantErr: true},
-		{name: "Not validate a ?", args: args{lapiKey: "test?"}, wantErr: true},
-		{name: "Not validate a \\n, (must be trimed before)", args: args{lapiKey: "test\n"}, wantErr: true},
+		{name: "Validate all the valid characters", args: args{lapiKey: "test!#$%&'*+-.^_`|~", paramName: "CrowdsecParamName"}, wantErr: false},
+		{name: "Not validate a @", args: args{lapiKey: "test@", paramName: "CrowdsecParamName"}, wantErr: true},
+		{name: "Not validate a (", args: args{lapiKey: "test(", paramName: "CrowdsecParamName"}, wantErr: true},
+		{name: "Not validate a [", args: args{lapiKey: "test[", paramName: "CrowdsecParamName"}, wantErr: true},
+		{name: "Not validate a ?", args: args{lapiKey: "test?", paramName: "CrowdsecParamName"}, wantErr: true},
+		{name: "Not validate a \\n, (must be trimed before)", args: args{lapiKey: "test\n", paramName: "CrowdsecParamName"}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateParamsAPIKey(tt.args.lapiKey); (err != nil) != tt.wantErr {
+			if err := validateParamsAPIKey(tt.args.lapiKey, tt.args.paramName); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsAPIKey() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
