@@ -25,20 +25,20 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Update version in bouncer.go
+      - name: Update version in version.go
         run: |
-          sed -i 's/pluginVersion *= *"[^"]*"/pluginVersion           = "'"${{ steps.get_version.outputs.version }}"'"/' bouncer.go
+          sed -i 's/pluginVersion = "[^"]*"/pluginVersion = "'"${{ steps.get_version.outputs.version }}"'"/' version.go
 
       - name: Verify change
         run: |
           echo "Updated version to ${{ steps.get_version.outputs.version }}"
-          grep 'pluginVersion' bouncer.go
+          cat version.go
 
       - name: Commit, push, and retag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add bouncer.go
+          git add version.go
           if git diff --cached --quiet; then
             echo "Version already up to date, nothing to commit"
             exit 0
