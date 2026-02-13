@@ -63,6 +63,7 @@ const (
 
 //nolint:gochecknoglobals
 var (
+	pluginVersion           = "1.5.0"
 	isStartup               = true
 	isCrowdsecStreamHealthy = true
 	updateFailure           int64
@@ -674,7 +675,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
 	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
-	req.Header.Add("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/1.X.X")
+	req.Header.Add("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
@@ -779,7 +780,7 @@ func reportMetrics(bouncer *Bouncer) error {
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{
 			{
-				"version": "1.X.X",
+				"version": pluginVersion,
 				"type":    "bouncer",
 				"name":    "traefik_plugin",
 				"metrics": []map[string]interface{}{

@@ -1,0 +1,50 @@
+name: Release Version Update
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-version:
+    name: Update version in source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Update version in bouncer.go
+        run: |
+          sed -i 's/pluginVersion *= *"[^"]*"/pluginVersion           = "'"${{ steps.get_version.outputs.version }}"'"/' bouncer.go
+
+      - name: Verify change
+        run: |
+          echo "Updated version to ${{ steps.get_version.outputs.version }}"
+          grep 'pluginVersion' bouncer.go
+
+      - name: Commit, push, and retag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bouncer.go
+          if git diff --cached --quiet; then
+            echo "Version already up to date, nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: bump version to ${{ steps.get_version.outputs.version }}"
+          git push origin main
+          # Move the release tag to include the version update
+          git tag -f "${{ steps.get_version.outputs.tag }}"
+          git push -f origin "${{ steps.get_version.outputs.tag }}"
