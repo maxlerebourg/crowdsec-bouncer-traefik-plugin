@@ -558,7 +558,7 @@ http:
     crowdsec:
       plugin:
         bouncer:
-          enabled: false
+          enabled: true
           logLevel: DEBUG
           crowdsecMode: live
           crowdsecLapiKey: privateKey-foo
