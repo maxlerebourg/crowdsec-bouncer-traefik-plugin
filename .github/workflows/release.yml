@@ -28,10 +28,6 @@ jobs:
       - name: Update version in version.go
         run: |
           sed -i 's/pluginVersion = "[^"]*"/pluginVersion = "'"${{ steps.get_version.outputs.version }}"'"/' version.go
-
-      - name: Verify change
-        run: |
-          echo "Updated version to ${{ steps.get_version.outputs.version }}"
           cat version.go
 
       - name: Commit, push, and retag
@@ -43,7 +39,7 @@ jobs:
             echo "Version already up to date, nothing to commit"
             exit 0
           fi
-          git commit -m "chore: bump version to ${{ steps.get_version.outputs.version }}"
+          git commit -m "⬆️ chore: bump version to ${{ steps.get_version.outputs.version }}"
           git push origin main
           # Move the release tag to include the version update
           git tag -f "${{ steps.get_version.outputs.tag }}"
