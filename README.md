@@ -536,7 +536,37 @@ experimental:
 ```
 
 ```yaml
-# Dynamic configuration
+# Simplified dynamic configuration
+
+http:
+  routers:
+    my-router:
+      rule: host(`whoami.localhost`)
+      service: service-foo
+      entryPoints:
+        - web
+      middlewares:
+        - crowdsec
+
+  services:
+    service-foo:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:5000
+
+  middlewares:
+    crowdsec:
+      plugin:
+        bouncer:
+          enabled: true
+          logLevel: DEBUG
+          crowdsecMode: live
+          crowdsecLapiKey: privateKey-foo
+          crowdsecLapiHost: crowdsec:8080
+```
+
+```yaml
+# Full dynamic configuration
 
 http:
   routers:
