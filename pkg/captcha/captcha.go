@@ -2,6 +2,7 @@
 package captcha
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -30,10 +31,11 @@ type Client struct {
 
 // Information for self-hosted provider.
 type infoProvider struct {
-	js       string
-	key      string
-	response string
-	validate string
+	js               string
+	key              string
+	response         string
+	validate         string
+	credentialsCheck string
 }
 
 //nolint:gochecknoglobals
@@ -55,6 +57,13 @@ var infoProviders = map[string]*infoProvider{
 		key:      "cf-turnstile",
 		response: "cf-turnstile-response",
 		validate: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+	},
+	configuration.EucaptchaProvider: {
+		js:               "https://cdn.eu-captcha.eu/verify.js",
+		key:              "eu-captcha",
+		response:         "eu-captcha-response",
+		validate:         "https://api.eu-captcha.eu/v1/verify",
+		credentialsCheck: "https://api.eu-captcha.eu/v1/verify-credentials",
 	},
 }
 
@@ -80,12 +89,15 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 	c.log = log
 	c.httpClient = httpClient
 	c.cacheClient = cacheClient
+	if provider == configuration.EucaptchaProvider {
+		c.checkEucaptchaCredentials()
+	}
 	return nil
 }
 
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
-	valid, err := c.Validate(r)
+	valid, err := c.Validate(r, remoteIP)
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
 		rw.WriteHeader(http.StatusBadRequest)
@@ -127,8 +139,73 @@ type responseProvider struct {
 	Success bool `json:"success"`
 }
 
+// validateEucaptcha calls the EU CAPTCHA verification API.
+// Unlike other providers, EU CAPTCHA requires a JSON body that includes the
+// client IP and user agent alongside the token.
+func (c *Client) validateEucaptcha(token, remoteIP, userAgent string) (*http.Response, error) {
+	type eucaptchaRequest struct {
+		Sitekey         string `json:"sitekey"`
+		Secret          string `json:"secret"`
+		ClientIP        string `json:"client_ip"`
+		ClientToken     string `json:"client_token"`
+		ClientUserAgent string `json:"client_user_agent"`
+	}
+	payload, err := json.Marshal(eucaptchaRequest{
+		Sitekey:         c.siteKey,
+		Secret:          c.secretKey,
+		ClientIP:        remoteIP,
+		ClientToken:     token,
+		ClientUserAgent: userAgent,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return c.httpClient.Post(c.infoProvider.validate, "application/json", bytes.NewReader(payload))
+}
+
+// checkEucaptchaCredentials calls /verify-credentials at startup to confirm the
+// configured sitekey and secret are valid. It logs the outcome but never
+// blocks startup on failure.
+func (c *Client) checkEucaptchaCredentials() {
+	type credCheckRequest struct {
+		Sitekey string `json:"sitekey"`
+		Secret  string `json:"secret"`
+	}
+	type credCheckResponse struct {
+		Valid bool `json:"valid"`
+	}
+	payload, err := json.Marshal(credCheckRequest{
+		Sitekey: c.siteKey,
+		Secret:  c.secretKey,
+	})
+	if err != nil {
+		c.log.Error("captcha:eucaptcha:checkEucaptchaCredentials marshal: " + err.Error())
+		return
+	}
+	res, err := c.httpClient.Post(c.infoProvider.credentialsCheck, "application/json", bytes.NewReader(payload))
+	if err != nil {
+		c.log.Error("captcha:eucaptcha:checkEucaptchaCredentials request failed: " + err.Error())
+		return
+	}
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			c.log.Error("captcha:eucaptcha:checkEucaptchaCredentials close: " + closeErr.Error())
+		}
+	}()
+	var resp credCheckResponse
+	if err = json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		c.log.Error("captcha:eucaptcha:checkEucaptchaCredentials decode: " + err.Error())
+		return
+	}
+	if !resp.Valid {
+		c.log.Error("captcha:eucaptcha:checkEucaptchaCredentials invalid sitekey or secret")
+		return
+	}
+	c.log.Info("captcha:eucaptcha:checkEucaptchaCredentials sitekey and secret are valid")
+}
+
 // Validate Verify the captcha from provider API.
-func (c *Client) Validate(r *http.Request) (bool, error) {
+func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if r.Method != http.MethodPost {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
@@ -138,10 +215,16 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
 	}
-	var body = url.Values{}
-	body.Add("secret", c.secretKey)
-	body.Add("response", response)
-	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
+	var res *http.Response
+	var err error
+	if c.infoProvider == infoProviders[configuration.EucaptchaProvider] {
+		res, err = c.validateEucaptcha(response, remoteIP, r.Header.Get("User-Agent"))
+	} else {
+		var body = url.Values{}
+		body.Add("secret", c.secretKey)
+		body.Add("response", response)
+		res, err = c.httpClient.PostForm(c.infoProvider.validate, body)
+	}
 	if err != nil {
 		return false, err
 	}

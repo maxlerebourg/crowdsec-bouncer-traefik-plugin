@@ -39,6 +39,7 @@ The following captcha providers are supported now:
 - [hcaptcha](https://www.hcaptcha.com/)
 - [recaptcha](https://www.google.com/recaptcha/about/)
 - [turnstile](https://www.cloudflare.com/products/turnstile/)
+- [eucaptcha](https://eu-captcha.eu/) — GDPR-compliant, EU-hosted
 - [custom/wicketkeeper](https://github.com/a-ve/wicketkeeper)
 
 There are 5 operating modes (CrowdsecMode) for this plugin:
@@ -480,7 +481,7 @@ make run
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
 - CaptchaProvider
   - string
-  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
+  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`, `eucaptcha` or `custom`
 - CaptchaCustomJsURL
   - string
   - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
@@ -651,6 +652,12 @@ http:
           captchaSecretKey: FIXME
           captchaGracePeriodSeconds: 1800
           captchaHTMLFilePath: /captcha.html
+          # EU CAPTCHA (GDPR-compliant, EU-hosted alternative):
+          # captchaProvider: eucaptcha
+          # captchaSiteKey: FIXME
+          # captchaSecretKey: FIXME
+          # captchaGracePeriodSeconds: 1800
+          # captchaHTMLFilePath: /captcha.html
           banHTMLFilePath: /ban.html
           traceHeadersCustomName: X-Request-ID
           metricsUpdateIntervalSeconds: 600
