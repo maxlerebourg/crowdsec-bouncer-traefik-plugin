@@ -738,6 +738,20 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m -t captcha # this
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 ```
 
+### Testing
+
+#### Go Unit Tests
+
+```bash
+go test ./...
+```
+
+#### Integration Tests
+
+```bash
+./Test-Integration.ps1
+```
+
 ### Examples
 
 #### 1. Behind another proxy service (ex: clouflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)
