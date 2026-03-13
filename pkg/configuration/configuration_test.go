@@ -146,6 +146,8 @@ func Test_validateParamsTLS(t *testing.T) {
 }
 
 func Test_validateParamsIPs(t *testing.T) {
+
+	log := logger.New("INFO", "")
 	type args struct {
 		listIP []string
 		key    string
@@ -165,7 +167,7 @@ func Test_validateParamsIPs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateParamsIPs(tt.args.listIP, tt.args.key); (err != nil) != tt.wantErr {
+			if err := validateParamsIPs(log, tt.args.listIP, tt.args.key); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsIPs() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -231,6 +233,7 @@ func Test_validateParamsAPIKey(t *testing.T) {
 }
 
 func Test_GetTLSConfigCrowdsec(t *testing.T) {
+	log := logger.New("INFO", "")
 	type args struct {
 		config *Config
 	}
@@ -244,7 +247,7 @@ func Test_GetTLSConfigCrowdsec(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetTLSConfigCrowdsec(tt.args.config, logger.New("INFO", "").Logger, false)
+			got, err := GetTLSConfigCrowdsec(tt.args.config, log, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getTLSConfigCrowdsec() error = %v, wantErr %v", err, tt.wantErr)
 				return
