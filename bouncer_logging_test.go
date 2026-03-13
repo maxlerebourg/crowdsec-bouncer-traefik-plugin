@@ -193,16 +193,16 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 		forbiddenLevels []string // Levels that should NOT appear
 	}{
 		{
-			name:            "DEBUG level should show DEBUG only (no TRACE)",
+			name:            "DEBUG level should show DEBUG only",
 			logLevel:        "DEBUG",
 			expectedLevels:  []string{"DEBUG"},
-			forbiddenLevels: []string{"TRACE"},
+			forbiddenLevels: []string{},
 		},
 		{
 			name:            "INFO level should show no logs (bouncer doesn't generate INFO during normal operation)",
 			logLevel:        "INFO",
 			expectedLevels:  []string{}, // No logs expected for normal operation
-			forbiddenLevels: []string{"TRACE", "DEBUG"},
+			forbiddenLevels: []string{"DEBUG"},
 		},
 	}
 
@@ -249,7 +249,7 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 
 	// Get test config and override specific fields
 	config := getTestConfig()
-	config.LogLevel = "TRACE"   // Use TRACE to test our custom level
+	config.LogLevel = "DEBUG"
 	config.LogFormat = "common" // Use common format
 	config.LogFilePath = logFile
 
@@ -295,7 +295,7 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 
 	// Verify common format structure
 	lines := strings.Split(strings.TrimSpace(logString), "\n")
-	foundTrace := false
+	foundDebug := false
 
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
@@ -303,17 +303,17 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 		}
 
 		// Common format should contain time, level, msg, and component
-		if strings.Contains(line, "level=TRACE") {
-			foundTrace = true
+		if strings.Contains(line, "level=DEBUG") {
+			foundDebug = true
 		}
 		if !strings.Contains(line, "component=CrowdsecBouncerTraefikPlugin") {
 			t.Errorf("Log line missing component field: %s", line)
 		}
 	}
 
-	// We should see TRACE level logs since we set LogLevel to TRACE
-	if !foundTrace {
-		t.Errorf("Expected to find TRACE level logs in common format. Log content:\n%s", logString)
+	// We should see DEBUG level logs since we set LogLevel to DEBUG
+	if !foundDebug {
+		t.Errorf("Expected to find DEBUG level logs in common format. Log content:\n%s", logString)
 	}
 
 	t.Logf("Successfully logged to file %s in common format with %d lines", logFile, len(lines))
