@@ -3,7 +3,6 @@
 package logger
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -23,7 +22,7 @@ func New(logLevel string, logFilePath string) *slog.Logger {
 }
 
 // NewWithFormat creates a Log wrapper with specified format (common or json).
-func NewWithFormat(logLevel string, logFilePath string, logFormat string) *slog.Logger {
+func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 	// Determine log level
 	var level slog.Level
 	switch logLevel {

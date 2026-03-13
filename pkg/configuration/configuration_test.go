@@ -72,6 +72,7 @@ func Test_GetVariable(t *testing.T) {
 }
 
 func Test_ValidateParams(t *testing.T) {
+	log := logger.NewWithFormat("", "", "")
 	cfg1 := New()
 	cfg1.CrowdsecLapiKey = "test\n\n"
 	cfg2 := New()
@@ -117,7 +118,7 @@ func Test_ValidateParams(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ValidateParams(tt.args.config); (err != nil) != tt.wantErr {
+			if err := ValidateParams(tt.args.config, log); (err != nil) != tt.wantErr {
 				t.Errorf("validateParams() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
