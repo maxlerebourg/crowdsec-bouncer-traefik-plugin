@@ -94,6 +94,9 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
 		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		if c.remediationCustomHeader != "" {
+			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
+		}
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
