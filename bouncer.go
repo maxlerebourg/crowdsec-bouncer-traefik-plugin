@@ -623,7 +623,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	// because updated routine information is in the cache
 	_, err := bouncer.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
-		bouncer.log.Info("handleStreamCache:alreadyUpdated")
+		bouncer.log.Debug("handleStreamCache:alreadyUpdated")
 		return nil
 	}
 	if err.Error() != cache.CacheMiss {
@@ -663,7 +663,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
-	bouncer.log.Info("handleStreamCache:updated")
+	bouncer.log.Debug("handleStreamCache:updated")
 	return nil
 }
 
@@ -775,7 +775,7 @@ func reportMetrics(bouncer *Bouncer) error {
 	currentCount := atomic.LoadInt64(&blockedRequests)
 	windowSizeSeconds := int(now.Sub(lastMetricsPush).Seconds())
 
-	bouncer.log.Info(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
+	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
 
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{
