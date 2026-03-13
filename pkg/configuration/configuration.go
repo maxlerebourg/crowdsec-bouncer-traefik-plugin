@@ -449,21 +449,17 @@ func validateParamsRequired(config *Config) error {
 	return nil
 }
 
-// GetTLSConfigCrowdsec get TLS config from Config.
-//
-//nolint:nestif
-func GetTLSConfigCrowdsec(config *Config, log *slog.Logger) (*tls.Config, error) {
+func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insecureVerify bool) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
-	//nolint:gocritic
-	if config.CrowdsecLapiScheme != HTTPS {
-		log.Info("getTLSConfigCrowdsec:CrowdsecLapiScheme https:no")
+	if scheme != HTTPS {
+		log.Debug("getTLSConfig:" + prefix + "Scheme https:no")
 		return tlsConfig, nil
 	}
 	//nolint:nestif
 	if insecureVerify {
 		tlsConfig.InsecureSkipVerify = true
-		log.Info("getTLSConfigCrowdsec:CrowdsecLapiTLSInsecureVerify tlsInsecure:true")
+		log.Info("getTLSConfig:" + prefix + "TLSInsecureVerify tlsInsecure:true")
 		// If we return here and still want to use client auth this won't work
 		// return tlsConfig, nil
 	} else {
@@ -475,9 +471,9 @@ func GetTLSConfigCrowdsec(config *Config, log *slog.Logger) (*tls.Config, error)
 			if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuthority)) {
 				// here we return because if CrowdsecLapiTLSInsecureVerify is false
 				// and CA not load, we can't communicate with https
-				return nil, errors.New("getTLSConfigCrowdsec:"+prefix+"cannot load CA and verify cert is enabled")
+				return nil, errors.New("getTLSConfig:" + prefix + " cannot load CA and verify cert is enabled")
 			}
-			log.Info("getTLSConfigCrowdsec:"+prefix+"TLSCertificateAuthority CA added successfully")
+			log.Info("getTLSConfig:" + prefix + "TLSCertificateAuthority CA added successfully")
 		}
 	}
 	certBouncer, err := GetVariable(config, prefix+"TLSCertificateBouncer")
@@ -501,7 +497,7 @@ func GetTLSConfigCrowdsec(config *Config, log *slog.Logger) (*tls.Config, error)
 }
 
 // GetTLSConfigCrowdsec get TLS config from Config.
-func GetTLSConfigCrowdsec(config *Config, log *logger.Log, isAppsec bool) (*tls.Config, error) {
+func GetTLSConfigCrowdsec(config *Config, log *slog.Logger, isAppsec bool) (*tls.Config, error) {
 	var prefix string
 	if isAppsec && config.CrowdsecAppsecScheme != "" {
 		prefix = "CrowdsecAppsec"
