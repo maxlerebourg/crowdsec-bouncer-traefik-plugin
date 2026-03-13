@@ -146,7 +146,6 @@ func Test_validateParamsTLS(t *testing.T) {
 }
 
 func Test_validateParamsIPs(t *testing.T) {
-
 	log := logger.New("INFO", "")
 	type args struct {
 		listIP []string
