@@ -459,7 +459,7 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 	//nolint:nestif
 	if insecureVerify {
 		tlsConfig.InsecureSkipVerify = true
-		log.Info("getTLSConfig:" + prefix + "TLSInsecureVerify tlsInsecure:true")
+		log.Debug("getTLSConfig:" + prefix + "TLSInsecureVerify tlsInsecure:true")
 		// If we return here and still want to use client auth this won't work
 		// return tlsConfig, nil
 	} else {
@@ -473,7 +473,7 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 				// and CA not load, we can't communicate with https
 				return nil, errors.New("getTLSConfig:" + prefix + " cannot load CA and verify cert is enabled")
 			}
-			log.Info("getTLSConfig:" + prefix + "TLSCertificateAuthority CA added successfully")
+			log.Debug("getTLSConfig:" + prefix + "TLSCertificateAuthority CA added successfully")
 		}
 	}
 	certBouncer, err := GetVariable(config, prefix+"TLSCertificateBouncer")

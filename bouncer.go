@@ -608,7 +608,7 @@ func getToken(bouncer *Bouncer) error {
 	if err != nil {
 		return fmt.Errorf("getToken:parsingBody %w", err)
 	}
-	if login.Code == 200 && len(login.Token) > 0 {
+	if login.Code == http.StatusOK && len(login.Token) > 0 {
 		bouncer.crowdsecKey = login.Token
 		return nil
 	}
@@ -663,7 +663,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
-	bouncer.log.Debug("handleStreamCache:updated")
+	bouncer.log.Info("handleStreamCache:updated")
 	return nil
 }
 
