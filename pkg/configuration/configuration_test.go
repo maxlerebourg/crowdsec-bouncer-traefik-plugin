@@ -72,7 +72,7 @@ func Test_GetVariable(t *testing.T) {
 }
 
 func Test_ValidateParams(t *testing.T) {
-	log := logger.NewWithFormat("", "", "")
+	log := logger.New("INFO", "")
 	cfg1 := New()
 	cfg1.CrowdsecLapiKey = "test\n\n"
 	cfg2 := New()

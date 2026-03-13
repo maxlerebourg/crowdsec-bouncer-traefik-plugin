@@ -14,26 +14,11 @@ func TestNew(t *testing.T) {
 		name     string
 		logLevel string
 	}{
-		{
-			name:     "ERROR level",
-			logLevel: "ERROR",
-		},
-		{
-			name:     "WARN level",
-			logLevel: "WARN",
-		},
-		{
-			name:     "INFO level",
-			logLevel: "INFO",
-		},
-		{
-			name:     "DEBUG level",
-			logLevel: "DEBUG",
-		},
-		{
-			name:     "Default level (INFO)",
-			logLevel: "INVALID",
-		},
+		{name: "ERROR level", logLevel: "ERROR"},
+		{name: "WARN level", logLevel: "WARN"},
+		{name: "INFO level", logLevel: "INFO"},
+		{name: "DEBUG level", logLevel: "DEBUG"},
+		{name: "Default level (INFO)", logLevel: "INVALID"},
 	}
 
 	for _, tt := range tests {
@@ -121,72 +106,6 @@ func TestCommonLogFormat(t *testing.T) {
 	}
 }
 
-func TestLogLevels(t *testing.T) {
-	var buf bytes.Buffer
-
-	// Create a logger with TRACE level to capture output
-	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{
-		Level: LevelTrace, // Use our custom TRACE level
-		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
-			// Customize level names to match our expected format
-			if a.Key == slog.LevelKey {
-				level, ok := a.Value.Any().(slog.Level)
-				if !ok {
-					return a
-				}
-				switch {
-				case level < LevelDebug:
-					a.Value = slog.StringValue("TRACE")
-				case level < LevelInfo:
-					a.Value = slog.StringValue("DEBUG")
-				case level < LevelWarn:
-					a.Value = slog.StringValue("INFO")
-				case level < LevelError:
-					a.Value = slog.StringValue("WARN")
-				default:
-					a.Value = slog.StringValue("ERROR")
-				}
-			}
-			return a
-		},
-	})
-	logger := slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
-
-	testMessage := "test message"
-
-	// Test all log methods
-	logger.Error(testMessage)
-	logger.Warn(testMessage)
-	logger.Info(testMessage)
-	logger.Debug(testMessage)
-	logger.Log(context.Background(), LevelTrace, testMessage) // Use Log method for TRACE
-
-	output := buf.String()
-
-	// Verify expected messages appear (slog format with custom level names)
-	if !strings.Contains(output, "level=ERROR") {
-		t.Error("Expected ERROR level message to appear")
-	}
-	if !strings.Contains(output, "level=WARN") {
-		t.Error("Expected WARN level message to appear")
-	}
-	if !strings.Contains(output, "level=INFO") {
-		t.Error("Expected INFO level message to appear")
-	}
-	if !strings.Contains(output, "level=DEBUG") {
-		t.Error("Expected DEBUG level message to appear")
-	}
-	if !strings.Contains(output, "level=TRACE") {
-		t.Error("Expected TRACE level message to appear")
-	}
-
-	// Verify message content appears
-	messageCount := strings.Count(output, testMessage)
-	if messageCount != 5 { // ERROR, WARN, INFO, DEBUG, TRACE
-		t.Errorf("Expected 5 occurrences of test message, got %d", messageCount)
-	}
-}
-
 func TestErrorLevel(t *testing.T) {
 	var buf bytes.Buffer
 
@@ -198,10 +117,9 @@ func TestErrorLevel(t *testing.T) {
 
 	// Test all log methods
 	logger.Error(testMessage)
-	logger.Warn(testMessage)                                  // Should not appear
-	logger.Info(testMessage)                                  // Should not appear
-	logger.Debug(testMessage)                                 // Should not appear
-	logger.Log(context.Background(), LevelTrace, testMessage) // Should not appear
+	logger.Warn(testMessage)  // Should not appear
+	logger.Info(testMessage)  // Should not appear
+	logger.Debug(testMessage) // Should not appear
 
 	output := buf.String()
 
@@ -222,101 +140,6 @@ func TestErrorLevel(t *testing.T) {
 	messageCount := strings.Count(output, testMessage)
 	if messageCount != 1 {
 		t.Errorf("Expected 1 occurrence of test message at ERROR level, got %d", messageCount)
-	}
-}
-
-func TestTraceMethod(t *testing.T) {
-	var buf bytes.Buffer
-
-	// Create a logger with TRACE level to capture output
-	logger := NewWithFormat("TRACE", "", "common")
-
-	// Replace the handler to capture output
-	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{
-		Level: LevelTrace,
-		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.LevelKey {
-				level, ok := a.Value.Any().(slog.Level)
-				if !ok {
-					return a
-				}
-				switch {
-				case level < LevelDebug:
-					a.Value = slog.StringValue("TRACE")
-				case level < LevelInfo:
-					a.Value = slog.StringValue("DEBUG")
-				case level < LevelWarn:
-					a.Value = slog.StringValue("INFO")
-				case level < LevelError:
-					a.Value = slog.StringValue("WARN")
-				default:
-					a.Value = slog.StringValue("ERROR")
-				}
-			}
-			return a
-		},
-	})
-	logger.Logger = slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
-
-	testMessage := "trace method test"
-	logger.Trace(testMessage)
-
-	output := buf.String()
-
-	// Verify TRACE level appears
-	if !strings.Contains(output, "level=TRACE") {
-		t.Error("Expected TRACE level message to appear")
-	}
-
-	// Verify message content appears
-	if !strings.Contains(output, testMessage) {
-		t.Error("Expected trace message content to appear")
-	}
-}
-
-func TestTraceLevel(t *testing.T) {
-	var buf bytes.Buffer
-
-	// Create a logger with TRACE level to capture output
-	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{
-		Level: LevelTrace,
-		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.LevelKey {
-				level, ok := a.Value.Any().(slog.Level)
-				if !ok {
-					return a
-				}
-				switch {
-				case level < LevelDebug:
-					a.Value = slog.StringValue("TRACE")
-				case level < LevelInfo:
-					a.Value = slog.StringValue("DEBUG")
-				case level < LevelWarn:
-					a.Value = slog.StringValue("INFO")
-				case level < LevelError:
-					a.Value = slog.StringValue("WARN")
-				default:
-					a.Value = slog.StringValue("ERROR")
-				}
-			}
-			return a
-		},
-	})
-	logger := slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
-
-	testMessage := "trace test message"
-
-	// Test TRACE level specifically
-	logger.Log(context.Background(), LevelTrace, testMessage)
-
-	output := buf.String()
-
-	// Verify TRACE message appears
-	if !strings.Contains(output, "level=TRACE") {
-		t.Error("Expected TRACE level message to appear")
-	}
-	if !strings.Contains(output, testMessage) {
-		t.Error("Expected test message to appear")
 	}
 }
 
