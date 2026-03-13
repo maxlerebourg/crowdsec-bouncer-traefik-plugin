@@ -5,11 +5,10 @@ package ip
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
-
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // CHECKER
@@ -21,7 +20,7 @@ type Checker struct {
 }
 
 // NewChecker builds a new Checker given a list of CIDR-Strings to trusted IPs.
-func NewChecker(log *logger.Log, trustedIPs []string) (*Checker, error) {
+func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 	checker := &Checker{}
 
 	for _, ipMaskRaw := range trustedIPs {
