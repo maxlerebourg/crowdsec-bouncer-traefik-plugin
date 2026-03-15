@@ -655,7 +655,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 			case "captcha":
 				value = cache.CaptchaValue
 			default:
-				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
+				bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
 			}
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
 		}
@@ -663,7 +663,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
-	bouncer.log.Info("handleStreamCache:updated")
+	bouncer.log.Debug("handleStreamCache:updated")
 	return nil
 }
 
