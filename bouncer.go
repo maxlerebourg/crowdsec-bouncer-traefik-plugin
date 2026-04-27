@@ -713,7 +713,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 		Path:   bouncer.appsecPath,
 	}
 	var req *http.Request
-	if bouncer.appsecBodyLimit > 0 && httpReq.Body != nil && httpReq.ContentLength > 0 {
+	if bouncer.appsecBodyLimit > 0 && httpReq.Body != nil {
 		var bodyBuffer bytes.Buffer
 		limitedReader := io.LimitReader(httpReq.Body, bouncer.appsecBodyLimit)
 		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
