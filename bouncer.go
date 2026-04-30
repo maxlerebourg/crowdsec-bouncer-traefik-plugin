@@ -663,7 +663,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
-	bouncer.log.Info("handleStreamCache:updated")
+	bouncer.log.Debug("handleStreamCache:updated")
 	return nil
 }
 
@@ -674,8 +674,8 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
-	req.Header.Add(bouncer.crowdsecHeader, bouncer.crowdsecKey)
-	req.Header.Add("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
+	req.Header.Set(bouncer.crowdsecHeader, bouncer.crowdsecKey)
+	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
@@ -739,6 +739,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
 	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
 	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
+	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpAppsecClient.Do(req)
 	if err != nil {
