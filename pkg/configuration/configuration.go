@@ -99,6 +99,7 @@ type Config struct {
 	RedisCacheDatabase                         string   `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock                 bool     `json:"redisCacheUnreachableBlock,omitempty"`
 	BanHTMLFilePath                            string   `json:"banHtmlFilePath,omitempty"`
+	BanResponseContentType                     string   `json:"banResponseContentType,omitempty"`
 	CaptchaHTMLFilePath                        string   `json:"captchaHtmlFilePath,omitempty"`
 	CaptchaProvider                            string   `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                         string   `json:"captchaCustomJsUrl,omitempty"`
@@ -159,6 +160,7 @@ func New() *Config {
 		CaptchaGracePeriodSeconds:       1800,
 		CaptchaHTMLFilePath:             "/captcha.html",
 		BanHTMLFilePath:                 "",
+		BanResponseContentType:          "text/html; charset=utf-8",
 		TraceHeadersCustomName:          "",
 		RemediationHeadersCustomName:    "",
 		ForwardedHeadersCustomName:      "X-Forwarded-For",

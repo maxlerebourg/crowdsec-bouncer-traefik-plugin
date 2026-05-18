@@ -515,6 +515,10 @@ make run
   - string
   - default: ""
   - Path where the ban html file is stored (default empty ""=disabled)
+- BanResponseContentType
+  - string
+  - default: "text/html; charset=utf-8"
+  - Content-Type header value to use for the ban HTTP response.
 - TraceHeadersCustomName
   - string
   - default: ""
