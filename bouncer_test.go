@@ -269,6 +269,42 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	}
 }
 
+func TestHandleBanServeHTTPContentType(t *testing.T) {
+	html := "<html>You are banned</html>"
+	banTemplate, _ := htmltemplate.New("html").Parse(html)
+	tests := []struct {
+		name                   string
+		banResponseContentType string
+	}{
+		{
+			name:                   "Default HTML content type",
+			banResponseContentType: "text/html; charset=utf-8",
+		},
+		{
+			name:                   "Custom JSON content type",
+			banResponseContentType: "application/json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bouncer := &Bouncer{
+				remediationStatusCode:  http.StatusForbidden,
+				banTemplate:            banTemplate,
+				banResponseContentType: tt.banResponseContentType,
+			}
+
+			rw := httptest.NewRecorder()
+			req := &http.Request{Method: http.MethodGet}
+			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+
+			if got := rw.Header().Get("Content-Type"); got != tt.banResponseContentType {
+				t.Errorf("Expected Content-Type %q, got %q", tt.banResponseContentType, got)
+			}
+		})
+	}
+}
+
 func TestCaptchaMethodBasedLogic(t *testing.T) {
 	tests := []struct {
 		name              string
