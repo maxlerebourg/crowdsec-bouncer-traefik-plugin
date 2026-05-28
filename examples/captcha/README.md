@@ -47,7 +47,7 @@ To instruct Crowdsec to use captcha remediation, change the `/etc/crowdsec/profi
 - Return a captcha decision the first X times and then a ban decision.
 
 The second mode could be used to prevent repeated malicious activity.
-More information is available on configuring Crowdsec in the [official documentation](https://docs.crowdsec.net/docs/next/profiles/captcha_profile/).
+More information is available on configuring Crowdsec in the [official documentation](https://docs.crowdsec.net/docs/next/local_api/profiles/captcha_profile/).
 
 ```yaml
   ...

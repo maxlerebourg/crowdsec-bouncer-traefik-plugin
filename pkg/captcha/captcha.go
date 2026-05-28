@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // Client Captcha client.
@@ -24,7 +24,7 @@ type Client struct {
 	captchaTemplate         *template.Template
 	cacheClient             *cache.Client
 	httpClient              *http.Client
-	log                     *logger.Log
+	log                     *slog.Logger
 	infoProvider            *infoProvider
 }
 
@@ -59,7 +59,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -94,6 +94,9 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
 		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		if c.remediationCustomHeader != "" {
+			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
+		}
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}

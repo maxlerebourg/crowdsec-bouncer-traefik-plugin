@@ -5,11 +5,10 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
 	simpleredis "github.com/maxlerebourg/simpleredis"
-
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 const (
@@ -53,7 +52,7 @@ func (localCache) delete(key string) {
 }
 
 type redisCache struct {
-	log *logger.Log
+	log *slog.Logger
 }
 
 func (redisCache) get(key string) (string, error) {
@@ -93,11 +92,11 @@ type cacheInterface interface {
 // Client Cache client.
 type Client struct {
 	cache cacheInterface
-	log   *logger.Log
+	log   *slog.Logger
 }
 
 // New Initialize cache client.
-func (c *Client) New(log *logger.Log, isRedis bool, host, pass, database string) {
+func (c *Client) New(log *slog.Logger, isRedis bool, host, pass, database string) {
 	c.log = log
 	if isRedis {
 		redis.Init(host, pass, database)
