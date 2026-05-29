@@ -465,6 +465,11 @@ make run
   - int64
   - default: 0
   - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
+- StreamStartupBlock
+  - bool
+  - default: true
+  - Used only in `stream` and `alone` mode, controls whether the initial stream update runs synchronously or asynchronously during plugin initialization
+  - **Warning**: When `true`, the plugin will wait crowdsec to be ready, when `false` it let queries pass through without any check.  
 - DefaultDecisionSeconds
   - int64
   - default: 60
@@ -598,6 +603,7 @@ http:
           LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0
+          streamStartupBlock: true
           defaultDecisionSeconds: 60
           remediationStatusCode: 403
           httpTimeoutSeconds: 10
