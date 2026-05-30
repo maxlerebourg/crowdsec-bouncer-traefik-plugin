@@ -1,8 +1,6 @@
 package configuration
 
 import (
-	"crypto/tls"
-	"reflect"
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -126,19 +124,37 @@ func Test_ValidateParams(t *testing.T) {
 }
 
 func Test_validateParamsTLS(t *testing.T) {
-	type args struct {
-		config *Config
-	}
+	// Minimal self-signed PEM accepted by AppendCertsFromPEM.
+	const validPEM = `-----BEGIN CERTIFICATE-----
+MIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw
+DgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow
+EjEQMA4GA1UEChMHQWNtZSBDbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABD0d
+7VNhbWvZLWPuj/RtHFjvtJBEwOkhbN/BnnE8rnZR8+sbwnc/KhCk3FhnpHZnQz7B
+5aETbbIgmuvewdjvSBSjYzBhMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggr
+BgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdEQQiMCCCDmxvY2FsaG9zdDo1
+NDUzgg4xMjcuMC4wLjE6NTQ1MzAKBggqhkjOPQQDAgNIADBFAiEA2zpJEPQyz6/l
+Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
+6MF9+Yw1Yy0t
+-----END CERTIFICATE-----`
+
+	cfgEmpty := getMinimalConfig()
+	cfgValid := getMinimalConfig()
+	cfgValid.CrowdsecLapiTLSCertificateAuthority = validPEM
+	cfgGarbage := getMinimalConfig()
+	cfgGarbage.CrowdsecLapiTLSCertificateAuthority = "not a pem"
+
 	tests := []struct {
 		name    string
-		args    args
+		config  *Config
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{name: "Empty CA is accepted (system trust store used at runtime)", config: cfgEmpty, wantErr: false},
+		{name: "Valid PEM CA is accepted", config: cfgValid, wantErr: false},
+		{name: "Garbage CA is rejected", config: cfgGarbage, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateParamsTLS(tt.args.config); (err != nil) != tt.wantErr {
+			if err := validateParamsTLS(tt.config); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsTLS() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -233,26 +249,64 @@ func Test_validateParamsAPIKey(t *testing.T) {
 
 func Test_GetTLSConfigCrowdsec(t *testing.T) {
 	log := logger.New("INFO", "")
-	type args struct {
-		config *Config
-	}
+	const validPEM = `-----BEGIN CERTIFICATE-----
+MIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw
+DgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow
+EjEQMA4GA1UEChMHQWNtZSBDbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABD0d
+7VNhbWvZLWPuj/RtHFjvtJBEwOkhbN/BnnE8rnZR8+sbwnc/KhCk3FhnpHZnQz7B
+5aETbbIgmuvewdjvSBSjYzBhMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggr
+BgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdEQQiMCCCDmxvY2FsaG9zdDo1
+NDUzgg4xMjcuMC4wLjE6NTQ1MzAKBggqhkjOPQQDAgNIADBFAiEA2zpJEPQyz6/l
+Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
+6MF9+Yw1Yy0t
+-----END CERTIFICATE-----`
+
+	httpCfg := getMinimalConfig()
+	httpCfg.CrowdsecLapiScheme = HTTP
+
+	httpsSystemCA := getMinimalConfig()
+	httpsSystemCA.CrowdsecLapiScheme = HTTPS
+
+	httpsCustomCA := getMinimalConfig()
+	httpsCustomCA.CrowdsecLapiScheme = HTTPS
+	httpsCustomCA.CrowdsecLapiTLSCertificateAuthority = validPEM
+
+	httpsInsecure := getMinimalConfig()
+	httpsInsecure.CrowdsecLapiScheme = HTTPS
+	httpsInsecure.CrowdsecLapiTLSInsecureVerify = true
+
+	httpsBadCA := getMinimalConfig()
+	httpsBadCA.CrowdsecLapiScheme = HTTPS
+	httpsBadCA.CrowdsecLapiTLSCertificateAuthority = "not a pem"
+
 	tests := []struct {
-		name    string
-		args    args
-		want    *tls.Config
-		wantErr bool
+		name              string
+		config            *Config
+		wantErr           bool
+		wantRootCAsNil    bool
+		wantInsecureSkip  bool
 	}{
-		// TODO: Add test cases.
+		{name: "HTTP scheme returns empty tls.Config", config: httpCfg, wantRootCAsNil: true},
+		{name: "HTTPS without CA leaves RootCAs nil (system trust store)", config: httpsSystemCA, wantRootCAsNil: true},
+		{name: "HTTPS with custom CA populates RootCAs", config: httpsCustomCA, wantRootCAsNil: false},
+		{name: "HTTPS with insecure verify sets InsecureSkipVerify", config: httpsInsecure, wantRootCAsNil: true, wantInsecureSkip: true},
+		{name: "HTTPS with garbage CA is rejected", config: httpsBadCA, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetTLSConfigCrowdsec(tt.args.config, log, false)
+			got, err := GetTLSConfigCrowdsec(tt.config, log, false)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getTLSConfigCrowdsec() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GetTLSConfigCrowdsec() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getTLSConfigCrowdsec() = %v, want %v", got, tt.want)
+			if tt.wantErr {
+				return
+			}
+			if (got.RootCAs == nil) != tt.wantRootCAsNil {
+				t.Errorf("GetTLSConfigCrowdsec() RootCAs nil = %v, want nil = %v", got.RootCAs == nil, tt.wantRootCAsNil)
+			}
+			if got.InsecureSkipVerify != tt.wantInsecureSkip {
+				t.Errorf("GetTLSConfigCrowdsec() InsecureSkipVerify = %v, want %v", got.InsecureSkipVerify, tt.wantInsecureSkip)
 			}
 		})
 	}
