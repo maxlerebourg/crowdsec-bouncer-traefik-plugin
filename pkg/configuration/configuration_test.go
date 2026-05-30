@@ -109,7 +109,7 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Not validate a bad clients ips", args: args{config: cfg5}, wantErr: true},
 		// HTTPS enabled
 		{name: "Validate https config with insecure verify", args: args{config: cfg6}, wantErr: false},
-		{name: "Not validate https without cert authority", args: args{config: cfg7}, wantErr: true},
+		{name: "Validate https without cert authority (falls back to system trust store)", args: args{config: cfg7}, wantErr: false},
 		{name: "Valid log level uppercase INFO", args: args{config: cfg8}, wantErr: false},
 		{name: "Valid log level lowercase info", args: args{config: cfg9}, wantErr: false},
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
