@@ -33,8 +33,8 @@ wait_for_status http://localhost:8000/foo 200 30
 echo "[$SCENARIO] benign request must pass"
 assert_status http://localhost:8000/foo 200
 
-echo "[$SCENARIO] SQL-injection-like query string must be blocked by AppSec virtual patching"
-# CRS-style SQLi probe — caught by crowdsecurity/appsec-generic-rules.
-assert_status "http://localhost:8000/foo?id=1%27%20UNION%20SELECT%201%2C2%2C3--" 403
+echo "[$SCENARIO] SQL-injection-like query string must be blocked by OWASP CRS (inband)"
+# Classic SQLi probe: ?id=1' OR '1'='1 — caught by CRS rule 942100/942130 (paranoia 1).
+assert_status "http://localhost:8000/foo?id=1%27%20OR%20%271%27%3D%271" 403
 
 echo "[$SCENARIO] OK"

@@ -41,7 +41,7 @@ services:
     image: crowdsecurity/crowdsec:v1.7.8
     container_name: crowdsec
     environment:
-      COLLECTIONS: "crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules"
+      COLLECTIONS: "crowdsecurity/appsec-crs-inband"
       BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
       CUSTOM_HOSTNAME: crowdsec
       CROWDSEC_BYPASS_DB_VOLUME_CHECK: "true"
