@@ -21,6 +21,12 @@ jobs:
       matrix:
         scenario:
           - stream-mode
+          - live-mode
+          - none-mode
+          - trusted-ips
+          - custom-ban-page
+          - captcha
+          - appsec
     steps:
       - uses: actions/checkout@v6
       - name: Run scenario

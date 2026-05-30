@@ -1,7 +1,7 @@
 services:
   traefik:
     image: traefik:v3.7.1
-    container_name: e2e-stream-traefik
+    container_name: e2e-trusted-traefik
     command:
       - "--log.level=INFO"
       - "--accesslog"
@@ -22,7 +22,7 @@ services:
 
   whoami:
     image: traefik/whoami
-    container_name: e2e-stream-whoami
+    container_name: e2e-trusted-whoami
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.r.rule=PathPrefix(`/foo`)"
@@ -34,6 +34,7 @@ services:
       - "traefik.http.middlewares.bouncer.plugin.bouncer.updateintervalseconds=3"
       - "traefik.http.middlewares.bouncer.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.bouncer.plugin.bouncer.forwardedheaderstrustedips=172.16.0.0/12"
+      - "traefik.http.middlewares.bouncer.plugin.bouncer.clienttrustedips=1.2.3.4/32"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.8

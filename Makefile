@@ -2,7 +2,7 @@
 
 export GO111MODULE=on
 
-E2E_SCENARIOS := stream-mode
+E2E_SCENARIOS := stream-mode live-mode none-mode trusted-ips custom-ban-page captcha appsec
 
 default: lint test
 
