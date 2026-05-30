@@ -627,6 +627,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	_, err := bouncer.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
 		bouncer.log.Debug("handleStreamCache:alreadyUpdated")
+		isCrowdsecStreamStartup = false
 		return nil
 	}
 	if err.Error() != cache.CacheMiss {
