@@ -469,7 +469,8 @@ make run
   - bool
   - default: true
   - Used only in `stream` and `alone` mode, controls whether the initial stream update runs synchronously or asynchronously during plugin initialization
-  - **Warning**: When `true`, the plugin will wait crowdsec to be ready, when `false` it let queries pass through without any check.  
+  - When `true`, plugin initialization waits for Crowdsec to be ready before serving traffic.
+  - **Warning**: When `false`, all requests bypass remediation until the first stream sync completes — banned IPs will be allowed through during this window. Only disable when startup availability is more important than blocking at startup.
 - DefaultDecisionSeconds
   - int64
   - default: 60
