@@ -44,6 +44,7 @@ services:
       DISABLE_ONLINE_API: "true"
       BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
       CUSTOM_HOSTNAME: crowdsec
+      CROWDSEC_BYPASS_DB_VOLUME_CHECK: "true"
     healthcheck:
       test: ["CMD", "cscli", "lapi", "status"]
       interval: 2s

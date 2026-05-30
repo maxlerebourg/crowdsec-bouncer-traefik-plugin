@@ -44,6 +44,7 @@ services:
       COLLECTIONS: "crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules"
       BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
       CUSTOM_HOSTNAME: crowdsec
+      CROWDSEC_BYPASS_DB_VOLUME_CHECK: "true"
     volumes:
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
     healthcheck:
