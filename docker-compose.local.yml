@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.5.0"
+    image: "traefik:v3.7.1"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -80,7 +80,7 @@ services:
       - "traefik.http.routers.router-bar3.entrypoints=web"
       - "traefik.http.routers.router-bar3.middlewares=crowdsec2@docker"
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.8
+    image: crowdsecurity/crowdsec:v1.7.8
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
