@@ -280,11 +280,11 @@ Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
 	httpsBadCA.CrowdsecLapiTLSCertificateAuthority = "not a pem"
 
 	tests := []struct {
-		name              string
-		config            *Config
-		wantErr           bool
-		wantRootCAsNil    bool
-		wantInsecureSkip  bool
+		name             string
+		config           *Config
+		wantErr          bool
+		wantRootCAsNil   bool
+		wantInsecureSkip bool
 	}{
 		{name: "HTTP scheme returns empty tls.Config", config: httpCfg, wantRootCAsNil: true},
 		{name: "HTTPS without CA leaves RootCAs nil (system trust store)", config: httpsSystemCA, wantRootCAsNil: true},
