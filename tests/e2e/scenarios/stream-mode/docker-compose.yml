@@ -1,0 +1,39 @@
+services:
+  traefik:
+    image: traefik:v3.5.0
+    container_name: e2e-stream-traefik
+    command:
+      - "--log.level=INFO"
+      - "--accesslog"
+      - "--api.insecure=true"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=false"
+      - "--entrypoints.web.address=:80"
+      - "--entryPoints.web.forwardedHeaders.insecure=true"
+      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+    volumes:
+      - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ../../../..:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+    ports:
+      - "8000:80"
+    depends_on:
+      crowdsec:
+        condition: service_healthy
+
+  whoami:
+    image: traefik/whoami
+    container_name: e2e-stream-whoami
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.6.8
+    container_name: crowdsec
+    environment:
+      DISABLE_ONLINE_API: "true"
+      BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
+      CUSTOM_HOSTNAME: crowdsec
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s

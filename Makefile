@@ -1,6 +1,8 @@
-.PHONY: lint test vendor clean
+.PHONY: lint test vendor clean e2e
 
 export GO111MODULE=on
+
+E2E_SCENARIOS := stream-mode
 
 default: lint test
 
@@ -12,6 +14,11 @@ test:
 
 yaegi_test:
 	yaegi test -v .
+
+e2e: $(addprefix e2e_,$(E2E_SCENARIOS))
+
+e2e_%:
+	./tests/e2e/scenarios/$*/run.sh
 
 vendor:
 	go mod vendor

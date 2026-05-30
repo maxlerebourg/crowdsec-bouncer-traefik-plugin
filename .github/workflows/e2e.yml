@@ -1,0 +1,34 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - stream-mode
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run scenario
+        run: ./tests/e2e/scenarios/${{ matrix.scenario }}/run.sh
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.scenario }}
+          path: /tmp/e2e-${{ matrix.scenario }}.log
+          if-no-files-found: ignore
