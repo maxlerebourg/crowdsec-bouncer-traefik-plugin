@@ -101,6 +101,7 @@ type Config struct {
 	BanHTMLFilePath                            string   `json:"banHtmlFilePath,omitempty"`
 	BanResponseContentType                     string   `json:"banResponseContentType,omitempty"`
 	CaptchaHTMLFilePath                        string   `json:"captchaHtmlFilePath,omitempty"`
+	CaptchaResponseContentType                 string   `json:"captchaResponseContentType,omitempty"`
 	CaptchaProvider                            string   `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                         string   `json:"captchaCustomJsUrl,omitempty"`
 	CaptchaCustomValidateURL                   string   `json:"captchaCustomValidateUrl,omitempty"`
@@ -159,6 +160,7 @@ func New() *Config {
 		CaptchaSecretKey:                "",
 		CaptchaGracePeriodSeconds:       1800,
 		CaptchaHTMLFilePath:             "/captcha.html",
+		CaptchaResponseContentType:      "text/html; charset=utf-8",
 		BanHTMLFilePath:                 "",
 		BanResponseContentType:          "text/html; charset=utf-8",
 		TraceHeadersCustomName:          "",
@@ -274,6 +276,12 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 	}
 	if strings.ContainsAny(config.BanResponseContentType, "\r\n") {
 		return errors.New("BanResponseContentType: must not contain CR or LF characters")
+	}
+	if config.CaptchaResponseContentType == "" {
+		config.CaptchaResponseContentType = "text/html; charset=utf-8"
+	}
+	if strings.ContainsAny(config.CaptchaResponseContentType, "\r\n") {
+		return errors.New("CaptchaResponseContentType: must not contain CR or LF characters")
 	}
 
 	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {

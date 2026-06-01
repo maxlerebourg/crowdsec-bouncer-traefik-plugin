@@ -279,6 +279,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CaptchaSecretKey,
 		config.RemediationHeadersCustomName,
 		config.CaptchaHTMLFilePath,
+		config.CaptchaResponseContentType,
 		config.CaptchaGracePeriodSeconds,
 	)
 	if err != nil {

@@ -20,6 +20,7 @@ type Client struct {
 	siteKey                 string
 	secretKey               string
 	remediationCustomHeader string
+	responseContentType     string
 	gracePeriodSeconds      int64
 	captchaTemplate         *template.Template
 	cacheClient             *cache.Client
@@ -59,7 +60,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath, responseContentType string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -74,6 +75,7 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.remediationCustomHeader = remediationCustomHeader
+	c.responseContentType = responseContentType
 	html, _ := configuration.GetHTMLTemplate(captchaTemplatePath)
 	c.captchaTemplate = html
 	c.gracePeriodSeconds = gracePeriodSeconds
@@ -100,7 +102,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
-	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+	rw.Header().Set("Content-Type", c.responseContentType)
 	if c.remediationCustomHeader != "" {
 		rw.Header().Set(c.remediationCustomHeader, "captcha")
 	}
