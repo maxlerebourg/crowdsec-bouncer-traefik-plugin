@@ -432,11 +432,11 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
+	rw.Header().Set("Content-Type", bouncer.banResponseContentType)
 	if bouncer.banTemplate == nil {
 		rw.WriteHeader(bouncer.remediationStatusCode)
 		return
 	}
-	rw.Header().Set("Content-Type", bouncer.banResponseContentType)
 	rw.WriteHeader(bouncer.remediationStatusCode)
 
 	if req.Method == http.MethodHead {
