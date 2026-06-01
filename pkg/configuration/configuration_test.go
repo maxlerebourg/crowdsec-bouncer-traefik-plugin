@@ -94,6 +94,13 @@ func Test_ValidateParams(t *testing.T) {
 	cfg9.LogLevel = "info"
 	cfg10 := getMinimalConfig()
 	cfg10.LogLevel = "Warning"
+	cfg11 := getMinimalConfig()
+	cfg11.BanResponseContentType = "text/html\r\nX-Injected: yes"
+	cfg12 := getMinimalConfig()
+	cfg12.CaptchaResponseContentType = "text/html\nX-Injected: yes"
+	cfg13 := getMinimalConfig()
+	cfg13.BanResponseContentType = ""
+	cfg13.CaptchaResponseContentType = ""
 	type args struct {
 		config *Config
 	}
@@ -115,6 +122,9 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Valid log level uppercase INFO", args: args{config: cfg8}, wantErr: false},
 		{name: "Valid log level lowercase info", args: args{config: cfg9}, wantErr: false},
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
+		{name: "Reject CRLF in BanResponseContentType", args: args{config: cfg11}, wantErr: true},
+		{name: "Reject LF in CaptchaResponseContentType", args: args{config: cfg12}, wantErr: true},
+		{name: "Empty content types are normalized to default", args: args{config: cfg13}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
