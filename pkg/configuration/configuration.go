@@ -269,6 +269,9 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 			return err
 		}
 	}
+	if config.BanResponseContentType == "" {
+		config.BanResponseContentType = "text/html; charset=utf-8"
+	}
 
 	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {
 		return err
