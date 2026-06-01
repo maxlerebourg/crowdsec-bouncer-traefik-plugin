@@ -271,17 +271,8 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 			return err
 		}
 	}
-	if config.BanResponseContentType == "" {
-		config.BanResponseContentType = "text/html; charset=utf-8"
-	}
-	if strings.ContainsAny(config.BanResponseContentType, "\r\n") {
-		return errors.New("BanResponseContentType: must not contain CR or LF characters")
-	}
-	if config.CaptchaResponseContentType == "" {
-		config.CaptchaResponseContentType = "text/html; charset=utf-8"
-	}
-	if strings.ContainsAny(config.CaptchaResponseContentType, "\r\n") {
-		return errors.New("CaptchaResponseContentType: must not contain CR or LF characters")
+	if err := validateResponseContentTypes(config); err != nil {
+		return err
 	}
 
 	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {
@@ -408,6 +399,22 @@ func validateCaptcha(config *Config) error {
 				config.CaptchaCustomJsURL,
 			)
 		}
+	}
+	return nil
+}
+
+func validateResponseContentTypes(config *Config) error {
+	if config.BanResponseContentType == "" {
+		config.BanResponseContentType = "text/html; charset=utf-8"
+	}
+	if strings.ContainsAny(config.BanResponseContentType, "\r\n") {
+		return errors.New("BanResponseContentType: must not contain CR or LF characters")
+	}
+	if config.CaptchaResponseContentType == "" {
+		config.CaptchaResponseContentType = "text/html; charset=utf-8"
+	}
+	if strings.ContainsAny(config.CaptchaResponseContentType, "\r\n") {
+		return errors.New("CaptchaResponseContentType: must not contain CR or LF characters")
 	}
 	return nil
 }
