@@ -511,6 +511,10 @@ make run
   - string
   - default: /captcha.html
   - Path where the captcha template is stored
+- CaptchaResponseContentType
+  - string
+  - default: "text/html; charset=utf-8"
+  - Content-Type header value to use for the captcha challenge response. The CaptchaHTMLFilePath body must match this Content-Type.
 - BanHTMLFilePath
   - string
   - default: ""
@@ -518,7 +522,7 @@ make run
 - BanResponseContentType
   - string
   - default: "text/html; charset=utf-8"
-  - Content-Type header value to use for the ban HTTP response.
+  - Content-Type header value to use for the ban HTTP response. The BanHTMLFilePath body must match this Content-Type.
 - TraceHeadersCustomName
   - string
   - default: ""
