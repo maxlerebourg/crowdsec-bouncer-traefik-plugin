@@ -272,6 +272,9 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 	if config.BanResponseContentType == "" {
 		config.BanResponseContentType = "text/html; charset=utf-8"
 	}
+	if strings.ContainsAny(config.BanResponseContentType, "\r\n") {
+		return errors.New("BanResponseContentType: must not contain CR or LF characters")
+	}
 
 	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {
 		return err
