@@ -235,6 +235,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 				remediationStatusCode:   http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
 				banTemplate:             tt.banTemplate,
+				banResponseContentType:  "text/html; charset=utf-8",
 			}
 
 			rw := httptest.NewRecorder()
@@ -274,14 +275,22 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 	banTemplate, _ := htmltemplate.New("html").Parse(html)
 	tests := []struct {
 		name                   string
+		banTemplate            *htmltemplate.Template
 		banResponseContentType string
 	}{
 		{
 			name:                   "Default HTML content type",
+			banTemplate:            banTemplate,
 			banResponseContentType: "text/html; charset=utf-8",
 		},
 		{
 			name:                   "Custom JSON content type",
+			banTemplate:            banTemplate,
+			banResponseContentType: "application/json",
+		},
+		{
+			name:                   "Content type set even when banTemplate is nil",
+			banTemplate:            nil,
 			banResponseContentType: "application/json",
 		},
 	}
@@ -290,7 +299,7 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			bouncer := &Bouncer{
 				remediationStatusCode:  http.StatusForbidden,
-				banTemplate:            banTemplate,
+				banTemplate:            tt.banTemplate,
 				banResponseContentType: tt.banResponseContentType,
 			}
 
