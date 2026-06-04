@@ -14,27 +14,21 @@ permissions:
 
 jobs:
   e2e:
-    name: ${{ matrix.scenario }}
+    name: e2e
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        scenario:
-          - stream-mode
-          - live-mode
-          - none-mode
-          - trusted-ips
-          - custom-ban-page
-          - captcha
-          - appsec
     steps:
       - uses: actions/checkout@v6
-      - name: Run scenario
-        run: ./tests/e2e/scenarios/${{ matrix.scenario }}/run.sh
+      # A single runner runs every scenario sequentially. Docker caches the
+      # Traefik/Crowdsec/whoami images locally, so they are pulled only once
+      # for the whole suite instead of once per scenario. `-k` keeps going
+      # after a failing scenario so the logs cover all of them, while make
+      # still exits non-zero if any scenario failed.
+      - name: Run scenarios
+        run: make -k e2e
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-${{ matrix.scenario }}
-          path: /tmp/e2e-${{ matrix.scenario }}.log
+          name: e2e-logs
+          path: /tmp/e2e-*.log
           if-no-files-found: ignore

@@ -28,22 +28,25 @@ Run everything:
 make e2e
 ```
 
-Each scenario uses an isolated Docker Compose project (`-p e2e-<scenario>`),
-so multiple scenarios can run in parallel without colliding on container
-names — except for the `crowdsec` container, which keeps its canonical
-name so `cscli` commands work uniformly across scenarios. Run scenarios
-serially if you need to invoke them on the same host at the same time.
+Scenarios run **sequentially** on a single host: they share the canonical
+`crowdsec` container name (so `cscli` commands work uniformly) and the same
+`8000:80` port. Each scenario uses its own Docker Compose project
+(`-p e2e-<scenario>`) and tears its stack down on exit, so the next one
+starts clean. `make e2e` runs them one after another; Docker reuses the
+images pulled by the first scenario, so the Traefik / Crowdsec / whoami
+images are downloaded only once for the whole suite.
 
 ## Writing a new scenario
 
 1. Copy `scenarios/stream-mode/` as a template.
 2. Rename `container_name`s (keep `crowdsec` for the LAPI container).
 3. Edit `run.sh` to express the behavior under test.
-4. Add the scenario name to the `matrix` in `.github/workflows/e2e.yml`
-   and to `E2E_SCENARIOS` in the `Makefile`.
+4. Add the scenario name to `E2E_SCENARIOS` in the `Makefile`.
 
 ## CI
 
-`.github/workflows/e2e.yml` runs one parallel job per scenario on every
-PR and push to `main`. On failure, container logs are uploaded as an
-artifact named `logs-<scenario>`.
+`.github/workflows/e2e.yml` runs the whole suite in a single job
+(`make -k e2e`) on every PR and push to `main`. `-k` lets the remaining
+scenarios run after a failure so the logs cover all of them, while make
+still exits non-zero if any scenario failed. On failure, the per-scenario
+logs (`/tmp/e2e-*.log`) are uploaded as an artifact named `e2e-logs`.
