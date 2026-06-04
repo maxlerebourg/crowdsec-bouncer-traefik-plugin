@@ -718,7 +718,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 // Content-Length (typically a bidirectional gRPC stream) keeps its body open
 // for the whole life of the stream and never reaches EOF, so reading it with
 // io.ReadAll would block until the request times out and is wrongly turned into
-// a 403. This mirrors the reference lua-cs-bouncer behaviour, which refuses to
+// a 403. This mirrors the reference lua-cs-bouncer behavior, which refuses to
 // read the body of an HTTP/2+ request that has no Content-Length.
 func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
@@ -734,14 +734,15 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	// When the body cannot be buffered (HTTP/2+ stream without Content-Length,
 	// e.g. gRPC), reading it would block until the request times out. We either
 	// drop the request outright or forward it to Appsec with headers only,
-	// mirroring the reference bouncer's APPSEC_DROP_UNREADABLE_BODY behaviour.
-	if isBodyUnreadable(httpReq) {
+	// mirroring the reference bouncer's APPSEC_DROP_UNREADABLE_BODY behavior.
+	switch {
+	case isBodyUnreadable(httpReq):
 		if bouncer.appsecDropUnreadableBody {
 			bouncer.log.Debug(fmt.Sprintf("appsecQuery:unreadableBody ip:%s dropped:true", ip))
 			return errors.New("appsecQuery:unreadableBody dropped")
 		}
 		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
-	} else if bouncer.appsecBodyLimit > 0 && httpReq.Body != nil {
+	case bouncer.appsecBodyLimit > 0 && httpReq.Body != nil:
 		var bodyBuffer bytes.Buffer
 		limitedReader := io.LimitReader(httpReq.Body, bouncer.appsecBodyLimit)
 		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
@@ -752,7 +753,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 		// Conserve body intact after reading it for other middlewares and service
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
 		req, _ = http.NewRequest(http.MethodPost, routeURL.String(), bytes.NewBuffer(bodyBytes))
-	} else {
+	default:
 		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
 	}
 
