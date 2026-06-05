@@ -1,0 +1,38 @@
+name: Renovate
+
+# Self-hosted Renovate: opens dependency-update PRs on a weekly schedule.
+# Config lives in /renovate.json. Requires a repo/org secret RENOVATE_TOKEN
+# (a PAT with `repo` + `workflow` scope, or a fine-grained token with
+# contents:write + pull-requests:write) so Renovate can push branches and open
+# PRs. Trigger manually from the Actions tab via "Run workflow" to test.
+
+on:
+  schedule:
+    - cron: "0 4 * * 1" # every Monday at 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: "Renovate log level"
+        required: false
+        default: "info"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Renovate
+        uses: renovatebot/github-action@v46.1.14
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_ONBOARDING: "false"
+          RENOVATE_REQUIRE_CONFIG: "required"
+          LOG_LEVEL: ${{ github.event.inputs.logLevel || 'info' }}
