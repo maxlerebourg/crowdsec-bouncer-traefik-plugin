@@ -21,7 +21,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.23"
+          # Track go.mod (Go 1.22) — the plugin's yaegi-bound floor. Keeps the
+          # single source of truth and builds the mock on the supported version.
+          go-version-file: go.mod
       # CI runs the binary/mock suite only: Traefik as a downloaded binary +
       # a small LAPI mock (no Docker, no real Crowdsec). It validates the
       # plugin's own behaviour. Crowdsec / AppSec correctness is upstream's
