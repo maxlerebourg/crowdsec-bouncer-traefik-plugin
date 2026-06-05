@@ -1,5 +1,16 @@
 # End-to-end test suite
 
+There are two suites:
+
+- **`scenarios/` (this one)** — real Traefik + Crowdsec **Docker** containers.
+  High fidelity, kept for **local debugging**. Run with `make e2e`.
+- **[`mock/`](mock/README.md)** — Traefik **binary** + a **mock LAPI**, no
+  Docker. This is what **CI runs** (`make e2e_mock`). It validates the
+  plugin's own behaviour; Crowdsec / AppSec correctness is out of scope there
+  (that is the upstream maintainer's responsibility).
+
+The rest of this document covers the Docker suite.
+
 These tests spin up real Traefik + Crowdsec containers and exercise the
 plugin in the same conditions Traefik uses in production: loaded from a
 local path, no module download, no mocking.
@@ -45,8 +56,7 @@ images are downloaded only once for the whole suite.
 
 ## CI
 
-`.github/workflows/e2e.yml` runs the whole suite in a single job
-(`make -k e2e`) on every PR and push to `main`. `-k` lets the remaining
-scenarios run after a failure so the logs cover all of them, while make
-still exits non-zero if any scenario failed. On failure, the per-scenario
-logs (`/tmp/e2e-*.log`) are uploaded as an artifact named `e2e-logs`.
+This Docker suite is **not** run in CI — it is meant for local debugging.
+`.github/workflows/e2e.yml` runs the [`mock/`](mock/README.md) suite
+(`make -k e2e_mock`) instead, which needs neither Docker nor a real Crowdsec.
+Run this suite locally with `make e2e` (or `make e2e_<scenario>`).

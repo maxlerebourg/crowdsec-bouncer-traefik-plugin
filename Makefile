@@ -1,8 +1,11 @@
-.PHONY: lint test vendor clean e2e
+.PHONY: lint test vendor clean e2e e2e_mock
 
 export GO111MODULE=on
 
+# Docker suite (real Traefik + Crowdsec). Kept for local debugging.
 E2E_SCENARIOS := stream-mode live-mode none-mode trusted-ips custom-ban-page captcha appsec
+# Binary/mock suite (Traefik binary + mock LAPI). This is what CI runs.
+E2E_MOCK_SCENARIOS := stream-mode live-mode none-mode trusted-ips custom-ban-page captcha
 
 default: lint test
 
@@ -19,6 +22,11 @@ e2e: $(addprefix e2e_,$(E2E_SCENARIOS))
 
 e2e_%:
 	./tests/e2e/scenarios/$*/run.sh
+
+e2e_mock: $(addprefix e2e_mock_,$(E2E_MOCK_SCENARIOS))
+
+e2e_mock_%:
+	./tests/e2e/mock/scenarios/$*/run.sh
 
 vendor:
 	go mod vendor

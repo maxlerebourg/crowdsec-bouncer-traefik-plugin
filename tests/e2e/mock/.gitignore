@@ -1,0 +1,2 @@
+# Cached Traefik binary and compiled mock, produced on first run.
+.cache/

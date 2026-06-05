@@ -1,0 +1,28 @@
+# Static Traefik configuration for the binary e2e suite.
+# The dynamic part (router + bouncer middleware + backend service) lives in
+# dynamic.yml, generated per scenario by common.sh.
+entryPoints:
+  web:
+    address: ":8000"
+    forwardedHeaders:
+      # The test's curl sets X-Forwarded-For; preserve it through the proxy.
+      insecure: true
+
+log:
+  level: INFO
+
+accessLog: {}
+
+# /ping on the web entrypoint is the readiness probe — no dashboard/API needed.
+ping:
+  entryPoint: web
+
+providers:
+  file:
+    filename: dynamic.yml
+    watch: false
+
+experimental:
+  localPlugins:
+    bouncer:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin

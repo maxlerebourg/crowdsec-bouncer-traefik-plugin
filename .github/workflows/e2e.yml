@@ -14,21 +14,27 @@ permissions:
 
 jobs:
   e2e:
-    name: e2e
+    name: e2e (binary + mock LAPI)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      # A single runner runs every scenario sequentially. Docker caches the
-      # Traefik/Crowdsec/whoami images locally, so they are pulled only once
-      # for the whole suite instead of once per scenario. `-k` keeps going
-      # after a failing scenario so the logs cover all of them, while make
-      # still exits non-zero if any scenario failed.
-      - name: Run scenarios
-        run: make -k e2e
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.23"
+      # CI runs the binary/mock suite only: Traefik as a downloaded binary +
+      # a small LAPI mock (no Docker, no real Crowdsec). It validates the
+      # plugin's own behaviour. Crowdsec / AppSec correctness is upstream's
+      # responsibility, so those are intentionally out of scope here. The
+      # Docker suite (tests/e2e/scenarios) stays available for local debugging.
+      # `-k` keeps going after a failing scenario so the logs cover all of
+      # them, while make still exits non-zero if any scenario failed.
+      - name: Run mock scenarios
+        run: make -k e2e_mock
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-logs
-          path: /tmp/e2e-*.log
+          path: /tmp/e2e-mock-*.log
           if-no-files-found: ignore
