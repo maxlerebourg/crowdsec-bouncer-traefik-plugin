@@ -143,10 +143,6 @@ lapi_delete_decision() {
   curl -sS -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}" >/dev/null
 }
 
-lapi_reset() {
-  curl -sS -X POST "http://127.0.0.1:${LAPI_PORT}/admin/reset" >/dev/null
-}
-
 # --- stack lifecycle ---------------------------------------------------------
 
 # start_stack SCENARIO_DIR
@@ -174,8 +170,7 @@ start_stack() {
 
   "$mock_bin" \
     --lapi-addr "127.0.0.1:${LAPI_PORT}" \
-    --backend-addr "127.0.0.1:${BACKEND_PORT}" \
-    --api-key "${LAPI_KEY}" >"$WORKDIR/mock.log" 2>&1 &
+    --backend-addr "127.0.0.1:${BACKEND_PORT}" >"$WORKDIR/mock.log" 2>&1 &
   MOCK_PID=$!
 
   ( cd "$WORKDIR" && exec "$traefik_bin" --configfile=traefik.yml ) >"$WORKDIR/traefik.log" 2>&1 &
