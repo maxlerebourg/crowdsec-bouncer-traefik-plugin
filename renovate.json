@@ -5,6 +5,12 @@
   "prHourlyLimit": 0,
   "packageRules": [
     {
+      "description": "Cap the Go version at what yaegi supports. The plugin is interpreted by yaegi (bundled in Traefik), and even Traefik v3.7.1 ships yaegi v0.16.1 = Go 1.22. A newer Go would break the plugin on every current Traefik. Raise this only once Traefik ships a yaegi supporting a newer Go.",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go", "toolchain"],
+      "allowedVersions": "<1.23"
+    },
+    {
       "description": "Group everything Traefik (image, helm tag, e2e binary) into one PR",
       "matchPackageNames": ["traefik", "traefik/traefik"],
       "groupName": "Traefik"
