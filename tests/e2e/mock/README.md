@@ -28,7 +28,7 @@ returns whatever decisions the test tells it to.
 
 | Component | How |
 |-----------|-----|
-| Traefik   | Binary `v3.7.1`, downloaded once and cached under `.cache/` |
+| Traefik   | Binary `v3.7.1`, downloaded into `.cache/` (reused across local runs; re-downloaded on fresh CI runners) |
 | Plugin    | Loaded via `experimental.localPlugins` from the repo root (symlinked into `plugins-local/`) |
 | LAPI      | `mocklapi` — a stdlib-only Go command (its own nested module), compiled and cached under `.cache/`, driven through `/admin` endpoints instead of `cscli` |
 | Backend   | A plain HTTP responder built into the mock |
@@ -38,8 +38,9 @@ backend `8091`.
 
 ## Running locally
 
-Prerequisites: `bash`, `curl`, `go`, `tar`. The Traefik binary is fetched and
-the mock is compiled automatically on first run (both cached under `.cache/`).
+Prerequisites: `bash`, `curl`, `go`, `tar`. On first use the Traefik binary is
+fetched and the mock is compiled into `.cache/`. That cache is reused across
+local runs; CI runs on fresh runners, so both are recreated on every CI run.
 
 ```bash
 # one scenario

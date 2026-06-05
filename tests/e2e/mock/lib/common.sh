@@ -7,7 +7,8 @@
 # IPs, ban / captcha rendering), NOT Crowdsec or AppSec correctness.
 #
 # Dependencies: bash, curl, go, tar. The Traefik binary is downloaded and the
-# mock is compiled on first run (both cached), so local and CI behave the same.
+# mock is compiled into .cache/ on first use. That cache persists across local
+# runs; CI runs on fresh runners, so both are recreated on every CI run.
 
 set -euo pipefail
 

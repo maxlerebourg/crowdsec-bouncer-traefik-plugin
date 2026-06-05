@@ -213,7 +213,9 @@ func backendHandler() http.Handler {
 
 func main() {
 	lapiAddr := flag.String("lapi-addr", "127.0.0.1:8090", "address for the LAPI mock")
-	backendAddr := flag.String("backend-addr", "127.0.0.1:8091", "address for the backend responder")
+	// The stub upstream service Traefik proxies allowed requests to — the
+	// binary-suite equivalent of the traefik/whoami container. Not AppSec.
+	backendAddr := flag.String("backend-addr", "127.0.0.1:8091", "address of the stub upstream service Traefik proxies allowed requests to")
 	apiKey := flag.String("api-key", "e2e-mock-key", "expected X-Api-Key value")
 	flag.Parse()
 
