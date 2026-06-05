@@ -90,6 +90,25 @@ wait_for_status() {
   return 1
 }
 
+# Poll a URL until its body contains a substring, or fail. Used when the status
+# code alone can't tell the states apart (e.g. captcha page vs backend, both 200).
+# Usage: wait_for_body_contains URL NEEDLE [TIMEOUT_SECONDS] [curl args...]
+wait_for_body_contains() {
+  local url="$1" needle="$2" timeout="${3:-30}"
+  shift 3 || true
+  local elapsed=0 body=""
+  while (( elapsed < timeout )); do
+    body=$(curl -s "$@" "$url" || true)
+    if grep -q "$needle" <<<"$body"; then
+      return 0
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  echo "wait_for_body_contains: $url did not contain \"$needle\" within ${timeout}s" >&2
+  return 1
+}
+
 # Assert a single curl returns the expected status code.
 # Usage: assert_status URL CODE [curl args...]
 assert_status() {

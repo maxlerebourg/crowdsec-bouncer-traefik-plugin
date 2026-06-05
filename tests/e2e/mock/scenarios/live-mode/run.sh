@@ -14,11 +14,10 @@ body() {
   echo "[$SCENARIO] adding ban decision for 1.2.3.4"
   lapi_add_decision 1.2.3.4 ban 5m
 
-  echo "[$SCENARIO] waiting for defaultDecisionSeconds cache to expire..."
-  sleep 3
-
-  echo "[$SCENARIO] next hit must re-query LAPI and now see the ban"
-  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4"
+  # Stays 200 until the cached 'allowed' (defaultDecisionSeconds) expires, then
+  # the re-query sees the ban — poll instead of guessing the cache TTL.
+  echo "[$SCENARIO] hit must turn 403 once the cached 'allowed' expires and LAPI is re-queried"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 15 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] another non-banned IP must still pass"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 5.6.7.8"
