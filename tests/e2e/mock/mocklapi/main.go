@@ -4,9 +4,10 @@
 // test drive decisions through /admin instead of `cscli`. It also serves the
 // stub upstream that Traefik proxies allowed requests to.
 //
-// It is deliberately NOT a Crowdsec/AppSec conformance harness: Crowdsec's own
-// correctness is the upstream maintainer's responsibility, not this plugin's.
-// See the suite README.
+// It is NOT a Crowdsec/AppSec conformance harness — the real WAF engine (OWASP
+// CRS, virtual patching) is out of scope. The AppSec endpoint here emulates a
+// single deterministic rule so the suite can exercise the plugin's AppSec
+// wiring (header forwarding, allow/block handling) end to end. See the README.
 package main
 
 import (
@@ -14,6 +15,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 )
 
@@ -48,11 +50,26 @@ func main() {
 	// The stub upstream Traefik proxies allowed requests to — the binary-suite
 	// equivalent of the traefik/whoami container. Not AppSec.
 	backendAddr := flag.String("backend-addr", "127.0.0.1:8091", "address for the stub upstream service")
+	// AppSec WAF stand-in (the real engine listens on :7422). Not a CRS engine.
+	appsecAddr := flag.String("appsec-addr", "127.0.0.1:8092", "address for the AppSec mock")
 	flag.Parse()
 
 	go func() {
 		log.Fatal(http.ListenAndServe(*backendAddr, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte("E2E_BACKEND_OK\n"))
+		})))
+	}()
+
+	// AppSec mock: the plugin forwards the request metadata in X-Crowdsec-Appsec-*
+	// headers and reads our status — 200 allows, 403 blocks. We emulate one
+	// deterministic virtual-patching rule (block any URI containing "rpc2", the
+	// exact probe from examples/appsec-enabled) so the plugin's AppSec path is
+	// exercised without standing up the real WAF.
+	go func() {
+		log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "rpc2") {
+				w.WriteHeader(http.StatusForbidden)
+			}
 		})))
 	}()
 
@@ -113,6 +130,6 @@ func main() {
 		}
 	})
 
-	log.Printf("mocklapi: LAPI on %s, backend on %s", *lapiAddr, *backendAddr)
+	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
 	log.Fatal(http.ListenAndServe(*lapiAddr, mux))
 }

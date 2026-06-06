@@ -17,12 +17,13 @@ http:
       plugin:
         bouncer:
           enabled: "true"
-          crowdsecMode: stream
-          updateIntervalSeconds: "2"
+          # IP bouncing disabled — this scenario exercises AppSec only.
+          crowdsecMode: none
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"
+          crowdsecAppsecEnabled: "true"
+          crowdsecAppsecScheme: http
+          crowdsecAppsecHost: "@@APPSEC_HOST@@"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
-          banHtmlFilePath: "@@SCENARIO_DIR@@/ban.html"
-          remediationHeadersCustomName: "X-E2E-Remediation"

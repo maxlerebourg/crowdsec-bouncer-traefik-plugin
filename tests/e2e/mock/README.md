@@ -10,20 +10,19 @@ suite** (real Traefik + Crowdsec, under `tests/e2e/scenarios`) is kept for
 high-fidelity debugging against a real Crowdsec but is not exercised in CI; it
 ships in its own PR (#333).
 
-## Scope — what this suite does and does NOT test
+## Scope — what this suite tests
 
 These tests validate the **plugin's own behaviour**: the request flow through
 the Traefik middleware, the live / none / stream modes, caching, trusted-IP
-bypass, and ban / captcha page rendering.
+bypass, ban / captcha page rendering, and the AppSec request path (header
+forwarding + enforcing the engine's allow/block verdict).
 
-They deliberately **do not** test that Crowdsec or its AppSec engine work
-correctly — that is validated and owned by the upstream maintainer
-([@maxlerebourg](https://github.com/maxlerebourg)), not by this plugin. The
-mock only emulates the slice of the LAPI HTTP contract the plugin consumes.
-
-So please **don't open issues here about Crowdsec/AppSec detection accuracy**
-based on this suite: the AppSec scenario is intentionally absent, and the mock
-returns whatever decisions the test tells it to.
+The mock stands in for Crowdsec, emulating the slice of the LAPI HTTP contract
+the plugin consumes — including a single, deterministic AppSec rule (block any
+URI containing `rpc2`, the probe from [`examples/appsec-enabled`](../../../examples/appsec-enabled)).
+It is not the real WAF engine, so this suite exercises the plugin's AppSec
+*wiring* rather than the detection accuracy of OWASP CRS / virtual patching —
+that lives upstream in Crowdsec.
 
 ## What runs
 
@@ -32,10 +31,11 @@ returns whatever decisions the test tells it to.
 | Traefik   | Binary `v3.7.1`, downloaded into `.cache/` (reused across local runs; re-downloaded on fresh CI runners) |
 | Plugin    | Loaded via `experimental.localPlugins` from the repo root (symlinked into `plugins-local/`) |
 | LAPI      | `mocklapi` — a stdlib-only Go command (its own nested module), compiled and cached under `.cache/`, driven through `/admin` endpoints instead of `cscli` |
+| AppSec    | WAF stand-in built into the mock — blocks URIs containing `rpc2`, allows the rest |
 | Backend   | A plain HTTP responder built into the mock |
 
 Fixed ports (override with env vars if needed): Traefik `8000`, LAPI `8090`,
-backend `8091`.
+backend `8091`, AppSec `8092`.
 
 ## Running locally
 
@@ -62,7 +62,7 @@ mock/
     traefik.yml   # static Traefik config (shared by all scenarios)
   mocklapi/
     go.mod        # nested module — kept out of the plugin's build/lint/vendor
-    main.go       # mock LAPI + backend
+    main.go       # mock LAPI + AppSec stand-in + backend
   scenarios/
     <name>/
       dynamic.yml # Traefik dynamic config (router + bouncer middleware + backend)

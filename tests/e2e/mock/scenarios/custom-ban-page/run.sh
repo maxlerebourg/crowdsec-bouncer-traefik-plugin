@@ -19,6 +19,9 @@ body() {
 
   echo "[$SCENARIO] banned response body contains the custom marker"
   assert_body_contains "http://127.0.0.1:${WEB_PORT}/foo" "E2E_CUSTOM_BAN_PAGE_MARKER" -H "X-Forwarded-For: 1.2.3.4"
+
+  echo "[$SCENARIO] banned response carries the custom remediation header (remediationHeadersCustomName)"
+  assert_header "http://127.0.0.1:${WEB_PORT}/foo" X-E2E-Remediation "ban" -H "X-Forwarded-For: 1.2.3.4"
 }
 
 run_scenario "$SCENARIO" "$HERE" body

@@ -4,7 +4,8 @@
 # Unlike the Docker suite under tests/e2e/scenarios, this one runs Traefik as a
 # downloaded binary and replaces Crowdsec with a small HTTP mock (the mocklapi
 # Go command). It validates the plugin's own behaviour (modes, cache, trusted
-# IPs, ban / captcha rendering), NOT Crowdsec or AppSec correctness.
+# IPs, ban / captcha rendering, AppSec wiring) — not the accuracy of Crowdsec's
+# detection or its WAF engine, which the mock only stands in for.
 #
 # Dependencies: bash, curl, go, tar. The Traefik binary is downloaded and the
 # mock is compiled into .cache/ on first use. That cache persists across local
@@ -18,6 +19,7 @@ TRAEFIK_VERSION="${TRAEFIK_VERSION:-v3.7.1}"
 WEB_PORT="${WEB_PORT:-8000}"
 LAPI_PORT="${LAPI_PORT:-8090}"
 BACKEND_PORT="${BACKEND_PORT:-8091}"
+APPSEC_PORT="${APPSEC_PORT:-8092}"
 LAPI_KEY="${LAPI_KEY:-e2e-mock-key}"
 
 MOCK_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -183,19 +185,23 @@ start_stack() {
   sed \
     -e "s|@@APIKEY@@|${LAPI_KEY}|g" \
     -e "s|@@LAPI_HOST@@|127.0.0.1:${LAPI_PORT}|g" \
+    -e "s|@@APPSEC_HOST@@|127.0.0.1:${APPSEC_PORT}|g" \
     -e "s|@@BACKEND_URL@@|http://127.0.0.1:${BACKEND_PORT}|g" \
     -e "s|@@SCENARIO_DIR@@|${scenario_dir}|g" \
     "$scenario_dir/dynamic.yml" > "$WORKDIR/dynamic.yml"
 
   "$mock_bin" \
     --lapi-addr "127.0.0.1:${LAPI_PORT}" \
-    --backend-addr "127.0.0.1:${BACKEND_PORT}" >"$WORKDIR/mock.log" 2>&1 &
+    --backend-addr "127.0.0.1:${BACKEND_PORT}" \
+    --appsec-addr "127.0.0.1:${APPSEC_PORT}" >"$WORKDIR/mock.log" 2>&1 &
   MOCK_PID=$!
 
   ( cd "$WORKDIR" && exec "$traefik_bin" --configfile=traefik.yml ) >"$WORKDIR/traefik.log" 2>&1 &
   TRAEFIK_PID=$!
 
   wait_for_status "http://127.0.0.1:${LAPI_PORT}/health" 200 30
+  # AppSec stand-in: a bare GET carries no "rpc2" URI, so it answers 200 (allow).
+  wait_for_status "http://127.0.0.1:${APPSEC_PORT}/" 200 30
   # /ping is served by Traefik itself once it is up (plugin compilation included).
   wait_for_status "http://127.0.0.1:${WEB_PORT}/ping" 200 60
 }
