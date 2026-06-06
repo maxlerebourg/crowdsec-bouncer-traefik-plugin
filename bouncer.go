@@ -738,7 +738,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	switch {
 	case isBodyUnreadable(httpReq):
 		if bouncer.appsecDropUnreadableBody {
-			bouncer.log.Debug(fmt.Sprintf("appsecQuery:unreadableBody ip:%s dropped:true", ip))
+			// The caller (handleNextServeHTTP) logs this returned error with the IP.
 			return errors.New("appsecQuery:unreadableBody dropped")
 		}
 		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
