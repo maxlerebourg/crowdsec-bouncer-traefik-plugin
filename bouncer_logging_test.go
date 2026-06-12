@@ -33,6 +33,8 @@ func getTestConfig() *configuration.Config {
 		ForwardedHeadersCustomName:           "",
 		RemediationStatusCode:                403,
 		BanHTMLFilePath:                      "",
+		BanResponseContentType:               "text/html; charset=utf-8",
+		CaptchaResponseContentType:           "text/html; charset=utf-8",
 		RemediationHeadersCustomName:         "",
 		CaptchaProvider:                      "",
 		CaptchaSiteKey:                       "",
