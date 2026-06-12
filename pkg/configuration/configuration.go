@@ -405,13 +405,13 @@ func validateCaptcha(config *Config) error {
 
 func validateResponseContentTypes(config *Config) error {
 	if config.BanResponseContentType == "" {
-		config.BanResponseContentType = "text/html; charset=utf-8"
+		return errors.New("BanResponseContentType: must not be empty")
 	}
 	if strings.ContainsAny(config.BanResponseContentType, "\r\n") {
 		return errors.New("BanResponseContentType: must not contain CR or LF characters")
 	}
 	if config.CaptchaResponseContentType == "" {
-		config.CaptchaResponseContentType = "text/html; charset=utf-8"
+		return errors.New("CaptchaResponseContentType: must not be empty")
 	}
 	if strings.ContainsAny(config.CaptchaResponseContentType, "\r\n") {
 		return errors.New("CaptchaResponseContentType: must not contain CR or LF characters")
