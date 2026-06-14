@@ -5,3 +5,7 @@ conf
 db
 logs
 docker-compose.dev.yml
+
+# Binary e2e suite working cache: Traefik binary + compiled mock. Persisted
+# across local runs; CI runs on fresh runners so it is recreated every time.
+tests/e2e/mock/.cache/

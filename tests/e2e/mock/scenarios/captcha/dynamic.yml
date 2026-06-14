@@ -1,0 +1,33 @@
+http:
+  routers:
+    r:
+      rule: "PathPrefix(`/foo`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecMode: stream
+          updateIntervalSeconds: "2"
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: "@@LAPI_HOST@@"
+          crowdsecLapiKey: "@@APIKEY@@"
+          forwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          captchaProvider: turnstile
+          # Cloudflare Turnstile public test keys: render a valid widget without
+          # contacting a real API key.
+          captchaSiteKey: "1x00000000000000000000AA"
+          captchaSecretKey: "1x0000000000000000000000000000000AA"
+          captchaHtmlFilePath: "@@SCENARIO_DIR@@/captcha.html"
+          captchaGracePeriodSeconds: "10"
