@@ -68,7 +68,7 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant CrowdsecLAPI
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a Crowdsec Decision ?
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Yes a ban Decision
     TraefikPlugin->>User: No, HTTP 403
 ```
@@ -82,9 +82,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant CrowdsecLAPI
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Nothing, all good!
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -105,10 +105,10 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Nothing, all good!
     create participant CrowdsecLAPI
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Yes a ban Decision
     TraefikPlugin-->>PluginCache: Store the information for this IP for DefaultDecisionSeconds
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
     TraefikPlugin->>User: No, HTTP 403
 ```
@@ -125,10 +125,10 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Nothing, all good!
     create participant CrowdsecLAPI
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Nothing, all good!
     TraefikPlugin-->>PluginCache: Store the information for this IP for DefaultDecisionSeconds
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
@@ -145,11 +145,11 @@ sequenceDiagram
     participant TraefikPlugin
     participant CrowdsecLAPI
     TraefikPlugin->>CrowdsecLAPI: What are the current decisions
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI->>TraefikPlugin: Here is the list
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Store this list
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
 ```
 
@@ -162,9 +162,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Yes a ban decision
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>User: No, HTTP 403
 ```
 
@@ -177,9 +177,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Nothing, all good!
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -195,11 +195,11 @@ sequenceDiagram
     participant TraefikPlugin
     participant CrowdsecCAPI
     TraefikPlugin->>CrowdsecCAPI: What are the current decisions from CAPI
-    Destroy CrowdsecCAPI
+    destroy CrowdsecCAPI
     CrowdsecCAPI->>TraefikPlugin: Here is the list
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Store this list
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
 ```
 
@@ -212,9 +212,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Yes a ban decision
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>User: No, HTTP 403
 ```
 
@@ -227,9 +227,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Nothing, all good!
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -247,9 +247,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant CrowdsecAppSec
     TraefikPlugin-->>CrowdsecAppSec: Is this request malicious ?
-    Destroy CrowdsecAppSec
+    destroy CrowdsecAppSec
     CrowdsecAppSec-->>TraefikPlugin: Yes I think so
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>User: No, HTTP 403
 ```
 
@@ -262,9 +262,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant CrowdsecAppSec
     TraefikPlugin-->>CrowdsecAppSec: Is this request malicious ?
-    Destroy CrowdsecAppSec
+    destroy CrowdsecAppSec
     CrowdsecAppSec-->>TraefikPlugin: No I don't think so
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -285,12 +285,12 @@ sequenceDiagram
     User->>TraefikPlugin: Fine, done!
     create participant ProviderCaptcha
     TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
-    Destroy ProviderCaptcha
+    destroy ProviderCaptcha
     ProviderCaptcha-->>TraefikPlugin: Yes
     TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
