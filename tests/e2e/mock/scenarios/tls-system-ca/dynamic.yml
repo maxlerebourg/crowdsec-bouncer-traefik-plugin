@@ -1,0 +1,28 @@
+http:
+  routers:
+    r:
+      rule: "PathPrefix(`/foo`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecMode: live
+          defaultDecisionSeconds: "2"
+          # HTTPS LAPI with NO custom CA configured: the bouncer must fall back to
+          # the OS/system trust store (which the scenario controls via SSL_CERT_FILE).
+          crowdsecLapiScheme: https
+          crowdsecLapiHost: "@@LAPI_HOST@@"
+          crowdsecLapiKey: "@@APIKEY@@"
+          forwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
