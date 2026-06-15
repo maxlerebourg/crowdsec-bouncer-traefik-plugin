@@ -100,9 +100,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the user IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Nothing, all good!
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -121,12 +121,12 @@ sequenceDiagram
     User->>TraefikPlugin: Fine, done!
     create participant ProviderCaptcha
     TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
-    Destroy ProviderCaptcha    
+    destroy ProviderCaptcha    
     ProviderCaptcha-->>TraefikPlugin: Yes
     TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -140,7 +140,7 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a Crowdsec Decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Yes a ban Decision
     TraefikPlugin->>User: No, HTTP 403
 ```

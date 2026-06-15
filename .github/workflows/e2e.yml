@@ -1,0 +1,42 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: e2e (binary + mock LAPI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          # Track go.mod (Go 1.22) — the plugin's yaegi-bound floor. Keeps the
+          # single source of truth and builds the mock on the supported version.
+          go-version-file: go.mod
+      # CI runs the binary/mock suite only: Traefik as a downloaded binary +
+      # a small LAPI mock (no Docker, no real Crowdsec). It validates the
+      # plugin's own behaviour. Crowdsec / AppSec correctness is upstream's
+      # responsibility, so those are intentionally out of scope here. The
+      # Docker suite (tests/e2e/scenarios) stays available for local debugging.
+      # `-k` keeps going after a failing scenario so the logs cover all of
+      # them, while make still exits non-zero if any scenario failed.
+      - name: Run mock scenarios
+        run: make -k e2e_mock
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-logs
+          path: /tmp/e2e-mock-*.log
+          if-no-files-found: ignore
