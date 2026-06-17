@@ -28,9 +28,9 @@ Minimal API requirement:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomChallengeURL=http://captcha.localhost:8000/v0/challenge"
       # Inside Traefik container the plugin must be able to reach wicketkeeper service so we can go through a Traefik localhost
       # domain which would resolve traefik itself and the port for the dashboard
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomKey=wicketkeeper"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomResponse=wicketkeeper_solution"
       # Define captcha HTML file path
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
 ```
