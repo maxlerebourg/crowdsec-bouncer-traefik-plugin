@@ -25,6 +25,7 @@ Minimal API requirement:
       # Define captcha grace period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsURL=http://captcha.localhost:8000/fast.js"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomChallengeURL=http://captcha.localhost:8000/v0/challenge"
       # Inside Traefik container the plugin must be able to reach wicketkeeper service so we can go through a Traefik localhost
       # domain which would resolve traefik itself and the port for the dashboard
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"

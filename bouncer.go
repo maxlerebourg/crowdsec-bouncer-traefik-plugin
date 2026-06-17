@@ -270,6 +270,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		},
 		config.CaptchaProvider,
 		config.CaptchaCustomJsURL,
+		config.CaptchaCustomChallengeURL,
 		config.CaptchaCustomKey,
 		config.CaptchaCustomResponse,
 		config.CaptchaCustomValidateURL,
@@ -467,6 +468,11 @@ func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
+			bouncer.handleNextServeHTTP(rw, req, remoteIP)
+			return
+		}
+		if bouncer.captchaClient.IsCaptchaResource(req) {
+			bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s captcha resource pass-through path:%s", remoteIP, req.URL.Path))
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}
