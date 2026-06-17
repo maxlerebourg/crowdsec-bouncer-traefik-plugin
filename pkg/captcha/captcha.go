@@ -185,9 +185,10 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	return captchaResponse.Success, nil
 }
 
-// Check if req targets one of the captcha resource paths (CaptchaCustomJsURL,
-// CaptchaCustomChallengeURL). Captcha-pending IPs must reach these paths for
-// the widget to load and submit; all other paths are still blocked.
+// IsCaptchaResource reports whether req targets one of the captcha resource
+// paths (CaptchaCustomJsURL, CaptchaCustomChallengeURL). Captcha-pending IPs
+// must reach these paths for the widget to load and submit; all other paths are
+// still blocked.
 //
 // Matching rules:
 //   - Path must match exactly.
