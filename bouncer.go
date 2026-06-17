@@ -688,7 +688,10 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpClient.Do(req)
-	if err != nil {
+	if err != nil ||
+		res.StatusCode == http.StatusBadGateway ||
+		res.StatusCode == http.StatusServiceUnavailable ||
+		res.StatusCode == http.StatusGatewayTimeout {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
 	}
 	defer func() {
@@ -752,7 +755,10 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpAppsecClient.Do(req)
-	if err != nil {
+	if err != nil ||
+		res.StatusCode == http.StatusBadGateway ||
+		res.StatusCode == http.StatusServiceUnavailable ||
+		res.StatusCode == http.StatusGatewayTimeout {
 		bouncer.log.Error("appsecQuery:unreachable")
 		if bouncer.appsecUnreachableBlock {
 			return fmt.Errorf("appsecQuery:unreachable %w", err)
