@@ -256,6 +256,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		log,
 		config.RedisCacheEnabled,
 		config.RedisCacheHost,
+		config.RedisCacheReadHosts,
 		config.RedisCachePassword,
 		config.RedisCacheDatabase,
 	)
