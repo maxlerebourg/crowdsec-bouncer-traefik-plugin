@@ -190,16 +190,29 @@ start_stack() {
     -e "s|@@SCENARIO_DIR@@|${scenario_dir}|g" \
     "$scenario_dir/dynamic.yml" > "$WORKDIR/dynamic.yml"
 
+  # Opt-in HTTPS LAPI: a scenario exports LAPI_TLS_CERT/LAPI_TLS_KEY to serve the
+  # LAPI over TLS (used by tls-system-ca). Default empty -> plaintext as before.
+  local mock_tls_args=() lapi_scheme=http lapi_curl=()
+  if [[ -n "${LAPI_TLS_CERT:-}" && -n "${LAPI_TLS_KEY:-}" ]]; then
+    mock_tls_args=(--lapi-tls-cert "$LAPI_TLS_CERT" --lapi-tls-key "$LAPI_TLS_KEY")
+    lapi_scheme=https
+    lapi_curl=(-k) # the readiness probe ignores trust; the bouncer's trust is what we test
+  fi
+
   "$mock_bin" \
     --lapi-addr "127.0.0.1:${LAPI_PORT}" \
     --backend-addr "127.0.0.1:${BACKEND_PORT}" \
-    --appsec-addr "127.0.0.1:${APPSEC_PORT}" >"$WORKDIR/mock.log" 2>&1 &
+    --appsec-addr "127.0.0.1:${APPSEC_PORT}" \
+    "${mock_tls_args[@]}" >"$WORKDIR/mock.log" 2>&1 &
   MOCK_PID=$!
 
-  ( cd "$WORKDIR" && exec "$traefik_bin" --configfile=traefik.yml ) >"$WORKDIR/traefik.log" 2>&1 &
+  # Opt-in trust store for the Traefik process: a scenario exports
+  # TRAEFIK_SSL_CERT_FILE to point Go's x509.SystemCertPool() at a specific CA
+  # bundle. Empty -> Go's default system store (unchanged behaviour).
+  ( cd "$WORKDIR" && SSL_CERT_FILE="${TRAEFIK_SSL_CERT_FILE:-}" exec "$traefik_bin" --configfile=traefik.yml ) >"$WORKDIR/traefik.log" 2>&1 &
   TRAEFIK_PID=$!
 
-  wait_for_status "http://127.0.0.1:${LAPI_PORT}/health" 200 30
+  wait_for_status "${lapi_scheme}://127.0.0.1:${LAPI_PORT}/health" 200 30 "${lapi_curl[@]}"
   # AppSec stand-in: a bare GET carries no "rpc2" URI, so it answers 200 (allow).
   wait_for_status "http://127.0.0.1:${APPSEC_PORT}/" 200 30
   # /ping is served by Traefik itself once it is up (plugin compilation included).

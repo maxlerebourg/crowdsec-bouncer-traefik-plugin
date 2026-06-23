@@ -52,6 +52,11 @@ func main() {
 	backendAddr := flag.String("backend-addr", "127.0.0.1:8091", "address for the stub upstream service")
 	// AppSec WAF stand-in (the real engine listens on :7422). Not a CRS engine.
 	appsecAddr := flag.String("appsec-addr", "127.0.0.1:8092", "address for the AppSec mock")
+	// Optional TLS for the LAPI: when both are set the LAPI is served over HTTPS
+	// (cert signed by the scenario's throwaway CA) so the suite can exercise the
+	// bouncer's system-trust-store path. Backend and AppSec stay plaintext.
+	lapiTLSCert := flag.String("lapi-tls-cert", "", "PEM cert to serve the LAPI over HTTPS (optional)")
+	lapiTLSKey := flag.String("lapi-tls-key", "", "PEM key for --lapi-tls-cert")
 	flag.Parse()
 
 	go func() {
@@ -130,6 +135,10 @@ func main() {
 		}
 	})
 
+	if *lapiTLSCert != "" && *lapiTLSKey != "" {
+		log.Printf("mocklapi: LAPI on %s (TLS), backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
+		log.Fatal(http.ListenAndServeTLS(*lapiAddr, *lapiTLSCert, *lapiTLSKey, mux))
+	}
 	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
 	log.Fatal(http.ListenAndServe(*lapiAddr, mux))
 }
