@@ -362,7 +362,7 @@ make run
 - CrowdsecAppsecTlsCertificateAuthority
   - string
   - default: ""
-  - PEM-encoded Certificate Authority of Appsec
+  - PEM-encoded Certificate Authority used to verify Appsec's server certificate. When empty (and `crowdsecAppsecTlsInsecureVerify` is `false`), the host's system trust store is used.
 - CrowdsecAppsecScheme
   - string
   - default: value of `CrowdsecLapiScheme`, expected values are: `http`, `https`
@@ -408,7 +408,7 @@ make run
 - CrowdsecLapiTlsCertificateAuthority
   - string
   - default: ""
-  - PEM-encoded Certificate Authority of the Crowdsec LAPI
+  - PEM-encoded Certificate Authority used to verify the LAPI's server certificate. When empty (and `crowdsecLapiTlsInsecureVerify` is `false`), the host's system trust store is used.
 - CrowdsecLapiTlsCertificateBouncer
   - string
   - default: ""
@@ -727,16 +727,18 @@ A script is available to generate certificates in `examples/tls-auth/gencerts.sh
 
 #### Use HTTPS to communicate with the LAPI
 
-To communicate with the LAPI in HTTPS you need to either accept any certificates by setting the `crowdsecLapiTLSInsecureVerify` to true or add the CA used by the server certificate of Crowdsec using `crowdsecLapiTLSCertificateAuthority` or `crowdsecLapiTLSCertificateAuthorityFile`.
-Set the `crowdsecLapiScheme` to https.
+Set `crowdsecLapiScheme` to `https`. The plugin then validates Crowdsec's server certificate. Three options:
+
+- **Publicly trusted certificate** (e.g. Let's Encrypt behind a reverse proxy): leave `crowdsecLapiTLSCertificateAuthority` empty and `crowdsecLapiTLSInsecureVerify` `false`. The plugin falls back to the host's system trust store (the `traefik` image ships `ca-certificates`).
+- **Private/self-signed CA**: set `crowdsecLapiTLSCertificateAuthority` (or `…File`) to the PEM-encoded CA that signed Crowdsec's server cert.
+- **Skip verification entirely** (not recommended for production): set `crowdsecLapiTLSInsecureVerify` to `true`.
 
 Crowdsec must be listening in HTTPS for this to work.
 Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/tls-auth/README.md) or the official documentation: [docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
 
 #### Use HTTPS to communicate with the Appsec
 
-To communicate with the Appsec in HTTPS you need to either accept any certificates by setting the `crowdsecAppsecTLSInsecureVerify` to true or add the CA used by the server certificate of Crowdsec using `crowdsecAppsecTLSCertificateAuthority` or `crowdsecAppsecTLSCertificateAuthorityFile`.
-Set the `crowdsecAppsecScheme` to https.
+Set `crowdsecAppsecScheme` to `https`. Same three options as for the LAPI, prefixed `crowdsecAppsec…` instead of `crowdsecLapi…`: empty CA + secure verify falls back to the system trust store, a custom CA pins to your private PKI, and `crowdsecAppsecTLSInsecureVerify=true` skips verification altogether.
 
 Currently AppSec does not support mTLS authentication for the AppSec Component.
 

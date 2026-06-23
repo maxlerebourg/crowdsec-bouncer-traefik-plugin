@@ -361,7 +361,8 @@ func validateParamsTLS(config *Config) error {
 		return err
 	}
 	if certAuth == "" {
-		return errors.New("CrowdsecLapiTLSCertificateAuthority must be specified when CrowdsecLapiScheme='https' and CrowdsecLapiTLSInsecureVerify=false")
+		// No custom CA — runtime will fall back to the system trust store.
+		return nil
 	}
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
@@ -453,29 +454,31 @@ func validateParamsRequired(config *Config) error {
 
 func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insecureVerify bool) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
-	tlsConfig.RootCAs = x509.NewCertPool()
 	if scheme != HTTPS {
 		log.Debug("getTLSConfig:" + prefix + "Scheme https:no")
 		return tlsConfig, nil
 	}
+	// RootCAs is intentionally left nil unless a custom CA is provided:
+	// crypto/tls then falls back to x509.SystemCertPool(), which is what we
+	// want when the LAPI is exposed behind a reverse proxy with a publicly
+	// trusted certificate (e.g. Let's Encrypt).
 	//nolint:nestif
 	if insecureVerify {
 		tlsConfig.InsecureSkipVerify = true
 		log.Debug("getTLSConfig:" + prefix + "TLSInsecureVerify tlsInsecure:true")
-		// If we return here and still want to use client auth this won't work
-		// return tlsConfig, nil
 	} else {
 		certAuthority, err := GetVariable(config, prefix+"TLSCertificateAuthority")
 		if err != nil {
 			return nil, err
 		}
 		if len(certAuthority) > 0 {
+			tlsConfig.RootCAs = x509.NewCertPool()
 			if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuthority)) {
-				// here we return because if CrowdsecLapiTLSInsecureVerify is false
-				// and CA not load, we can't communicate with https
 				return nil, errors.New("getTLSConfig:" + prefix + " cannot load CA and verify cert is enabled")
 			}
 			log.Debug("getTLSConfig:" + prefix + "TLSCertificateAuthority CA added successfully")
+		} else {
+			log.Debug("getTLSConfig:" + prefix + " no CA provided, using system trust store")
 		}
 	}
 	certBouncer, err := GetVariable(config, prefix+"TLSCertificateBouncer")
