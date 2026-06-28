@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -15,6 +14,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"text/template"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
@@ -99,8 +99,10 @@ type Config struct {
 	RedisCachePasswordFile                     string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                         string   `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock                 bool     `json:"redisCacheUnreachableBlock,omitempty"`
-	BanHTMLFilePath                            string   `json:"banHtmlFilePath,omitempty"`
-	CaptchaHTMLFilePath                        string   `json:"captchaHtmlFilePath,omitempty"`
+	BanHTMLFilePath                            string   `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
+	BanFilePath                                string   `json:"banFilePath,omitempty"`
+	CaptchaHTMLFilePath                        string   `json:"captchaHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
+	CaptchaFilePath                            string   `json:"captchaFilePath,omitempty"`
 	CaptchaProvider                            string   `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                         string   `json:"captchaCustomJsUrl,omitempty"`
 	CaptchaCustomValidateURL                   string   `json:"captchaCustomValidateUrl,omitempty"`
@@ -159,8 +161,8 @@ func New() *Config {
 		CaptchaSiteKey:                  "",
 		CaptchaSecretKey:                "",
 		CaptchaGracePeriodSeconds:       1800,
-		CaptchaHTMLFilePath:             "/captcha.html",
-		BanHTMLFilePath:                 "",
+		CaptchaFilePath:                 "/captcha.html",
+		BanFilePath:                     "",
 		TraceHeadersCustomName:          "",
 		RemediationHeadersCustomName:    "",
 		ForwardedHeadersCustomName:      "X-Forwarded-For",
@@ -201,28 +203,50 @@ func GetVariable(config *Config, key string) (string, error) {
 	return strings.TrimSpace(value), nil
 }
 
-// GetHTMLTemplate get compiled HTML template.
-func GetHTMLTemplate(path string) (*template.Template, error) {
-	var err error
+func getContentTypeFromPath(path string) string {
 	if path == "" {
-		return nil, errors.New("no html template provided")
+		return ""
 	}
+	ext := strings.ToLower(filepath.Ext(path))
+	contentTypeMap := map[string]string{
+		".html": "text/html; charset=utf-8",
+		".htm":  "text/html; charset=utf-8",
+		".json": "application/json",
+		".txt":  "text/plain",
+		".xml":  "application/xml",
+		".js":   "application/javascript",
+		".css":  "text/css",
+	}
+	if contentType, ok := contentTypeMap[ext]; ok {
+		return contentType
+	}
+	// Default to HTML for backward compatibility
+	return "text/html; charset=utf-8"
+}
+
+// GetTemplate get compiled template with {{ and }} delimiters.
+// Uses text/template for all file types to avoid HTML escaping issues.
+func GetTemplate(path string) (*template.Template, string, error) {
+	if path == "" {
+		return nil, "", errors.New("no template file provided")
+	}
+	contentType := getContentTypeFromPath(path)
 	//nolint:gosec
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	html := string(b)
-	compiledTemplate, err := template.New("html").Parse(html)
+	content := string(b)
+	compiledTemplate, err := template.New(filepath.Base(path)).Delims("{{", "}}").Parse(content)
 	if err != nil {
-		return nil, fmt.Errorf("impossible to compile html template: %w", err)
+		return nil, "", fmt.Errorf("impossible to compile template %s: %w", path, err)
 	}
-	return compiledTemplate, nil
+	return compiledTemplate, contentType, nil
 }
 
 // ValidateParams validate all the param gave by user.
 //
-//nolint:gocyclo,gocognit
+//nolint:gocyclo,gocognit,nestif
 func ValidateParams(config *Config, log *slog.Logger) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err
@@ -260,12 +284,14 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
 			return err
 		}
-		if _, err := GetHTMLTemplate(config.CaptchaHTMLFilePath); err != nil {
-			return err
+		if config.CaptchaFilePath != "" {
+			if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
+				return err
+			}
 		}
 	}
-	if config.BanHTMLFilePath != "" {
-		if _, err := GetHTMLTemplate(config.BanHTMLFilePath); err != nil {
+	if config.BanFilePath != "" {
+		if _, _, err := GetTemplate(config.BanFilePath); err != nil {
 			return err
 		}
 	}

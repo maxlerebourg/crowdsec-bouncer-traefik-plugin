@@ -2,7 +2,6 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	htmltemplate "html/template"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -190,11 +189,11 @@ func Test_crowdsecQuery(t *testing.T) {
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	html := "<html>You are banned</html>"
-	banTemplate, _ := htmltemplate.New("html").Parse(html)
+	banTemplate, _ := template.New("html").Delims("{{", "}}").Parse(html)
 	tests := []struct {
 		name              string
 		method            string
-		banTemplate       *htmltemplate.Template
+		banTemplate       *template.Template
 		expectBodyContent bool
 	}{
 		{
@@ -235,6 +234,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 				remediationStatusCode:   http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
 				banTemplate:             tt.banTemplate,
+				banTemplateContentType:  "text/html; charset=utf-8",
 			}
 
 			rw := httptest.NewRecorder()
@@ -264,6 +264,50 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			// If we expect body content, verify it matches template
 			if tt.expectBodyContent && body != html {
 				t.Errorf("Expected body %q, got %q", html, body)
+			}
+		})
+	}
+}
+
+func TestHandleBanServeHTTPContentType(t *testing.T) {
+	html := "<html>You are banned</html>"
+	banTemplate, _ := template.New("html").Delims("{{", "}}").Parse(html)
+	tests := []struct {
+		name                   string
+		banTemplate            *template.Template
+		banTemplateContentType string
+	}{
+		{
+			name:                   "Default HTML content type",
+			banTemplate:            banTemplate,
+			banTemplateContentType: "text/html; charset=utf-8",
+		},
+		{
+			name:                   "Custom JSON content type",
+			banTemplate:            banTemplate,
+			banTemplateContentType: "application/json",
+		},
+		{
+			name:                   "Content type set even when banTemplate is nil",
+			banTemplate:            nil,
+			banTemplateContentType: "application/json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bouncer := &Bouncer{
+				remediationStatusCode:  http.StatusForbidden,
+				banTemplate:            tt.banTemplate,
+				banTemplateContentType: tt.banTemplateContentType,
+			}
+
+			rw := httptest.NewRecorder()
+			req := &http.Request{Method: http.MethodGet}
+			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+
+			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
+				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
 			}
 		})
 	}

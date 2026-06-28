@@ -301,3 +301,28 @@ func Test_GetTLSConfigCrowdsec(t *testing.T) {
 		})
 	}
 }
+
+func Test_getContentTypeFromPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{name: "HTML file with .html extension", path: "/ban.html", expected: "text/html; charset=utf-8"},
+		{name: "JSON file", path: "/ban.json", expected: "application/json"},
+		{name: "Text file", path: "/ban.txt", expected: "text/plain"},
+		{name: "File with mixed case extension", path: "/ban.HtMl", expected: "text/html; charset=utf-8"},
+		{name: "Unknown extension defaults to HTML", path: "/ban.xyz", expected: "text/html; charset=utf-8"},
+		{name: "File without extension", path: "/ban", expected: "text/html; charset=utf-8"},
+		{name: "Empty path", path: "", expected: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getContentTypeFromPath(tt.path)
+			if got != tt.expected {
+				t.Errorf("GetContentTypeFromPath(%q) = %q, want %q", tt.path, got, tt.expected)
+			}
+		})
+	}
+}
