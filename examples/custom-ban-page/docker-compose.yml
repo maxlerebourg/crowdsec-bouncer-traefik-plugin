@@ -42,8 +42,8 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      # Define ban HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.banHtmlFilePath=/ban.html"
+      # Define ban file path
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.banFilePath=/ban.html"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.1-2

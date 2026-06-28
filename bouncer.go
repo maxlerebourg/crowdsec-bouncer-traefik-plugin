@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	htmltemplate "html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -110,7 +109,7 @@ type Bouncer struct {
 	crowdsecStreamRoute     string
 	crowdsecHeader          string
 	redisUnreachableBlock   bool
-	banTemplate             *htmltemplate.Template
+	banTemplate             *template.Template
 	banResponseContentType  string
 	traceCustomHeader       string
 	clientPoolStrategy      *ip.PoolStrategy
@@ -128,6 +127,14 @@ type Bouncer struct {
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
+
+	if config.BanFilePath == "" && config.BanHTMLFilePath != "" {
+		config.BanFilePath = config.BanHTMLFilePath
+	}
+	if config.CaptchaHTMLFilePath != "" {
+		config.CaptchaFilePath = config.CaptchaHTMLFilePath
+	}
+
 	err := configuration.ValidateParams(config, log)
 	if err != nil {
 		log.Error("New:validateParams " + err.Error())
@@ -185,9 +192,10 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 	}
 
-	var banTemplate *htmltemplate.Template
-	if config.BanHTMLFilePath != "" {
-		banTemplate, _ = configuration.GetHTMLTemplate(config.BanHTMLFilePath)
+	var banTemplate *template.Template
+	var banContentType string
+	if config.BanFilePath != "" {
+		banTemplate, banContentType, _ = configuration.GetTemplate(config.BanFilePath)
 	}
 
 	bouncer := &Bouncer{
@@ -220,7 +228,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		remediationStatusCode:   config.RemediationStatusCode,
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		banTemplate:             banTemplate,
-		banResponseContentType:  config.BanResponseContentType,
+		banResponseContentType:  banContentType,
 		traceCustomHeader:       config.TraceHeadersCustomName,
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
@@ -278,8 +286,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
 		config.RemediationHeadersCustomName,
-		config.CaptchaHTMLFilePath,
-		config.CaptchaResponseContentType,
+		config.CaptchaFilePath,
 		config.CaptchaGracePeriodSeconds,
 	)
 	if err != nil {
@@ -437,13 +444,8 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
 	rw.Header().Set("Content-Type", bouncer.banResponseContentType)
-	if bouncer.banTemplate == nil {
-		rw.WriteHeader(bouncer.remediationStatusCode)
-		return
-	}
 	rw.WriteHeader(bouncer.remediationStatusCode)
-
-	if req.Method == http.MethodHead {
+	if bouncer.banTemplate == nil || req.Method == http.MethodHead {
 		return
 	}
 	templateData := map[string]string{

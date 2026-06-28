@@ -4,11 +4,11 @@ package captcha
 import (
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
+	"text/template"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -60,7 +60,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath, responseContentType string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -75,9 +75,9 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.remediationCustomHeader = remediationCustomHeader
-	c.responseContentType = responseContentType
-	html, _ := configuration.GetHTMLTemplate(captchaTemplatePath)
-	c.captchaTemplate = html
+	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
+	c.captchaTemplate = template
+	c.responseContentType = contentType
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
 	c.httpClient = httpClient

@@ -106,14 +106,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfg9.LogLevel = "info"
 	cfg10 := getMinimalConfig()
 	cfg10.LogLevel = "Warning"
-	cfg11 := getMinimalConfig()
-	cfg11.BanResponseContentType = "text/html\r\nX-Injected: yes"
-	cfg12 := getMinimalConfig()
-	cfg12.CaptchaResponseContentType = "text/html\nX-Injected: yes"
-	cfg13 := getMinimalConfig()
-	cfg13.BanResponseContentType = ""
-	cfg14 := getMinimalConfig()
-	cfg14.CaptchaResponseContentType = ""
+
 	type args struct {
 		config *Config
 	}
@@ -135,10 +128,6 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Valid log level uppercase INFO", args: args{config: cfg8}, wantErr: false},
 		{name: "Valid log level lowercase info", args: args{config: cfg9}, wantErr: false},
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
-		{name: "Reject CRLF in BanResponseContentType", args: args{config: cfg11}, wantErr: true},
-		{name: "Reject LF in CaptchaResponseContentType", args: args{config: cfg12}, wantErr: true},
-		{name: "Reject empty BanResponseContentType", args: args{config: cfg13}, wantErr: true},
-		{name: "Reject empty CaptchaResponseContentType", args: args{config: cfg14}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -309,6 +298,31 @@ func Test_GetTLSConfigCrowdsec(t *testing.T) {
 			}
 			if got.InsecureSkipVerify != tt.wantInsecureSkip {
 				t.Errorf("GetTLSConfigCrowdsec() InsecureSkipVerify = %v, want %v", got.InsecureSkipVerify, tt.wantInsecureSkip)
+			}
+		})
+	}
+}
+
+func Test_getContentTypeFromPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{name: "HTML file with .html extension", path: "/ban.html", expected: "text/html; charset=utf-8"},
+		{name: "JSON file", path: "/ban.json", expected: "application/json"},
+		{name: "Text file", path: "/ban.txt", expected: "text/plain"},
+		{name: "File with mixed case extension", path: "/ban.HtMl", expected: "text/html; charset=utf-8"},
+		{name: "Unknown extension defaults to HTML", path: "/ban.xyz", expected: "text/html; charset=utf-8"},
+		{name: "File without extension", path: "/ban", expected: "text/html; charset=utf-8"},
+		{name: "Empty path", path: "", expected: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getContentTypeFromPath(tt.path)
+			if got != tt.expected {
+				t.Errorf("GetContentTypeFromPath(%q) = %q, want %q", tt.path, got, tt.expected)
 			}
 		})
 	}

@@ -513,22 +513,14 @@ make run
   - int64
   - default: 1800 (= 30 minutes)
   - Period after validation of a captcha before a new validation is required if Crowdsec decision is still valid
-- CaptchaHTMLFilePath
+- CaptchaFilePath
   - string
   - default: /captcha.html
-  - Path where the captcha template is stored
-- CaptchaResponseContentType
-  - string
-  - default: "text/html; charset=utf-8"
-  - Content-Type header value to use for the captcha challenge response. The CaptchaHTMLFilePath body must match this Content-Type.
-- BanHTMLFilePath
+  - Path where the captcha template is stored. The Content-Type header is automatically inferred from the file extension.
+- BanFilePath
   - string
   - default: ""
-  - Path where the ban html file is stored (default empty ""=disabled)
-- BanResponseContentType
-  - string
-  - default: "text/html; charset=utf-8"
-  - Content-Type header value to use for the ban HTTP response. The BanHTMLFilePath body must match this Content-Type.
+  - Path where the ban file is stored (default empty ""=disabled). The Content-Type header is automatically inferred from the file extension.
 - TraceHeadersCustomName
   - string
   - default: ""

@@ -2,7 +2,6 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	htmltemplate "html/template"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -190,11 +189,11 @@ func Test_crowdsecQuery(t *testing.T) {
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	html := "<html>You are banned</html>"
-	banTemplate, _ := htmltemplate.New("html").Parse(html)
+	banTemplate, _ := template.New("html").Delims("{{", "}}").Parse(html)
 	tests := []struct {
 		name              string
 		method            string
-		banTemplate       *htmltemplate.Template
+		banTemplate       *template.Template
 		expectBodyContent bool
 	}{
 		{
@@ -272,10 +271,10 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 
 func TestHandleBanServeHTTPContentType(t *testing.T) {
 	html := "<html>You are banned</html>"
-	banTemplate, _ := htmltemplate.New("html").Parse(html)
+	banTemplate, _ := template.New("html").Delims("{{", "}}").Parse(html)
 	tests := []struct {
 		name                   string
-		banTemplate            *htmltemplate.Template
+		banTemplate            *template.Template
 		banResponseContentType string
 	}{
 		{
