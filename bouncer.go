@@ -123,7 +123,7 @@ type Bouncer struct {
 
 // New creates the crowdsec bouncer plugin.
 //
-//nolint:nestif,gocyclo,gocognit,funlen
+//nolint:nestif,gocyclo,gocognit,funlen,maintidx
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
