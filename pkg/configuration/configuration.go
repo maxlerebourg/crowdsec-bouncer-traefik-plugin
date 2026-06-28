@@ -292,16 +292,12 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
 			return err
 		}
-		if config.CaptchaFilePath != "" {
-			if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
-				return err
-			}
-		}
-	}
-	if config.BanFilePath != "" {
-		if _, _, err := GetTemplate(config.BanFilePath); err != nil {
+		if config.CaptchaFilePath != "" && _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
 			return err
 		}
+	}
+	if config.BanFilePath != "" && _, _, err := GetTemplate(config.BanFilePath); err != nil {
+		return err
 	}
 
 	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {
