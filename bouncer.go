@@ -110,7 +110,7 @@ type Bouncer struct {
 	crowdsecHeader          string
 	redisUnreachableBlock   bool
 	banTemplate             *template.Template
-	banResponseContentType  string
+	banTemplateContentType  string
 	traceCustomHeader       string
 	clientPoolStrategy      *ip.PoolStrategy
 	serverPoolStrategy      *ip.PoolStrategy
@@ -193,9 +193,9 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	}
 
 	var banTemplate *template.Template
-	var banContentType string
+	var banTemplateContentType string
 	if config.BanFilePath != "" {
-		banTemplate, banContentType, _ = configuration.GetTemplate(config.BanFilePath)
+		banTemplate, banTemplateContentType, _ = configuration.GetTemplate(config.BanFilePath)
 	}
 
 	bouncer := &Bouncer{
@@ -228,7 +228,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		remediationStatusCode:   config.RemediationStatusCode,
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		banTemplate:             banTemplate,
-		banResponseContentType:  banContentType,
+		banTemplateContentType:  banTemplateContentType,
 		traceCustomHeader:       config.TraceHeadersCustomName,
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
@@ -443,7 +443,7 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
-	rw.Header().Set("Content-Type", bouncer.banResponseContentType)
+	rw.Header().Set("Content-Type", bouncer.banTemplateContentType)
 	rw.WriteHeader(bouncer.remediationStatusCode)
 	if bouncer.banTemplate == nil || req.Method == http.MethodHead {
 		return

@@ -234,7 +234,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 				remediationStatusCode:   http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
 				banTemplate:             tt.banTemplate,
-				banResponseContentType:  "text/html; charset=utf-8",
+				banTemplateContentType:  "text/html; charset=utf-8",
 			}
 
 			rw := httptest.NewRecorder()
@@ -275,22 +275,22 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 	tests := []struct {
 		name                   string
 		banTemplate            *template.Template
-		banResponseContentType string
+		banTemplateContentType string
 	}{
 		{
 			name:                   "Default HTML content type",
 			banTemplate:            banTemplate,
-			banResponseContentType: "text/html; charset=utf-8",
+			banTemplateContentType: "text/html; charset=utf-8",
 		},
 		{
 			name:                   "Custom JSON content type",
 			banTemplate:            banTemplate,
-			banResponseContentType: "application/json",
+			banTemplateContentType: "application/json",
 		},
 		{
 			name:                   "Content type set even when banTemplate is nil",
 			banTemplate:            nil,
-			banResponseContentType: "application/json",
+			banTemplateContentType: "application/json",
 		},
 	}
 
@@ -299,15 +299,15 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			bouncer := &Bouncer{
 				remediationStatusCode:  http.StatusForbidden,
 				banTemplate:            tt.banTemplate,
-				banResponseContentType: tt.banResponseContentType,
+				banTemplateContentType: tt.banTemplateContentType,
 			}
 
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet}
 			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
 
-			if got := rw.Header().Get("Content-Type"); got != tt.banResponseContentType {
-				t.Errorf("Expected Content-Type %q, got %q", tt.banResponseContentType, got)
+			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
+				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
 			}
 		})
 	}

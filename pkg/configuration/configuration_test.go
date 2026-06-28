@@ -106,7 +106,6 @@ func Test_ValidateParams(t *testing.T) {
 	cfg9.LogLevel = "info"
 	cfg10 := getMinimalConfig()
 	cfg10.LogLevel = "Warning"
-
 	type args struct {
 		config *Config
 	}
