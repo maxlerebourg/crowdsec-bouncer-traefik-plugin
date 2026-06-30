@@ -677,6 +677,12 @@ func handleStreamCache(bouncer *Bouncer) error {
 	return nil
 }
 
+func isReverseProxyError(statusCode int) bool {
+	return statusCode == http.StatusBadGateway ||
+		statusCode == http.StatusServiceUnavailable ||
+		statusCode == http.StatusGatewayTimeout
+}
+
 func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, error) {
 	var req *http.Request
 	if len(data) > 0 {
@@ -688,10 +694,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpClient.Do(req)
-	if err != nil ||
-		res.StatusCode == http.StatusBadGateway ||
-		res.StatusCode == http.StatusServiceUnavailable ||
-		res.StatusCode == http.StatusGatewayTimeout {
+	if err != nil || isReverseProxyError(res.StatusCode) {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
 	}
 	defer func() {
@@ -755,10 +758,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpAppsecClient.Do(req)
-	if err != nil ||
-		res.StatusCode == http.StatusBadGateway ||
-		res.StatusCode == http.StatusServiceUnavailable ||
-		res.StatusCode == http.StatusGatewayTimeout {
+	if err != nil || isReverseProxyError(res.StatusCode) {
 		bouncer.log.Error("appsecQuery:unreachable")
 		if bouncer.appsecUnreachableBlock {
 			return fmt.Errorf("appsecQuery:unreachable %w", err)
