@@ -23,6 +23,9 @@ http:
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"
           crowdsecAppsecEnabled: "true"
+          crowdsecAppsecFailureBlock: "true"
+          crowdsecAppsecBodyLimit: 4
+          crowdsecAppsecUnreachableBlock: "false"
           crowdsecAppsecScheme: http
           crowdsecAppsecHost: "@@APPSEC_HOST@@"
           forwardedHeadersTrustedIps:

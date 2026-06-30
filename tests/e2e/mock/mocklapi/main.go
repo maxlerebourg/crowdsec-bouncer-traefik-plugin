@@ -13,6 +13,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -72,8 +73,25 @@ func main() {
 	// exercised without standing up the real WAF.
 	go func() {
 		log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "rpc2") {
+			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403") {
 				w.WriteHeader(http.StatusForbidden)
+			}
+			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500") {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502") {
+				w.WriteHeader(http.StatusBadGateway)
+			}
+			// Read body
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			defer r.Body.Close()
+			if strings.Contains(string(body), "a=0") {
+				w.WriteHeader(http.StatusForbidden)
+				return
 			}
 		})))
 	}()
