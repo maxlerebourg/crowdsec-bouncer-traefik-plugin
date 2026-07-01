@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
 	simpleredis "github.com/maxlerebourg/simpleredis"
@@ -27,10 +28,7 @@ const (
 )
 
 //nolint:gochecknoglobals
-var (
-	redis simpleredis.SimpleRedis
-	cache = ttl_map.New()
-)
+var cache = ttl_map.New()
 
 type localCache struct{}
 
@@ -52,33 +50,53 @@ func (localCache) delete(key string) {
 }
 
 type redisCache struct {
-	log *slog.Logger
+	log     *slog.Logger
+	writer  simpleredis.SimpleRedis
+	readers []simpleredis.SimpleRedis
+	counter atomic.Uint64
 }
 
-func (redisCache) get(key string) (string, error) {
-	value, err := redis.Get(key)
-	valueString := string(value)
-	if err == nil && len(valueString) > 0 {
-		return valueString, nil
+func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
+	n := len(rc.readers)
+	if n == 0 {
+		return &rc.writer
 	}
-	errRedisMessage := err.Error()
-	if errRedisMessage == simpleredis.RedisMiss {
-		return "", errors.New(CacheMiss)
-	}
-	if errRedisMessage == simpleredis.RedisUnreachable {
-		return "", errors.New(CacheUnreachable)
-	}
-	return "", err
+	idx := rc.counter.Add(1) % uint64(n)
+	return &rc.readers[idx]
 }
 
-func (rc redisCache) set(key, value string, duration int64) {
-	if err := redis.Set(key, []byte(value), duration); err != nil {
+func redisResultToString(value []byte, err error) (string, error) {
+	if err == nil {
+		valueString := string(value)
+		if len(valueString) > 0 {
+			return valueString, nil
+		}
+	}
+	if err != nil {
+		switch err.Error() {
+		case simpleredis.RedisMiss:
+			return "", errors.New(CacheMiss)
+		case simpleredis.RedisUnreachable:
+			return "", errors.New(CacheUnreachable)
+		}
+		return "", err
+	}
+	return "", errors.New(CacheMiss)
+}
+
+func (rc *redisCache) get(key string) (string, error) {
+	value, err := rc.nextReader().Get(key)
+	return redisResultToString(value, err)
+}
+
+func (rc *redisCache) set(key, value string, duration int64) {
+	if err := rc.writer.Set(key, []byte(value), duration); err != nil {
 		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
 	}
 }
 
-func (rc redisCache) delete(key string) {
-	if err := redis.Del(key); err != nil {
+func (rc *redisCache) delete(key string) {
+	if err := rc.writer.Del(key); err != nil {
 		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
 	}
 }
@@ -96,15 +114,21 @@ type Client struct {
 }
 
 // New Initialize cache client.
-func (c *Client) New(log *slog.Logger, isRedis bool, host, pass, database string) {
+func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts []string, pass, database string) {
 	c.log = log
 	if isRedis {
-		redis.Init(host, pass, database)
-		c.cache = &redisCache{log: log}
+		rc := &redisCache{log: log}
+		rc.writer.Init(writeHost, pass, database)
+		for _, h := range readHosts {
+			var r simpleredis.SimpleRedis
+			r.Init(h, pass, database)
+			rc.readers = append(rc.readers, r)
+		}
+		c.cache = rc
 	} else {
 		c.cache = &localCache{}
 	}
-	c.log.Debug(fmt.Sprintf("cache:New initialized isRedis:%v", isRedis))
+	c.log.Debug(fmt.Sprintf("cache:New initialized isRedis:%v writeHost:%v readHosts:%v", isRedis, writeHost, readHosts))
 }
 
 // Delete delete decision in cache.

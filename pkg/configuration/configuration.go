@@ -95,6 +95,7 @@ type Config struct {
 	ClientTrustedIPs                           []string `json:"clientTrustedIps,omitempty"`
 	RedisCacheEnabled                          bool     `json:"redisCacheEnabled,omitempty"`
 	RedisCacheHost                             string   `json:"redisCacheHost,omitempty"`
+	RedisCacheReadHosts                        []string `json:"redisCacheReadHosts,omitempty"`
 	RedisCachePassword                         string   `json:"redisCachePassword,omitempty"`
 	RedisCachePasswordFile                     string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                         string   `json:"redisCacheDatabase,omitempty"`
@@ -170,6 +171,7 @@ func New() *Config {
 		ClientTrustedIPs:                []string{},
 		RedisCacheEnabled:               false,
 		RedisCacheHost:                  "redis:6379",
+		RedisCacheReadHosts:             []string{},
 		RedisCachePassword:              "",
 		RedisCacheDatabase:              "",
 		RedisCacheUnreachableBlock:      true,
