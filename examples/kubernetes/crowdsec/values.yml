@@ -1,5 +1,5 @@
 image:
-  tag: v1.7.8
+  tag: v1.6.1-2
 
 agent:
   acquisition:
