@@ -17,16 +17,12 @@ http:
       plugin:
         bouncer:
           enabled: "true"
-          # IP bouncing disabled — this scenario exercises AppSec only.
-          crowdsecMode: none
-          crowdsecLapiScheme: http
+          crowdsecMode: live
+          defaultDecisionSeconds: "2"
+          # HTTPS LAPI with NO custom CA configured: the bouncer must fall back to
+          # the OS/system trust store (which the scenario controls via SSL_CERT_FILE).
+          crowdsecLapiScheme: https
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"
-          crowdsecAppsecEnabled: "true"
-          crowdsecAppsecFailureBlock: "true"
-          crowdsecAppsecBodyLimit: 4
-          crowdsecAppsecUnreachableBlock: "false"
-          crowdsecAppsecScheme: http
-          crowdsecAppsecHost: "@@APPSEC_HOST@@"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"

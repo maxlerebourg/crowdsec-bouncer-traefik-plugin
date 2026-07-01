@@ -2,16 +2,19 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	htmltemplate "html/template"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 	"text/template"
+	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func TestServeHTTP(t *testing.T) {
@@ -190,11 +193,11 @@ func Test_crowdsecQuery(t *testing.T) {
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	html := "<html>You are banned</html>"
-	banTemplate, _ := htmltemplate.New("html").Parse(html)
+	banTemplate, _ := template.New("html").Delims("{{", "}}").Parse(html)
 	tests := []struct {
 		name              string
 		method            string
-		banTemplate       *htmltemplate.Template
+		banTemplate       *template.Template
 		expectBodyContent bool
 	}{
 		{
@@ -235,6 +238,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 				remediationStatusCode:   http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
 				banTemplate:             tt.banTemplate,
+				banTemplateContentType:  "text/html; charset=utf-8",
 			}
 
 			rw := httptest.NewRecorder()
@@ -264,6 +268,50 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			// If we expect body content, verify it matches template
 			if tt.expectBodyContent && body != html {
 				t.Errorf("Expected body %q, got %q", html, body)
+			}
+		})
+	}
+}
+
+func TestHandleBanServeHTTPContentType(t *testing.T) {
+	html := "<html>You are banned</html>"
+	banTemplate, _ := template.New("html").Delims("{{", "}}").Parse(html)
+	tests := []struct {
+		name                   string
+		banTemplate            *template.Template
+		banTemplateContentType string
+	}{
+		{
+			name:                   "Default HTML content type",
+			banTemplate:            banTemplate,
+			banTemplateContentType: "text/html; charset=utf-8",
+		},
+		{
+			name:                   "Custom JSON content type",
+			banTemplate:            banTemplate,
+			banTemplateContentType: "application/json",
+		},
+		{
+			name:                   "Content type set even when banTemplate is nil",
+			banTemplate:            nil,
+			banTemplateContentType: "application/json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bouncer := &Bouncer{
+				remediationStatusCode:  http.StatusForbidden,
+				banTemplate:            tt.banTemplate,
+				banTemplateContentType: tt.banTemplateContentType,
+			}
+
+			rw := httptest.NewRecorder()
+			req := &http.Request{Method: http.MethodGet}
+			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+
+			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
+				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
 			}
 		})
 	}
@@ -330,5 +378,138 @@ func TestCaptchaMethodBasedLogic(t *testing.T) {
 					tt.method, tt.remediation, tt.expectBanFallback, shouldUseCaptcha)
 			}
 		})
+	}
+}
+
+// blockingBody simulates a request body that never reaches EOF, like a
+// bidirectional gRPC stream that keeps its body open for the whole life of
+// the connection. Reading from it blocks until the test is done.
+type blockingBody struct {
+	done <-chan struct{}
+}
+
+func (b blockingBody) Read(_ []byte) (int, error) {
+	<-b.done
+	return 0, io.EOF
+}
+
+func (blockingBody) Close() error { return nil }
+
+func Test_isBodyUnreadable(t *testing.T) {
+	tests := []struct {
+		name          string
+		protoMajor    int
+		contentLength int64
+		hasBody       bool
+		want          bool
+	}{
+		{name: "http2 grpc stream without content-length", protoMajor: 2, contentLength: -1, hasBody: true, want: true},
+		{name: "http3 stream without content-length", protoMajor: 3, contentLength: -1, hasBody: true, want: true},
+		{name: "http2 with content-length", protoMajor: 2, contentLength: 42, hasBody: true, want: false},
+		{name: "http1.1 chunked without content-length", protoMajor: 1, contentLength: -1, hasBody: true, want: false},
+		{name: "http2 without body", protoMajor: 2, contentLength: -1, hasBody: false, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodPost, "http://localhost", nil)
+			req.ProtoMajor = tt.protoMajor
+			req.ContentLength = tt.contentLength
+			if tt.hasBody {
+				req.Body = http.NoBody
+			} else {
+				req.Body = nil
+			}
+			if got := isBodyUnreadable(req); got != tt.want {
+				t.Errorf("isBodyUnreadable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// newStreamingRequest builds an HTTP/2 request whose body never reaches EOF,
+// like a bidirectional gRPC stream (issue #323).
+func newStreamingRequest(done <-chan struct{}) *http.Request {
+	req, _ := http.NewRequest(http.MethodPost, "http://localhost/signalexchange.SignalExchange/ConnectStream", blockingBody{done: done})
+	req.Header.Set("Content-Type", "application/grpc")
+	req.ProtoMajor = 2
+	req.ContentLength = -1
+	return req
+}
+
+// Test_appsecQuery_streamingDoesNotBlock is a regression test for issue #323:
+// a gRPC streaming request whose body never reaches EOF must not be buffered
+// (io.ReadAll would block until timeout and wrongly produce a 403). The appsec
+// query must complete promptly, inspecting headers only.
+func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	bouncer := &Bouncer{
+		appsecScheme:           appsecURL.Scheme,
+		appsecHost:             appsecURL.Host,
+		appsecPath:             "/",
+		appsecBodyLimit:        10485760,
+		appsecUnreachableBlock: true,
+		appsecFailureBlock:     true,
+		httpAppsecClient:       appsecServer.Client(),
+		log:                    logger.New("INFO", ""),
+	}
+
+	done := make(chan struct{})
+	defer close(done)
+
+	finished := make(chan error, 1)
+	go func() {
+		finished <- appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+	}()
+
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Errorf("appsecQuery() on streaming request returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("appsecQuery() blocked on a streaming request body (issue #323 regression)")
+	}
+}
+
+// Test_appsecQuery_dropUnreadableBody verifies that, when configured to do so,
+// a request with an unreadable body is dropped (blocked) instead of forwarded
+// without its body, mirroring the reference APPSEC_DROP_UNREADABLE_BODY option.
+func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	bouncer := &Bouncer{
+		appsecScheme:              appsecURL.Scheme,
+		appsecHost:                appsecURL.Host,
+		appsecPath:                "/",
+		appsecBodyLimit:           10485760,
+		appsecUnreadableBodyBlock: true,
+		httpAppsecClient:          appsecServer.Client(),
+		log:                       logger.New("INFO", ""),
+	}
+
+	done := make(chan struct{})
+	defer close(done)
+
+	finished := make(chan error, 1)
+	go func() {
+		finished <- appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+	}()
+
+	select {
+	case err := <-finished:
+		if err == nil {
+			t.Error("appsecQuery() expected an error to block the request, got nil")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("appsecQuery() blocked on a streaming request body (issue #323 regression)")
 	}
 }

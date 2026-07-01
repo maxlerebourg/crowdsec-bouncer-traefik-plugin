@@ -4,11 +4,11 @@ package captcha
 import (
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
+	"text/template"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -21,7 +21,8 @@ type Client struct {
 	secretKey               string
 	remediationCustomHeader string
 	gracePeriodSeconds      int64
-	captchaTemplate         *template.Template
+	templateContentType     string
+	template                *template.Template
 	cacheClient             *cache.Client
 	httpClient              *http.Client
 	log                     *slog.Logger
@@ -96,8 +97,9 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.remediationCustomHeader = remediationCustomHeader
-	html, _ := configuration.GetHTMLTemplate(captchaTemplatePath)
-	c.captchaTemplate = html
+	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
+	c.template = template
+	c.templateContentType = contentType
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
 	c.httpClient = httpClient
@@ -122,12 +124,12 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
-	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+	rw.Header().Set("Content-Type", c.templateContentType)
 	if c.remediationCustomHeader != "" {
 		rw.Header().Set(c.remediationCustomHeader, "captcha")
 	}
 	rw.WriteHeader(http.StatusOK)
-	err = c.captchaTemplate.Execute(rw, map[string]string{
+	err = c.template.Execute(rw, map[string]string{
 		"SiteKey":     c.siteKey,
 		"FrontendJS":  c.infoProvider.js,
 		"FrontendKey": c.infoProvider.key,
