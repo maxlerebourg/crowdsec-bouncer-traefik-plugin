@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -15,6 +14,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"text/template"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
@@ -63,8 +63,8 @@ type Config struct {
 	CrowdsecAppsecTLSCertificateBouncerKeyFile string   `json:"crowdsecAppsecTlsCertificateBouncerKeyFile,omitempty"`
 	CrowdsecAppsecFailureBlock                 bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
 	CrowdsecAppsecUnreachableBlock             bool     `json:"crowdsecAppsecUnreachableBlock,omitempty"`
+	CrowdsecAppsecUnreadableBodyBlock          bool     `json:"crowdsecAppsecUnreadableBodyBlock,omitempty"`
 	CrowdsecAppsecBodyLimit                    int64    `json:"crowdsecAppsecBodyLimit,omitempty"`
-	CrowdsecAppsecDropUnreadableBody           bool     `json:"crowdsecAppsecDropUnreadableBody,omitempty"`
 	CrowdsecLapiScheme                         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                           string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiPath                           string   `json:"crowdsecLapiPath,omitempty"`
@@ -100,8 +100,10 @@ type Config struct {
 	RedisCachePasswordFile                     string   `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                         string   `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock                 bool     `json:"redisCacheUnreachableBlock,omitempty"`
-	BanHTMLFilePath                            string   `json:"banHtmlFilePath,omitempty"`
-	CaptchaHTMLFilePath                        string   `json:"captchaHtmlFilePath,omitempty"`
+	BanHTMLFilePath                            string   `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
+	BanFilePath                                string   `json:"banFilePath,omitempty"`
+	CaptchaHTMLFilePath                        string   `json:"captchaHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
+	CaptchaFilePath                            string   `json:"captchaFilePath,omitempty"`
 	CaptchaProvider                            string   `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                         string   `json:"captchaCustomJsUrl,omitempty"`
 	CaptchaCustomValidateURL                   string   `json:"captchaCustomValidateUrl,omitempty"`
@@ -126,53 +128,53 @@ func contains(source []string, target string) bool {
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
-		Enabled:                          false,
-		LogLevel:                         LogINFO,
-		LogFormat:                        "common",
-		LogFilePath:                      "",
-		CrowdsecMode:                     LiveMode,
-		CrowdsecAppsecEnabled:            false,
-		CrowdsecAppsecFailureBlock:       true,
-		CrowdsecAppsecUnreachableBlock:   true,
-		CrowdsecAppsecBodyLimit:          10485760,
-		CrowdsecAppsecDropUnreadableBody: false,
-		CrowdsecAppsecScheme:             "",
-		CrowdsecAppsecHost:               "crowdsec:7422",
-		CrowdsecAppsecPath:               "/",
-		CrowdsecAppsecKey:                "",
-		CrowdsecAppsecTLSInsecureVerify:  false,
-		CrowdsecLapiScheme:               HTTP,
-		CrowdsecLapiHost:                 "crowdsec:8080",
-		CrowdsecLapiPath:                 "/",
-		CrowdsecLapiKey:                  "",
-		CrowdsecLapiTLSInsecureVerify:    false,
-		UpdateIntervalSeconds:            60,
-		MetricsUpdateIntervalSeconds:     600,
-		UpdateMaxFailure:                 0,
-		StreamStartupBlock:               true,
-		DefaultDecisionSeconds:           60,
-		RemediationStatusCode:            http.StatusForbidden,
-		HTTPTimeoutSeconds:               10,
-		CaptchaProvider:                  "",
-		CaptchaCustomJsURL:               "",
-		CaptchaCustomValidateURL:         "",
-		CaptchaCustomKey:                 "",
-		CaptchaCustomResponse:            "",
-		CaptchaSiteKey:                   "",
-		CaptchaSecretKey:                 "",
-		CaptchaGracePeriodSeconds:        1800,
-		CaptchaHTMLFilePath:              "/captcha.html",
-		BanHTMLFilePath:                  "",
-		TraceHeadersCustomName:           "",
-		RemediationHeadersCustomName:     "",
-		ForwardedHeadersCustomName:       "X-Forwarded-For",
-		ForwardedHeadersTrustedIPs:       []string{},
-		ClientTrustedIPs:                 []string{},
-		RedisCacheEnabled:                false,
-		RedisCacheHost:                   "redis:6379",
-		RedisCachePassword:               "",
-		RedisCacheDatabase:               "",
-		RedisCacheUnreachableBlock:       true,
+		Enabled:                           false,
+		LogLevel:                          LogINFO,
+		LogFormat:                         "common",
+		LogFilePath:                       "",
+		CrowdsecMode:                      LiveMode,
+		CrowdsecAppsecEnabled:             false,
+		CrowdsecAppsecFailureBlock:        true,
+		CrowdsecAppsecUnreachableBlock:    true,
+		CrowdsecAppsecUnreadableBodyBlock: true,
+		CrowdsecAppsecBodyLimit:           10485760,
+		CrowdsecAppsecScheme:              "",
+		CrowdsecAppsecHost:                "crowdsec:7422",
+		CrowdsecAppsecPath:                "/",
+		CrowdsecAppsecKey:                 "",
+		CrowdsecAppsecTLSInsecureVerify:   false,
+		CrowdsecLapiScheme:                HTTP,
+		CrowdsecLapiHost:                  "crowdsec:8080",
+		CrowdsecLapiPath:                  "/",
+		CrowdsecLapiKey:                   "",
+		CrowdsecLapiTLSInsecureVerify:     false,
+		UpdateIntervalSeconds:             60,
+		MetricsUpdateIntervalSeconds:      600,
+		UpdateMaxFailure:                  0,
+		StreamStartupBlock:                true,
+		DefaultDecisionSeconds:            60,
+		RemediationStatusCode:             http.StatusForbidden,
+		HTTPTimeoutSeconds:                10,
+		CaptchaProvider:                   "",
+		CaptchaCustomJsURL:                "",
+		CaptchaCustomValidateURL:          "",
+		CaptchaCustomKey:                  "",
+		CaptchaCustomResponse:             "",
+		CaptchaSiteKey:                    "",
+		CaptchaSecretKey:                  "",
+		CaptchaGracePeriodSeconds:         1800,
+		CaptchaFilePath:                   "/captcha.html",
+		BanFilePath:                       "",
+		TraceHeadersCustomName:            "",
+		RemediationHeadersCustomName:      "",
+		ForwardedHeadersCustomName:        "X-Forwarded-For",
+		ForwardedHeadersTrustedIPs:        []string{},
+		ClientTrustedIPs:                  []string{},
+		RedisCacheEnabled:                 false,
+		RedisCacheHost:                    "redis:6379",
+		RedisCachePassword:                "",
+		RedisCacheDatabase:                "",
+		RedisCacheUnreachableBlock:        true,
 	}
 }
 
@@ -203,28 +205,50 @@ func GetVariable(config *Config, key string) (string, error) {
 	return strings.TrimSpace(value), nil
 }
 
-// GetHTMLTemplate get compiled HTML template.
-func GetHTMLTemplate(path string) (*template.Template, error) {
-	var err error
+func getContentTypeFromPath(path string) string {
 	if path == "" {
-		return nil, errors.New("no html template provided")
+		return ""
 	}
+	ext := strings.ToLower(filepath.Ext(path))
+	contentTypeMap := map[string]string{
+		".html": "text/html; charset=utf-8",
+		".htm":  "text/html; charset=utf-8",
+		".json": "application/json",
+		".txt":  "text/plain",
+		".xml":  "application/xml",
+		".js":   "application/javascript",
+		".css":  "text/css",
+	}
+	if contentType, ok := contentTypeMap[ext]; ok {
+		return contentType
+	}
+	// Default to HTML for backward compatibility
+	return "text/html; charset=utf-8"
+}
+
+// GetTemplate get compiled template with {{ and }} delimiters.
+// Uses text/template for all file types to avoid HTML escaping issues.
+func GetTemplate(path string) (*template.Template, string, error) {
+	if path == "" {
+		return nil, "", errors.New("no template file provided")
+	}
+	contentType := getContentTypeFromPath(path)
 	//nolint:gosec
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	html := string(b)
-	compiledTemplate, err := template.New("html").Parse(html)
+	content := string(b)
+	compiledTemplate, err := template.New(filepath.Base(path)).Delims("{{", "}}").Parse(content)
 	if err != nil {
-		return nil, fmt.Errorf("impossible to compile html template: %w", err)
+		return nil, "", fmt.Errorf("impossible to compile template %s: %w", path, err)
 	}
-	return compiledTemplate, nil
+	return compiledTemplate, contentType, nil
 }
 
 // ValidateParams validate all the param gave by user.
 //
-//nolint:gocyclo,gocognit
+//nolint:gocyclo,gocognit,nestif
 func ValidateParams(config *Config, log *slog.Logger) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err
@@ -262,12 +286,14 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
 			return err
 		}
-		if _, err := GetHTMLTemplate(config.CaptchaHTMLFilePath); err != nil {
-			return err
+		if config.CaptchaFilePath != "" {
+			if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
+				return err
+			}
 		}
 	}
-	if config.BanHTMLFilePath != "" {
-		if _, err := GetHTMLTemplate(config.BanHTMLFilePath); err != nil {
+	if config.BanFilePath != "" {
+		if _, _, err := GetTemplate(config.BanFilePath); err != nil {
 			return err
 		}
 	}
@@ -363,7 +389,8 @@ func validateParamsTLS(config *Config) error {
 		return err
 	}
 	if certAuth == "" {
-		return errors.New("CrowdsecLapiTLSCertificateAuthority must be specified when CrowdsecLapiScheme='https' and CrowdsecLapiTLSInsecureVerify=false")
+		// No custom CA — runtime will fall back to the system trust store.
+		return nil
 	}
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
@@ -455,29 +482,31 @@ func validateParamsRequired(config *Config) error {
 
 func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insecureVerify bool) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
-	tlsConfig.RootCAs = x509.NewCertPool()
 	if scheme != HTTPS {
 		log.Debug("getTLSConfig:" + prefix + "Scheme https:no")
 		return tlsConfig, nil
 	}
+	// RootCAs is intentionally left nil unless a custom CA is provided:
+	// crypto/tls then falls back to x509.SystemCertPool(), which is what we
+	// want when the LAPI is exposed behind a reverse proxy with a publicly
+	// trusted certificate (e.g. Let's Encrypt).
 	//nolint:nestif
 	if insecureVerify {
 		tlsConfig.InsecureSkipVerify = true
 		log.Debug("getTLSConfig:" + prefix + "TLSInsecureVerify tlsInsecure:true")
-		// If we return here and still want to use client auth this won't work
-		// return tlsConfig, nil
 	} else {
 		certAuthority, err := GetVariable(config, prefix+"TLSCertificateAuthority")
 		if err != nil {
 			return nil, err
 		}
 		if len(certAuthority) > 0 {
+			tlsConfig.RootCAs = x509.NewCertPool()
 			if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuthority)) {
-				// here we return because if CrowdsecLapiTLSInsecureVerify is false
-				// and CA not load, we can't communicate with https
 				return nil, errors.New("getTLSConfig:" + prefix + " cannot load CA and verify cert is enabled")
 			}
 			log.Debug("getTLSConfig:" + prefix + "TLSCertificateAuthority CA added successfully")
+		} else {
+			log.Debug("getTLSConfig:" + prefix + " no CA provided, using system trust store")
 		}
 	}
 	certBouncer, err := GetVariable(config, prefix+"TLSCertificateBouncer")

@@ -68,7 +68,7 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant CrowdsecLAPI
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a Crowdsec Decision ?
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Yes a ban Decision
     TraefikPlugin->>User: No, HTTP 403
 ```
@@ -82,9 +82,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant CrowdsecLAPI
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Nothing, all good!
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -105,10 +105,10 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Nothing, all good!
     create participant CrowdsecLAPI
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Yes a ban Decision
     TraefikPlugin-->>PluginCache: Store the information for this IP for DefaultDecisionSeconds
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
     TraefikPlugin->>User: No, HTTP 403
 ```
@@ -125,10 +125,10 @@ sequenceDiagram
     PluginCache-->>TraefikPlugin: Nothing, all good!
     create participant CrowdsecLAPI
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Nothing, all good!
     TraefikPlugin-->>PluginCache: Store the information for this IP for DefaultDecisionSeconds
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
@@ -145,11 +145,11 @@ sequenceDiagram
     participant TraefikPlugin
     participant CrowdsecLAPI
     TraefikPlugin->>CrowdsecLAPI: What are the current decisions
-    Destroy CrowdsecLAPI
+    destroy CrowdsecLAPI
     CrowdsecLAPI->>TraefikPlugin: Here is the list
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Store this list
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
 ```
 
@@ -162,9 +162,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Yes a ban decision
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>User: No, HTTP 403
 ```
 
@@ -177,9 +177,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Nothing, all good!
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -195,11 +195,11 @@ sequenceDiagram
     participant TraefikPlugin
     participant CrowdsecCAPI
     TraefikPlugin->>CrowdsecCAPI: What are the current decisions from CAPI
-    Destroy CrowdsecCAPI
+    destroy CrowdsecCAPI
     CrowdsecCAPI->>TraefikPlugin: Here is the list
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Store this list
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
 ```
 
@@ -212,9 +212,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Yes a ban decision
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>User: No, HTTP 403
 ```
 
@@ -227,9 +227,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant PluginCache
     TraefikPlugin-->>PluginCache: Does the User IP has a crowdsec decision ?
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Nothing, all good!
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -247,9 +247,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant CrowdsecAppSec
     TraefikPlugin-->>CrowdsecAppSec: Is this request malicious ?
-    Destroy CrowdsecAppSec
+    destroy CrowdsecAppSec
     CrowdsecAppSec-->>TraefikPlugin: Yes I think so
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>User: No, HTTP 403
 ```
 
@@ -262,9 +262,9 @@ sequenceDiagram
     User->>TraefikPlugin: Can I access that webpage
     create participant CrowdsecAppSec
     TraefikPlugin-->>CrowdsecAppSec: Is this request malicious ?
-    Destroy CrowdsecAppSec
+    destroy CrowdsecAppSec
     CrowdsecAppSec-->>TraefikPlugin: No I don't think so
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -285,12 +285,12 @@ sequenceDiagram
     User->>TraefikPlugin: Fine, done!
     create participant ProviderCaptcha
     TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
-    Destroy ProviderCaptcha
+    destroy ProviderCaptcha
     ProviderCaptcha-->>TraefikPlugin: Yes
     TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
-    Destroy PluginCache
+    destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
-    Destroy TraefikPlugin
+    destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
 ```
@@ -362,7 +362,7 @@ make run
 - CrowdsecAppsecTlsCertificateAuthority
   - string
   - default: ""
-  - PEM-encoded Certificate Authority of Appsec
+  - PEM-encoded Certificate Authority used to verify Appsec's server certificate. When empty (and `crowdsecAppsecTlsInsecureVerify` is `false`), the host's system trust store is used.
 - CrowdsecAppsecScheme
   - string
   - default: value of `CrowdsecLapiScheme`, expected values are: `http`, `https`
@@ -382,7 +382,7 @@ make run
   - int64
   - default: 10485760 (= 10MB)
   - Transmit only the first number of bytes to Crowdsec Appsec Server.
-- CrowdsecAppsecDropUnreadableBody
+- CrowdsecAppsecUnreadableBodyBlock
   - bool
   - default: false
   - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` (default) the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. Mirrors the reference bouncers' `APPSEC_DROP_UNREADABLE_BODY` option.
@@ -412,7 +412,7 @@ make run
 - CrowdsecLapiTlsCertificateAuthority
   - string
   - default: ""
-  - PEM-encoded Certificate Authority of the Crowdsec LAPI
+  - PEM-encoded Certificate Authority used to verify the LAPI's server certificate. When empty (and `crowdsecLapiTlsInsecureVerify` is `false`), the host's system trust store is used.
 - CrowdsecLapiTlsCertificateBouncer
   - string
   - default: ""
@@ -517,14 +517,14 @@ make run
   - int64
   - default: 1800 (= 30 minutes)
   - Period after validation of a captcha before a new validation is required if Crowdsec decision is still valid
-- CaptchaHTMLFilePath
+- CaptchaFilePath
   - string
   - default: /captcha.html
-  - Path where the captcha template is stored
-- BanHTMLFilePath
+  - Path where the captcha template is stored. The Content-Type header is automatically inferred from the file extension.
+- BanFilePath
   - string
   - default: ""
-  - Path where the ban html file is stored (default empty ""=disabled)
+  - Path where the ban file is stored (default empty ""=disabled). The Content-Type header is automatically inferred from the file extension.
 - TraceHeadersCustomName
   - string
   - default: ""
@@ -620,7 +620,7 @@ http:
           crowdsecAppsecFailureBlock: true
           crowdsecAppsecUnreachableBlock: true
           crowdsecAppsecBodyLimit: 10485760
-          crowdsecAppsecDropUnreadableBody: false
+          crowdsecAppsecUnreadableBodyBlock: false
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiScheme: http
           crowdsecLapiHost: crowdsec:8080
@@ -732,16 +732,18 @@ A script is available to generate certificates in `examples/tls-auth/gencerts.sh
 
 #### Use HTTPS to communicate with the LAPI
 
-To communicate with the LAPI in HTTPS you need to either accept any certificates by setting the `crowdsecLapiTLSInsecureVerify` to true or add the CA used by the server certificate of Crowdsec using `crowdsecLapiTLSCertificateAuthority` or `crowdsecLapiTLSCertificateAuthorityFile`.
-Set the `crowdsecLapiScheme` to https.
+Set `crowdsecLapiScheme` to `https`. The plugin then validates Crowdsec's server certificate. Three options:
+
+- **Publicly trusted certificate** (e.g. Let's Encrypt behind a reverse proxy): leave `crowdsecLapiTLSCertificateAuthority` empty and `crowdsecLapiTLSInsecureVerify` `false`. The plugin falls back to the host's system trust store (the `traefik` image ships `ca-certificates`).
+- **Private/self-signed CA**: set `crowdsecLapiTLSCertificateAuthority` (or `…File`) to the PEM-encoded CA that signed Crowdsec's server cert.
+- **Skip verification entirely** (not recommended for production): set `crowdsecLapiTLSInsecureVerify` to `true`.
 
 Crowdsec must be listening in HTTPS for this to work.
 Please see the [tls-auth example](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/tls-auth/README.md) or the official documentation: [docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
 
 #### Use HTTPS to communicate with the Appsec
 
-To communicate with the Appsec in HTTPS you need to either accept any certificates by setting the `crowdsecAppsecTLSInsecureVerify` to true or add the CA used by the server certificate of Crowdsec using `crowdsecAppsecTLSCertificateAuthority` or `crowdsecAppsecTLSCertificateAuthorityFile`.
-Set the `crowdsecAppsecScheme` to https.
+Set `crowdsecAppsecScheme` to `https`. Same three options as for the LAPI, prefixed `crowdsecAppsec…` instead of `crowdsecLapi…`: empty CA + secure verify falls back to the system trust store, a custom CA pins to your private PKI, and `crowdsecAppsecTLSInsecureVerify=true` skips verification altogether.
 
 Currently AppSec does not support mTLS authentication for the AppSec Component.
 

@@ -1,0 +1,32 @@
+http:
+  routers:
+    r:
+      rule: "PathPrefix(`/foo`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer:
+      plugin:
+        bouncer:
+          enabled: "true"
+          # IP bouncing disabled — this scenario exercises AppSec only.
+          crowdsecMode: none
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: "@@LAPI_HOST@@"
+          crowdsecLapiKey: "@@APIKEY@@"
+          crowdsecAppsecEnabled: "true"
+          crowdsecAppsecFailureBlock: "true"
+          crowdsecAppsecBodyLimit: 4
+          crowdsecAppsecUnreachableBlock: "false"
+          crowdsecAppsecScheme: http
+          crowdsecAppsecHost: "@@APPSEC_HOST@@"
+          forwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
