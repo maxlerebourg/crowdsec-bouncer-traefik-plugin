@@ -1,0 +1,72 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["dependencies"],
+  "prHourlyLimit": 0,
+  "ignorePaths": ["**/vendor/**", "**/node_modules/**"],
+  "packageRules": [
+    {
+      "description": "Cap the Go version at what yaegi supports. The plugin is interpreted by yaegi (bundled in Traefik), and even Traefik v3.7.1 ships yaegi v0.16.1 = Go 1.22. A newer Go would break the plugin on every current Traefik. Raise this only once Traefik ships a yaegi supporting a newer Go.",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go", "toolchain"],
+      "allowedVersions": "<1.23"
+    },
+    {
+      "description": "Group everything Traefik (image, helm tag, e2e binary) into one PR",
+      "matchPackageNames": ["traefik", "traefik/traefik"],
+      "groupName": "Traefik"
+    },
+    {
+      "description": "Group Crowdsec (image + helm tag) into one PR",
+      "matchPackageNames": ["crowdsecurity/crowdsec"],
+      "groupName": "Crowdsec"
+    },
+    {
+      "description": "whoami is a throwaway demo backend; leave it on latest",
+      "matchPackageNames": ["traefik/whoami"],
+      "enabled": false
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Plugin self-pin in docker-compose CLI args (--experimental.plugins.bouncer.version=vX)",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)docker-compose[^/]*\\.ya?ml$/"],
+      "matchStrings": ["experimental\\.plugins\\.bouncer\\.version=(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "depNameTemplate": "maxlerebourg/crowdsec-bouncer-traefik-plugin",
+      "datasourceTemplate": "github-tags"
+    },
+    {
+      "description": "Plugin self-pin in the Traefik Helm values (version: \"vX\")",
+      "customType": "regex",
+      "managerFilePatterns": ["/^examples/kubernetes/traefik/values\\.ya?ml$/"],
+      "matchStrings": ["version:\\s*\"(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)\""],
+      "depNameTemplate": "maxlerebourg/crowdsec-bouncer-traefik-plugin",
+      "datasourceTemplate": "github-tags"
+    },
+    {
+      "description": "Traefik image tag in the Traefik Helm values (no repository key, so match by file)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^examples/kubernetes/traefik/values\\.ya?ml$/"],
+      "matchStrings": ["tag:\\s*(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "depNameTemplate": "traefik",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "description": "Crowdsec image tag in the Crowdsec Helm values (no repository key, so match by file)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^examples/kubernetes/crowdsec/values\\.ya?ml$/"],
+      "matchStrings": ["tag:\\s*(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "depNameTemplate": "crowdsecurity/crowdsec",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "description": "Pinned Traefik binary in the e2e mock suite (TRAEFIK_VERSION:-vX in common.sh)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^tests/e2e/mock/lib/common\\.sh$/"],
+      "matchStrings": ["TRAEFIK_VERSION:-(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "depNameTemplate": "traefik/traefik",
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}

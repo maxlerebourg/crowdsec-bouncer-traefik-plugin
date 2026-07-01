@@ -52,7 +52,7 @@ More information is available on configuring Crowdsec in the [official documenta
 ```yaml
   ...
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.1-2
+    image: crowdsecurity/crowdsec:v1.6.8
     volumes:
       # For captcha and ban mixed decision
       - './profiles.yaml:/etc/crowdsec/profiles.yaml:ro' 
