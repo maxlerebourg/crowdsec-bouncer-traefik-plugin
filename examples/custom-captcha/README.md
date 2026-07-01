@@ -4,17 +4,16 @@ Read the example captcha before this, to better understand what is done here.
 
 ### Traefik configuration
 
-The minimal configuration is defined below to implement custom captcha.  
-This documentation use https://github.com/a-ve/wicketkeeper, a self-hosted captcha provider that have a similar API than big providers.
+The minimal configuration to implement custom captcha is defined below.  
+This documentation uses https://github.com/a-ve/wicketkeeper, a self-hosted captcha provider that has a similar API to big providers.
 
-Minimal API requirement:
+Minimal API requirements:
 
 - the JS file URL to load the captcha on the served `captcha.html`
 - the HTML className to tell to the JS where to display the challenge
 - the verify URL endpoint to send the field `response` from the captcha with `content-type: application/x-www-form-urlencoded`
 - the name of the field when you POST the resolved captcha to Traefik
-
-- the JS file need to respect the `data-callback` on the div that contains the captcha if you use our template, but you can customize it by your side
+- the JS file needs to respect the `data-callback` on the div that contains the captcha if you use our template, but you can customize it on your side
 
 ```yaml
   traefik:
@@ -25,11 +24,12 @@ Minimal API requirement:
       # Define captcha grace period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsURL=http://captcha.localhost:8000/fast.js"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomChallengeURL=http://captcha.localhost:8000/v0/challenge"
       # Inside Traefik container the plugin must be able to reach wicketkeeper service so we can go through a Traefik localhost
       # domain which would resolve traefik itself and the port for the dashboard
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomKey=wicketkeeper"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomResponse=wicketkeeper_solution"
       # Define captcha HTML file path
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
 ```

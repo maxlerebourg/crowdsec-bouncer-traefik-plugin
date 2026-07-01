@@ -27,6 +27,27 @@ type Client struct {
 	httpClient              *http.Client
 	log                     *slog.Logger
 	infoProvider            *infoProvider
+	captchaResourceURLs     []*url.URL
+}
+
+// parseCaptchaResourceURLs parses raw URL strings into *url.URL values used
+// for per-request pass-through matching. Empty strings and unparseable values
+// are skipped with a warning. URLs with no path are also skipped because a
+// path is required for meaningful matching.
+func parseCaptchaResourceURLs(log *slog.Logger, rawURLs ...string) []*url.URL {
+	out := make([]*url.URL, 0, len(rawURLs))
+	for _, raw := range rawURLs {
+		if raw == "" {
+			continue
+		}
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed.Path == "" {
+			log.Warn("captcha: invalid or path-less resource URL, pass-through disabled for: " + raw)
+			continue
+		}
+		out = append(out, parsed)
+	}
+	return out
 }
 
 // Information for self-hosted provider.
@@ -60,7 +81,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, challenge, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -68,6 +89,7 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	var info *infoProvider
 	if provider == configuration.CustomProvider {
 		info = &infoProvider{js: js, key: key, response: response, validate: validate}
+		c.captchaResourceURLs = parseCaptchaResourceURLs(log, js, challenge)
 	} else {
 		info = infoProviders[provider]
 	}
@@ -163,4 +185,35 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	}
 	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
 	return captchaResponse.Success, nil
+}
+
+// IsCaptchaResource reports whether req targets one of the captcha resource
+// paths (CaptchaCustomJsURL, CaptchaCustomChallengeURL). Captcha-pending IPs
+// must reach these paths for the widget to load and submit; all other paths are
+// still blocked.
+//
+// Matching rules:
+//   - Path must match exactly.
+//   - If the configured URL includes a host (and optional port), req.Host must
+//     match case-insensitively.
+//   - If the configured URL is path-only (no host), only the path is checked.
+func (c *Client) IsCaptchaResource(req *http.Request) bool {
+	if len(c.captchaResourceURLs) == 0 {
+		return false
+	}
+	// req.Host is the canonical host for server-side requests;
+	// req.URL.Host is typically empty for proxied requests.
+	reqHost := strings.ToLower(req.Host)
+	reqPath := req.URL.Path
+
+	for _, u := range c.captchaResourceURLs {
+		if reqPath != u.Path {
+			continue
+		}
+		if u.Host != "" && strings.ToLower(u.Host) != reqHost {
+			continue
+		}
+		return true
+	}
+	return false
 }
