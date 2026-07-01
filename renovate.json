@@ -3,6 +3,7 @@
   "extends": ["config:recommended"],
   "labels": ["dependencies"],
   "prHourlyLimit": 0,
+  "ignorePaths": ["**/vendor/**", "**/node_modules/**"],
   "packageRules": [
     {
       "description": "Cap the Go version at what yaegi supports. The plugin is interpreted by yaegi (bundled in Traefik), and even Traefik v3.7.1 ships yaegi v0.16.1 = Go 1.22. A newer Go would break the plugin on every current Traefik. Raise this only once Traefik ships a yaegi supporting a newer Go.",
