@@ -742,10 +742,6 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 		Path:   bouncer.appsecPath,
 	}
 	var req *http.Request
-	// When the body cannot be buffered (HTTP/2+ stream without Content-Length,
-	// e.g. gRPC), reading it would block until the request times out. We either
-	// drop the request outright or forward it to Appsec with headers only,
-	// mirroring the reference bouncer's APPSEC_DROP_UNREADABLE_BODY behavior.
 	switch {
 	case isBodyUnreadable(httpReq):
 		if bouncer.appsecUnreadableBodyBlock {
