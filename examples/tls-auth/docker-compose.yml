@@ -71,7 +71,7 @@ services:
       # Define AppSec host and port informations
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
   crowdsec:
-    image: crowdsecurity/crowdsec:latest
+    image: crowdsecurity/crowdsec:v1.6.8
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
