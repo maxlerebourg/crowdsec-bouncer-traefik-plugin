@@ -87,7 +87,7 @@ services:
       - "traefik.enable=false"
 
   redis-secure:
-    image: "redis:7.0.12-alpine"
+    image: "redis:8.8.0-alpine"
     container_name: "redis-secure"
     hostname: redis-secure
     restart: unless-stopped
