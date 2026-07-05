@@ -35,4 +35,7 @@ jobs:
           RENOVATE_REPOSITORIES: ${{ github.repository }}
           RENOVATE_ONBOARDING: "false"
           RENOVATE_REQUIRE_CONFIG: "required"
+          # The grouped "all" branch holds many upgrades; changelog/PR-body
+          # rendering for it blew the default 4GB V8 heap (exit 134 OOM).
+          NODE_OPTIONS: "--max-old-space-size=8192"
           LOG_LEVEL: ${{ github.event.inputs.logLevel || 'info' }}
