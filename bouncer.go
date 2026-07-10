@@ -732,7 +732,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 // a 403. This mirrors the reference lua-cs-bouncer behavior, which refuses to
 // read the body of an HTTP/2+ request that has no Content-Length.
 func isBodyUnreadable(httpReq *http.Request) bool {
-	return httpReq.Body != nil && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
+	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
 
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
