@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -396,29 +397,27 @@ func (b blockingBody) Read(_ []byte) (int, error) {
 func (blockingBody) Close() error { return nil }
 
 func Test_isBodyUnreadable(t *testing.T) {
+	realBody := func() io.ReadCloser { return io.NopCloser(strings.NewReader("data")) }
 	tests := []struct {
 		name          string
 		protoMajor    int
 		contentLength int64
-		hasBody       bool
+		body          io.ReadCloser
 		want          bool
 	}{
-		{name: "http2 grpc stream without content-length", protoMajor: 2, contentLength: -1, hasBody: true, want: true},
-		{name: "http3 stream without content-length", protoMajor: 3, contentLength: -1, hasBody: true, want: true},
-		{name: "http2 with content-length", protoMajor: 2, contentLength: 42, hasBody: true, want: false},
-		{name: "http1.1 chunked without content-length", protoMajor: 1, contentLength: -1, hasBody: true, want: false},
-		{name: "http2 without body", protoMajor: 2, contentLength: -1, hasBody: false, want: false},
+		{name: "http2 grpc stream without content-length", protoMajor: 2, contentLength: -1, body: realBody(), want: true},
+		{name: "http3 stream without content-length", protoMajor: 3, contentLength: -1, body: realBody(), want: true},
+		{name: "http2 with content-length", protoMajor: 2, contentLength: 42, body: realBody(), want: false},
+		{name: "http1.1 chunked without content-length", protoMajor: 1, contentLength: -1, body: realBody(), want: false},
+		{name: "http2 without body", protoMajor: 2, contentLength: -1, body: nil, want: false},
+		{name: "http2 with http.NoBody", protoMajor: 2, contentLength: -1, body: http.NoBody, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, _ := http.NewRequest(http.MethodPost, "http://localhost", nil)
 			req.ProtoMajor = tt.protoMajor
 			req.ContentLength = tt.contentLength
-			if tt.hasBody {
-				req.Body = http.NoBody
-			} else {
-				req.Body = nil
-			}
+			req.Body = tt.body
 			if got := isBodyUnreadable(req); got != tt.want {
 				t.Errorf("isBodyUnreadable() = %v, want %v", got, tt.want)
 			}
@@ -511,5 +510,57 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("appsecQuery() blocked on a streaming request body (issue #323 regression)")
+	}
+}
+
+// newUnreadableGetRequest builds an HTTP/3-style GET request without a
+// Content-Length, as received through Traefik's HTTP/3 entrypoint: quic-go
+// always wraps the stream in a non-nil body and sets ContentLength to -1 when
+// the header is absent, even for requests that carry no body.
+func newUnreadableGetRequest(done <-chan struct{}) *http.Request {
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", blockingBody{done: done})
+	req.ProtoMajor = 3
+	req.ContentLength = -1
+	return req
+}
+
+// Test_appsecQuery_unreadableBodyGetNotDropped is a regression test for issue
+// #351: methods that do not carry a body (e.g. browser GETs over HTTP/3, which
+// never have a Content-Length) must be forwarded to appsec headers-only rather
+// than dropped, even with appsecUnreadableBodyBlock enabled. This mirrors the
+// reference lua-cs-bouncer METHODS_WITH_BODY behavior and its regression test
+// t/19_appsec_drop_unreadable_body_get.t.
+func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	bouncer := &Bouncer{
+		appsecScheme:              appsecURL.Scheme,
+		appsecHost:                appsecURL.Host,
+		appsecPath:                "/",
+		appsecBodyLimit:           10485760,
+		appsecUnreadableBodyBlock: true,
+		httpAppsecClient:          appsecServer.Client(),
+		log:                       logger.New("INFO", ""),
+	}
+
+	done := make(chan struct{})
+	defer close(done)
+
+	finished := make(chan error, 1)
+	go func() {
+		finished <- appsecQuery(bouncer, "1.2.3.4", newUnreadableGetRequest(done))
+	}()
+
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Errorf("appsecQuery() on an HTTP/3 GET without content-length returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("appsecQuery() blocked on an HTTP/3 GET request body (issue #351 regression)")
 	}
 }

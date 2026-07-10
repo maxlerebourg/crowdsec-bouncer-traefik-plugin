@@ -735,6 +735,20 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
 
+// isMethodWithBody reports whether the method is expected to carry a request
+// body. Only those methods may be dropped when their body is unreadable,
+// mirroring the reference lua-cs-bouncer METHODS_WITH_BODY list. Other methods
+// (e.g. a browser GET over HTTP/3, which never carries a Content-Length) are
+// forwarded to the Appsec component headers-only instead of dropped (issue #351).
+func isMethodWithBody(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	routeURL := url.URL{
 		Scheme: bouncer.appsecScheme,
@@ -744,7 +758,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 	var req *http.Request
 	switch {
 	case isBodyUnreadable(httpReq):
-		if bouncer.appsecUnreadableBodyBlock {
+		if bouncer.appsecUnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
 			// The caller (handleNextServeHTTP) logs this returned error with the IP.
 			return errors.New("appsecQuery:unreadableBody dropped")
 		}
