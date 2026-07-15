@@ -411,6 +411,20 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 	return nil
 }
 
+func validateCaptchaResourceURL(field, raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("%s: invalid URL %q: %w", field, raw, err)
+	}
+	if !contains([]string{HTTP, HTTPS}, u.Scheme) {
+		return fmt.Errorf("%s: URL %q must have an http or https scheme, got %q", field, raw, u.Scheme)
+	}
+	if contains([]string{"", "/"}, u.Path) {
+		return fmt.Errorf("%s: URL %q must include a specific path (e.g. /fast.js), got %q", field, raw, u.Path)
+	}
+	return nil
+}
+
 func validateCaptcha(config *Config) error {
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
 		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
@@ -424,6 +438,14 @@ func validateCaptcha(config *Config) error {
 				config.CaptchaCustomValidateURL,
 				config.CaptchaCustomJsURL,
 			)
+		}
+		if err := validateCaptchaResourceURL("CaptchaCustomJsURL", config.CaptchaCustomJsURL); err != nil {
+			return err
+		}
+	}
+	if config.CaptchaCustomChallengeURL != "" {
+		if err := validateCaptchaResourceURL("CaptchaCustomChallengeURL", config.CaptchaCustomChallengeURL); err != nil {
+			return err
 		}
 	}
 	return nil
