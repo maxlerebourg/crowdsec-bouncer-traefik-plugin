@@ -15,6 +15,8 @@ Minimal API requirements:
 - the name of the field when you POST the resolved captcha to Traefik
 - the JS file needs to respect the `data-callback` on the div that contains the captcha if you use our template, but you can customize it on your side
 
+Multi-host deployments: If multiple routers share the same crowdsec@docker middleware, configure full URLs including the hostname (e.g. http://captcha.example.com/fast.js) for captchaCustomJsURL and captchaCustomChallengeURL. A path-only value (e.g. /fast.js) will allow captcha-pending IPs to reach that path on any virtual host served by the shared middleware instance.
+
 ```yaml
   traefik:
     ...
