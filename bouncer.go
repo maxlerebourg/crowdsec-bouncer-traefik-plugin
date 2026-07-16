@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	htmltemplate "html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -85,41 +84,43 @@ type Bouncer struct {
 	name     string
 	template *template.Template
 
-	enabled                 bool
-	appsecEnabled           bool
-	appsecScheme            string
-	appsecHost              string
-	appsecPath              string
-	appsecKey               string
-	appsecFailureBlock      bool
-	appsecUnreachableBlock  bool
-	appsecBodyLimit         int64
-	crowdsecScheme          string
-	crowdsecHost            string
-	crowdsecPath            string
-	crowdsecKey             string
-	crowdsecMode            string
-	crowdsecMachineID       string
-	crowdsecPassword        string
-	crowdsecScenarios       []string
-	updateInterval          int64
-	updateMaxFailure        int64
-	defaultDecisionTimeout  int64
-	remediationStatusCode   int
-	remediationCustomHeader string
-	forwardedCustomHeader   string
-	crowdsecStreamRoute     string
-	crowdsecHeader          string
-	redisUnreachableBlock   bool
-	banTemplate             *htmltemplate.Template
-	traceCustomHeader       string
-	clientPoolStrategy      *ip.PoolStrategy
-	serverPoolStrategy      *ip.PoolStrategy
-	httpClient              *http.Client
-	httpAppsecClient        *http.Client
-	cacheClient             *cache.Client
-	captchaClient           *captcha.Client
-	log                     *slog.Logger
+	enabled                   bool
+	appsecEnabled             bool
+	appsecScheme              string
+	appsecHost                string
+	appsecPath                string
+	appsecKey                 string
+	appsecFailureBlock        bool
+	appsecUnreachableBlock    bool
+	appsecUnreadableBodyBlock bool
+	appsecBodyLimit           int64
+	crowdsecScheme            string
+	crowdsecHost              string
+	crowdsecPath              string
+	crowdsecKey               string
+	crowdsecMode              string
+	crowdsecMachineID         string
+	crowdsecPassword          string
+	crowdsecScenarios         []string
+	updateInterval            int64
+	updateMaxFailure          int64
+	defaultDecisionTimeout    int64
+	remediationStatusCode     int
+	remediationCustomHeader   string
+	forwardedCustomHeader     string
+	crowdsecStreamRoute       string
+	crowdsecHeader            string
+	redisUnreachableBlock     bool
+	banTemplate               *template.Template
+	banTemplateContentType    string
+	traceCustomHeader         string
+	clientPoolStrategy        *ip.PoolStrategy
+	serverPoolStrategy        *ip.PoolStrategy
+	httpClient                *http.Client
+	httpAppsecClient          *http.Client
+	cacheClient               *cache.Client
+	captchaClient             *captcha.Client
+	log                       *slog.Logger
 }
 
 type AppSecResponse struct {
@@ -132,10 +133,18 @@ type AppSecResponse struct {
 
 // New creates the crowdsec bouncer plugin.
 //
-//nolint:nestif,gocyclo,gocognit
+//nolint:nestif,gocyclo,gocognit,funlen,maintidx
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
+
+	if config.BanFilePath == "" && config.BanHTMLFilePath != "" {
+		config.BanFilePath = config.BanHTMLFilePath
+	}
+	if config.CaptchaHTMLFilePath != "" {
+		config.CaptchaFilePath = config.CaptchaHTMLFilePath
+	}
+
 	err := configuration.ValidateParams(config, log)
 	if err != nil {
 		log.Error("New:validateParams " + err.Error())
@@ -193,9 +202,10 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 	}
 
-	var banTemplate *htmltemplate.Template
-	if config.BanHTMLFilePath != "" {
-		banTemplate, _ = configuration.GetHTMLTemplate(config.BanHTMLFilePath)
+	var banTemplate *template.Template
+	var banTemplateContentType string
+	if config.BanFilePath != "" {
+		banTemplate, banTemplateContentType, _ = configuration.GetTemplate(config.BanFilePath)
 	}
 
 	bouncer := &Bouncer{
@@ -203,35 +213,37 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		name:     name,
 		template: template.New("CrowdsecBouncer").Delims("[[", "]]"),
 
-		enabled:                 config.Enabled,
-		crowdsecMode:            config.CrowdsecMode,
-		appsecEnabled:           config.CrowdsecAppsecEnabled,
-		appsecScheme:            config.CrowdsecAppsecScheme,
-		appsecHost:              config.CrowdsecAppsecHost,
-		appsecPath:              config.CrowdsecAppsecPath,
-		appsecKey:               config.CrowdsecAppsecKey,
-		appsecFailureBlock:      config.CrowdsecAppsecFailureBlock,
-		appsecUnreachableBlock:  config.CrowdsecAppsecUnreachableBlock,
-		appsecBodyLimit:         config.CrowdsecAppsecBodyLimit,
-		crowdsecScheme:          config.CrowdsecLapiScheme,
-		crowdsecHost:            config.CrowdsecLapiHost,
-		crowdsecPath:            config.CrowdsecLapiPath,
-		crowdsecKey:             config.CrowdsecLapiKey,
-		crowdsecMachineID:       config.CrowdsecCapiMachineID,
-		crowdsecPassword:        config.CrowdsecCapiPassword,
-		crowdsecScenarios:       config.CrowdsecCapiScenarios,
-		updateInterval:          config.UpdateIntervalSeconds,
-		updateMaxFailure:        config.UpdateMaxFailure,
-		remediationCustomHeader: config.RemediationHeadersCustomName,
-		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
-		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
-		remediationStatusCode:   config.RemediationStatusCode,
-		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
-		banTemplate:             banTemplate,
-		traceCustomHeader:       config.TraceHeadersCustomName,
-		crowdsecStreamRoute:     crowdsecStreamRoute,
-		crowdsecHeader:          crowdsecHeader,
-		log:                     log,
+		enabled:                   config.Enabled,
+		crowdsecMode:              config.CrowdsecMode,
+		appsecEnabled:             config.CrowdsecAppsecEnabled,
+		appsecScheme:              config.CrowdsecAppsecScheme,
+		appsecHost:                config.CrowdsecAppsecHost,
+		appsecPath:                config.CrowdsecAppsecPath,
+		appsecKey:                 config.CrowdsecAppsecKey,
+		appsecFailureBlock:        config.CrowdsecAppsecFailureBlock,
+		appsecUnreachableBlock:    config.CrowdsecAppsecUnreachableBlock,
+		appsecUnreadableBodyBlock: config.CrowdsecAppsecUnreadableBodyBlock,
+		appsecBodyLimit:           config.CrowdsecAppsecBodyLimit,
+		crowdsecScheme:            config.CrowdsecLapiScheme,
+		crowdsecHost:              config.CrowdsecLapiHost,
+		crowdsecPath:              config.CrowdsecLapiPath,
+		crowdsecKey:               config.CrowdsecLapiKey,
+		crowdsecMachineID:         config.CrowdsecCapiMachineID,
+		crowdsecPassword:          config.CrowdsecCapiPassword,
+		crowdsecScenarios:         config.CrowdsecCapiScenarios,
+		updateInterval:            config.UpdateIntervalSeconds,
+		updateMaxFailure:          config.UpdateMaxFailure,
+		remediationCustomHeader:   config.RemediationHeadersCustomName,
+		forwardedCustomHeader:     config.ForwardedHeadersCustomName,
+		defaultDecisionTimeout:    config.DefaultDecisionSeconds,
+		remediationStatusCode:     config.RemediationStatusCode,
+		redisUnreachableBlock:     config.RedisCacheUnreachableBlock,
+		banTemplate:               banTemplate,
+		banTemplateContentType:    banTemplateContentType,
+		traceCustomHeader:         config.TraceHeadersCustomName,
+		crowdsecStreamRoute:       crowdsecStreamRoute,
+		crowdsecHeader:            crowdsecHeader,
+		log:                       log,
 		serverPoolStrategy: &ip.PoolStrategy{
 			Checker: serverChecker,
 		},
@@ -285,7 +297,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
 		config.RemediationHeadersCustomName,
-		config.CaptchaHTMLFilePath,
+		config.CaptchaFilePath,
 		config.CaptchaGracePeriodSeconds,
 	)
 	if err != nil {
@@ -326,7 +338,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 // ServeHTTP principal function of plugin.
 //
-//nolint:nestif,gocyclo
+//nolint:nestif
 func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !bouncer.enabled {
 		bouncer.next.ServeHTTP(rw, req)
@@ -442,14 +454,9 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
-	if bouncer.banTemplate == nil {
-		rw.WriteHeader(bouncer.remediationStatusCode)
-		return
-	}
-	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+	rw.Header().Set("Content-Type", bouncer.banTemplateContentType)
 	rw.WriteHeader(bouncer.remediationStatusCode)
-
-	if req.Method == http.MethodHead {
+	if bouncer.banTemplate == nil || req.Method == http.MethodHead {
 		return
 	}
 	templateData := map[string]string{
@@ -715,6 +722,12 @@ func handleStreamCache(bouncer *Bouncer) error {
 	return nil
 }
 
+func isReverseProxyError(statusCode int) bool {
+	return statusCode == http.StatusBadGateway ||
+		statusCode == http.StatusServiceUnavailable ||
+		statusCode == http.StatusGatewayTimeout
+}
+
 func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, error) {
 	var req *http.Request
 	if len(data) > 0 {
@@ -726,7 +739,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpClient.Do(req)
-	if err != nil {
+	if err != nil || isReverseProxyError(res.StatusCode) {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
 	}
 	defer func() {
@@ -754,6 +767,17 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	return body, nil
 }
 
+// isBodyUnreadable reports whether the request body cannot be buffered before
+// forwarding it to the Appsec component. An HTTP/2 or HTTP/3 request without a
+// Content-Length (typically a bidirectional gRPC stream) keeps its body open
+// for the whole life of the stream and never reaches EOF, so reading it with
+// io.ReadAll would block until the request times out and is wrongly turned into
+// a 403. This mirrors the reference lua-cs-bouncer behavior, which refuses to
+// read the body of an HTTP/2+ request that has no Content-Length.
+func isBodyUnreadable(httpReq *http.Request) bool {
+	return httpReq.Body != nil && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
+}
+
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecResponse, error) {
 	routeURL := url.URL{
 		Scheme: bouncer.appsecScheme,
@@ -761,7 +785,14 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		Path:   bouncer.appsecPath,
 	}
 	var req *http.Request
-	if bouncer.appsecBodyLimit > 0 && httpReq.Body != nil {
+	switch {
+	case isBodyUnreadable(httpReq):
+		if bouncer.appsecUnreadableBodyBlock {
+			// The caller (handleNextServeHTTP) logs this returned error with the IP.
+			return nil, errors.New("appsecQuery:unreadableBody dropped")
+		}
+		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
+	case bouncer.appsecBodyLimit > 0 && httpReq.Body != nil:
 		var bodyBuffer bytes.Buffer
 		limitedReader := io.LimitReader(httpReq.Body, bouncer.appsecBodyLimit)
 		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
@@ -772,7 +803,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		// Conserve body intact after reading it for other middlewares and service
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
 		req, _ = http.NewRequest(http.MethodPost, routeURL.String(), bytes.NewBuffer(bodyBytes))
-	} else {
+	default:
 		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
 	}
 
@@ -790,7 +821,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpAppsecClient.Do(req)
-	if err != nil {
+	if err != nil || isReverseProxyError(res.StatusCode) {
 		bouncer.log.Error("appsecQuery:unreachable")
 		if bouncer.appsecUnreachableBlock {
 			return nil, fmt.Errorf("appsecQuery:unreachable %w", err)

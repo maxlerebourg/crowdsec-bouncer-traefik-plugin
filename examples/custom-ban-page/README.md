@@ -9,11 +9,11 @@ This can be usefull as some browser (Firefox for instance) return a 403 blank we
 
 ```yaml
   labels:
-      # Define ban HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.banHtmlFilePath=/ban.html"
+      # Define ban file path
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.banFilePath=/ban.html"
 ```
 
-The ban HTML file must be present in the Traefik container (bind mounted or added during a custom build).  
+The ban file must be present in the Traefik container (bind mounted or added during a custom build).  
 It is not directly accessible from Traefik even when importing the plugin, so [download](https://raw.githubusercontent.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/master/ban.html) it locally to expose it to Traefik.
 
 ```yaml 

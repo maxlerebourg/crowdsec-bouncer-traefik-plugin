@@ -30,7 +30,7 @@ that lives upstream in Crowdsec.
 |-----------|-----|
 | Traefik   | Binary `v3.7.1`, downloaded into `.cache/` (reused across local runs; re-downloaded on fresh CI runners) |
 | Plugin    | Loaded via `experimental.localPlugins` from the repo root (symlinked into `plugins-local/`) |
-| LAPI      | `mocklapi` — a stdlib-only Go command (its own nested module), compiled and cached under `.cache/`, driven through `/admin` endpoints instead of `cscli` |
+| LAPI      | `mocklapi` — a stdlib-only Go command (its own nested module), compiled and cached under `.cache/`, driven through `/admin` endpoints instead of `cscli`. Serves plain HTTP, or HTTPS when `--lapi-tls-cert/--lapi-tls-key` are passed (the `tls-system-ca` scenario) |
 | AppSec    | WAF stand-in built into the mock — blocks URIs containing `rpc2`, allows the rest |
 | Backend   | A plain HTTP responder built into the mock |
 
@@ -39,9 +39,16 @@ backend `8091`, AppSec `8092`.
 
 ## Running locally
 
-Prerequisites: `bash`, `curl`, `go`, `tar`. On first use the Traefik binary is
-fetched and the mock is compiled into `.cache/`. That cache is reused across
-local runs; CI runs on fresh runners, so both are recreated on every CI run.
+Prerequisites: `bash`, `curl`, `go`, `tar` (plus `openssl` for the
+`tls-system-ca` scenario, which mints a throwaway CA at runtime). On first use
+the Traefik binary is fetched and the mock is compiled into `.cache/`. That
+cache is reused across local runs; CI runs on fresh runners, so both are
+recreated on every CI run.
+
+The `tls-system-ca` scenario verifies that, with no custom CA configured, the
+bouncer falls back to the OS/system trust store for an HTTPS LAPI: it serves the
+mock over TLS and points the Traefik process's `SSL_CERT_FILE` at the test CA
+(trusted → 200) or an empty bundle (untrusted → 403, proving it still verifies).
 
 ```bash
 # one scenario

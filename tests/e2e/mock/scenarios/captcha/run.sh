@@ -16,6 +16,9 @@ body() {
   echo "[$SCENARIO] captcha page must be served once the decision is polled (200 + marker)"
   wait_for_body_contains "http://127.0.0.1:${WEB_PORT}/foo" "E2E_CAPTCHA_PAGE_MARKER" 15 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] captcha response Content-Type is HTML"
+  assert_header "http://127.0.0.1:${WEB_PORT}/foo" Content-Type "text/html; charset=utf-8" -H "X-Forwarded-For: 1.2.3.4"
+
   echo "[$SCENARIO] captcha response is HTTP 200 (the captcha page itself, not a 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4"
 

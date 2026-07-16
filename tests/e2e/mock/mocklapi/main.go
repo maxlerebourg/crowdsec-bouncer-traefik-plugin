@@ -13,6 +13,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -52,6 +53,11 @@ func main() {
 	backendAddr := flag.String("backend-addr", "127.0.0.1:8091", "address for the stub upstream service")
 	// AppSec WAF stand-in (the real engine listens on :7422). Not a CRS engine.
 	appsecAddr := flag.String("appsec-addr", "127.0.0.1:8092", "address for the AppSec mock")
+	// Optional TLS for the LAPI: when both are set the LAPI is served over HTTPS
+	// (cert signed by the scenario's throwaway CA) so the suite can exercise the
+	// bouncer's system-trust-store path. Backend and AppSec stay plaintext.
+	lapiTLSCert := flag.String("lapi-tls-cert", "", "PEM cert to serve the LAPI over HTTPS (optional)")
+	lapiTLSKey := flag.String("lapi-tls-key", "", "PEM key for --lapi-tls-cert")
 	flag.Parse()
 
 	go func() {
@@ -67,8 +73,25 @@ func main() {
 	// exercised without standing up the real WAF.
 	go func() {
 		log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "rpc2") {
+			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403") {
 				w.WriteHeader(http.StatusForbidden)
+			}
+			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500") {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502") {
+				w.WriteHeader(http.StatusBadGateway)
+			}
+			// Read body
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			defer r.Body.Close()
+			if strings.Contains(string(body), "a=0") {
+				w.WriteHeader(http.StatusForbidden)
+				return
 			}
 		})))
 	}()
@@ -130,6 +153,10 @@ func main() {
 		}
 	})
 
+	if *lapiTLSCert != "" && *lapiTLSKey != "" {
+		log.Printf("mocklapi: LAPI on %s (TLS), backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
+		log.Fatal(http.ListenAndServeTLS(*lapiAddr, *lapiTLSCert, *lapiTLSKey, mux))
+	}
 	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
 	log.Fatal(http.ListenAndServe(*lapiAddr, mux))
 }

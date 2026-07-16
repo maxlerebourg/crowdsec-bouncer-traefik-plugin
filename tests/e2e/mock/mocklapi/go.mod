@@ -3,4 +3,4 @@
 // golangci-lint and `go mod vendor`. Stdlib only — no dependencies.
 module mocklapi
 
-go 1.22
+go 1.22.12

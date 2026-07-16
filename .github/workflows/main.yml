@@ -15,8 +15,13 @@ jobs:
     name: Main Process
     runs-on: ubuntu-latest
     env:
-      GO_VERSION: 1.23
+      # Keep in sync with go.mod. Capped at 1.22 because the plugin is run by
+      # yaegi (bundled in Traefik) and even Traefik v3.7.1 ships yaegi v0.16.1,
+      # which only supports Go 1.22. Building on the floor makes go build / go
+      # test reject newer stdlib before yaegi_test does.
+      GO_VERSION: 1.22
       GOLANGCI_LINT_VERSION: v1.63.4
+      # yaegi_test guard — pin to the version current Traefik bundles.
       YAEGI_VERSION: v0.16.1
       CGO_ENABLED: 0
     defaults:
@@ -33,14 +38,14 @@ jobs:
 
       # https://github.com/marketplace/actions/checkout
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: go/src/github.com/${{ github.repository }}
           fetch-depth: 0
 
       # https://github.com/marketplace/actions/cache
       - name: Cache Go modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}

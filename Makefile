@@ -4,7 +4,7 @@ export GO111MODULE=on
 
 # Binary/mock suite (Traefik binary + mock LAPI). This is what CI runs.
 # The local Docker suite (make e2e) lives in a separate PR/branch.
-E2E_MOCK_SCENARIOS := stream-mode live-mode none-mode trusted-ips custom-ban-page captcha appsec
+E2E_MOCK_SCENARIOS := stream-mode live-mode none-mode trusted-ips custom-ban-page captcha appsec tls-system-ca
 
 default: lint test
 

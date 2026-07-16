@@ -1,0 +1,4 @@
+{
+  "marker": "E2E_CUSTOM_BAN_PAGE_MARKER",
+  "body": "IP: {{ .ClientIP }}, reason: {{ .RemediationReason }}, trace: {{ .TraceID }}"
+}
