@@ -31,10 +31,13 @@ body() {
   echo "[$SCENARIO] request that send bad body before crowdsecAppsecBodyLimit must pass (AppSec 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" -X POST -d "a=0&______"
 
-  echo "[$SCENARIO] request that send unreadable body GET (AppSec 200)"
+  echo "[$SCENARIO] request http2 that send no body GET (AppSec 200)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:"
 
-  echo "[$SCENARIO] request that send unreadable body POST (AppSec 403)"
+  echo "[$SCENARIO] request http2 that send unreadable body GET (AppSec 403)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -d "test"
+
+  echo "[$SCENARIO] request http2 that send unreadable body POST (AppSec 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -X POST -d "test"
 }
 
