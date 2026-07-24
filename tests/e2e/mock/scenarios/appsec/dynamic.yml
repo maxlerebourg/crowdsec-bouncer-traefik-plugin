@@ -18,7 +18,7 @@ http:
         bouncer:
           enabled: "true"
           # IP bouncing disabled — this scenario exercises AppSec only.
-          crowdsecMode: none
+          crowdsecMode: appsec
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"

@@ -513,10 +513,6 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	}
 }
 
-// newUnreadableGetRequest builds an HTTP/3-style GET request without a
-// Content-Length, as received through Traefik's HTTP/3 entrypoint: quic-go
-// always wraps the stream in a non-nil body and sets ContentLength to -1 when
-// the header is absent, even for requests that carry no body.
 func newUnreadableGetRequest(done <-chan struct{}) *http.Request {
 	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", blockingBody{done: done})
 	req.ProtoMajor = 3
@@ -524,12 +520,7 @@ func newUnreadableGetRequest(done <-chan struct{}) *http.Request {
 	return req
 }
 
-// Test_appsecQuery_unreadableBodyGetNotDropped is a regression test for issue
-// #351: methods that do not carry a body (e.g. browser GETs over HTTP/3, which
-// never have a Content-Length) must be forwarded to appsec headers-only rather
-// than dropped, even with appsecUnreadableBodyBlock enabled. This mirrors the
-// reference lua-cs-bouncer METHODS_WITH_BODY behavior and its regression test
-// t/19_appsec_drop_unreadable_body_get.t.
+// Test_appsecQuery_unreadableBodyGetNotDropped is a regression test for issue #351
 func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
