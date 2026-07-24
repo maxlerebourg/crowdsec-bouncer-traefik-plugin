@@ -752,7 +752,6 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 		Path:   bouncer.appsecPath,
 	}
 	var req *http.Request
-	bouncer.log.Info("coucou %d", httpReq.ProtoMajor)
 	switch {
 	case isBodyUnreadable(httpReq):
 		if bouncer.appsecUnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
