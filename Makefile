@@ -20,7 +20,7 @@ yaegi_test:
 e2e_mock: $(addprefix e2e_mock_,$(E2E_MOCK_SCENARIOS))
 
 e2e_mock_%:
-	./tests/e2e/mock/scenarios/$*/run.sh
+	bash ./tests/e2e/mock/scenarios/$*/run.sh
 
 vendor:
 	go mod vendor
@@ -124,4 +124,3 @@ show_metrics:
 
 show_decisions:
 	docker exec crowdsec cscli decisions list
-
