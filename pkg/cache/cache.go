@@ -65,28 +65,21 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 	return &rc.readers[idx]
 }
 
-func redisResultToString(value []byte, err error) (string, error) {
+func (rc *redisCache) get(key string) (string, error) {
+	value, err := rc.nextReader().Get(key)
 	if err == nil {
 		valueString := string(value)
 		if len(valueString) > 0 {
 			return valueString, nil
 		}
 	}
-	if err != nil {
-		switch err.Error() {
-		case simpleredis.RedisMiss:
-			return "", errors.New(CacheMiss)
-		case simpleredis.RedisUnreachable:
-			return "", errors.New(CacheUnreachable)
-		}
-		return "", err
+	switch err.Error() {
+	case simpleredis.RedisMiss:
+		return "", errors.New(CacheMiss)
+	case simpleredis.RedisUnreachable:
+		return "", errors.New(CacheUnreachable)
 	}
-	return "", errors.New(CacheMiss)
-}
-
-func (rc *redisCache) get(key string) (string, error) {
-	value, err := rc.nextReader().Get(key)
-	return redisResultToString(value, err)
+	return "", err
 }
 
 func (rc *redisCache) set(key, value string, duration int64) {
