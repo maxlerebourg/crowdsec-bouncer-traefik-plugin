@@ -2,7 +2,8 @@
 // suite. It answers only the few LAPI routes the plugin calls — live/none
 // decision lookups, the stream poll and the usage-metrics push — and lets the
 // test drive decisions through /admin instead of `cscli`. It also serves the
-// stub upstream that Traefik proxies allowed requests to.
+// stub upstream that Traefik proxies allowed requests to, and a hardcoded Redis
+// stand-in for exercising the redis cache path.
 //
 // It is NOT a Crowdsec/AppSec conformance harness — the real WAF engine (OWASP
 // CRS, virtual patching) is out of scope. The AppSec endpoint here emulates a
@@ -11,10 +12,12 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -46,6 +49,48 @@ func list(m map[string]Decision) []Decision {
 	return out
 }
 
+// --- Redis mock (inline-command wire format, as spoken by simpleredis) ---
+
+// serveRedis is a hardcoded stand-in. Every line is scanned for known IPs:
+// 1.2.3.4 → "t", 1.2.3.5 → "f", GET for anything else → miss ($-1).
+// SET, DEL, AUTH, SELECT get +OK (they don't read the response anyway).
+func serveRedis(addr string) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ln.Close()
+	log.Printf("mocklapi: Redis mock listening on %s", addr)
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			continue
+		}
+		go func(conn net.Conn) {
+			defer conn.Close()
+			rd := bufio.NewReader(conn)
+			for {
+				line, _, err := rd.ReadLine()
+				if err != nil {
+					return
+				}
+				s := string(line)
+				switch {
+				case strings.Contains(s, "1.2.3.4"):
+					conn.Write([]byte("$1\r\nf\r\n"))
+				case strings.Contains(s, "1.2.3.5"):
+					conn.Write([]byte("$1\r\nt\r\n"))
+				case strings.HasPrefix(strings.ToUpper(s), "GET "):
+					conn.Write([]byte("$-1\r\n"))
+				default:
+					conn.Write([]byte("+OK\r\n"))
+				}
+			}
+		}(conn)
+	}
+}
+
 func main() {
 	lapiAddr := flag.String("lapi-addr", "127.0.0.1:8090", "address for the LAPI mock")
 	// The stub upstream Traefik proxies allowed requests to — the binary-suite
@@ -53,6 +98,9 @@ func main() {
 	backendAddr := flag.String("backend-addr", "127.0.0.1:8091", "address for the stub upstream service")
 	// AppSec WAF stand-in (the real engine listens on :7422). Not a CRS engine.
 	appsecAddr := flag.String("appsec-addr", "127.0.0.1:8092", "address for the AppSec mock")
+	// Redis stand-in: the mock always serves a hardcoded GET on a plain TCP
+	// port, enough to exercise the plugin's redis cache path.
+	redisAddr := flag.String("redis-addr", "127.0.0.1:8093", "address for the Redis mock")
 	// Optional TLS for the LAPI: when both are set the LAPI is served over HTTPS
 	// (cert signed by the scenario's throwaway CA) so the suite can exercise the
 	// bouncer's system-trust-store path. Backend and AppSec stay plaintext.
@@ -95,6 +143,8 @@ func main() {
 			}
 		})))
 	}()
+
+	go serveRedis(*redisAddr)
 
 	mux := http.NewServeMux()
 
@@ -154,9 +204,9 @@ func main() {
 	})
 
 	if *lapiTLSCert != "" && *lapiTLSKey != "" {
-		log.Printf("mocklapi: LAPI on %s (TLS), backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
+		log.Printf("mocklapi: LAPI on %s (TLS), backend on %s, appsec on %s, redis on %s", *lapiAddr, *backendAddr, *appsecAddr, *redisAddr)
 		log.Fatal(http.ListenAndServeTLS(*lapiAddr, *lapiTLSCert, *lapiTLSKey, mux))
 	}
-	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
+	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s, redis on %s", *lapiAddr, *backendAddr, *appsecAddr, *redisAddr)
 	log.Fatal(http.ListenAndServe(*lapiAddr, mux))
 }
