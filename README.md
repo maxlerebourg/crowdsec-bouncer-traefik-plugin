@@ -449,6 +449,7 @@ make run
   - []string
   - default: []
   - List of Redis replica hostnames (host:port) to use for read operations. Reads are distributed round-robin across replicas. Falls back to RedisCacheHost when empty.
+  - Note: when set, reads are not retried against RedisCacheHost (the primary) if the replicas are unreachable. With RedisCacheUnreachableBlock at its default (true), a replica outage will therefore block/delay requests even though the primary is healthy.
 - RedisCachePassword
   - string
   - default: ""
