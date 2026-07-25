@@ -72,6 +72,10 @@ func (rc *redisCache) get(key string) (string, error) {
 		if len(valueString) > 0 {
 			return valueString, nil
 		}
+		// Reachable and no error, but nothing stored: treat as a miss. This
+		// also keeps err non-nil for the switch below, which would otherwise
+		// panic on err.Error().
+		return "", errors.New(CacheMiss)
 	}
 	switch err.Error() {
 	case simpleredis.RedisMiss:
