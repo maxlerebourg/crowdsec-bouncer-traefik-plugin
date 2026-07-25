@@ -7,8 +7,8 @@ source "$HERE/../../lib/common.sh"
 
 SCENARIO=redis
 
-# Redis cache check: the mock returns "t" (banned) for 1.2.3.4 and "f" (not
-# banned) for 1.2.3.5. All other IPs return a miss, which falls through to the
+# Redis cache check: the mock returns "f" (not banned) for 1.2.3.4 and "t"
+# (banned) for 1.2.3.5. All other IPs return a miss, which falls through to the
 # LAPI (no decision → allowed). This proves the plugin reads cached decisions
 # from Redis correctly.
 body() {

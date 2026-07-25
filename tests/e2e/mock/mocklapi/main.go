@@ -52,7 +52,7 @@ func list(m map[string]Decision) []Decision {
 // --- Redis mock (inline-command wire format, as spoken by simpleredis) ---
 
 // serveRedis is a hardcoded stand-in. Every line is scanned for known IPs:
-// 1.2.3.4 → "t", 1.2.3.5 → "f", GET for anything else → miss ($-1).
+// 1.2.3.4 → "f", 1.2.3.5 → "t", GET for anything else → miss ($-1).
 // SET, DEL, AUTH, SELECT get +OK (they don't read the response anyway).
 func serveRedis(addr string) {
 	ln, err := net.Listen("tcp", addr)
