@@ -21,6 +21,7 @@ LAPI_PORT="${LAPI_PORT:-8090}"
 BACKEND_PORT="${BACKEND_PORT:-8091}"
 APPSEC_PORT="${APPSEC_PORT:-8092}"
 REDIS_PORT="${REDIS_PORT:-8093}"
+REDIS_READ_PORT="${REDIS_READ_PORT:-8094}"
 LAPI_KEY="${LAPI_KEY:-e2e-mock-key}"
 
 MOCK_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -189,6 +190,7 @@ start_stack() {
     -e "s|@@APPSEC_HOST@@|127.0.0.1:${APPSEC_PORT}|g" \
     -e "s|@@BACKEND_URL@@|http://127.0.0.1:${BACKEND_PORT}|g" \
     -e "s|@@REDIS_HOST@@|127.0.0.1:${REDIS_PORT}|g" \
+    -e "s|@@REDIS_READ_HOST@@|127.0.0.1:${REDIS_READ_PORT}|g" \
     -e "s|@@SCENARIO_DIR@@|${scenario_dir}|g" \
     "$scenario_dir/dynamic.yml" > "$WORKDIR/dynamic.yml"
 
@@ -206,6 +208,7 @@ start_stack() {
     --backend-addr "127.0.0.1:${BACKEND_PORT}" \
     --appsec-addr "127.0.0.1:${APPSEC_PORT}" \
     --redis-addr "127.0.0.1:${REDIS_PORT}" \
+    --redis-read-addr "127.0.0.1:${REDIS_READ_PORT}" \
     "${mock_tls_args[@]}" >"$WORKDIR/mock.log" 2>&1 &
   MOCK_PID=$!
 

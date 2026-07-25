@@ -51,16 +51,19 @@ func list(m map[string]Decision) []Decision {
 
 // --- Redis mock (inline-command wire format, as spoken by simpleredis) ---
 
-// serveRedis is a hardcoded stand-in. Every line is scanned for known IPs:
-// 1.2.3.4 → "f", 1.2.3.5 → "t", GET for anything else → miss ($-1).
+// serveRedis is a hardcoded stand-in. When verdicts is true it plays a replica
+// that holds decisions: every line is scanned for known IPs, 1.2.3.4 → "f"
+// (clean), 1.2.3.5 → "t" (banned); any other GET is a miss ($-1). When verdicts
+// is false it plays the primary and answers every GET with a miss, so a
+// scenario can prove reads are served from the replica and not the primary.
 // SET, DEL, AUTH, SELECT get +OK (they don't read the response anyway).
-func serveRedis(addr string) {
+func serveRedis(addr string, verdicts bool) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer ln.Close()
-	log.Printf("mocklapi: Redis mock listening on %s", addr)
+	log.Printf("mocklapi: Redis mock listening on %s (verdicts:%v)", addr, verdicts)
 
 	for {
 		conn, err := ln.Accept()
@@ -77,9 +80,9 @@ func serveRedis(addr string) {
 				}
 				s := string(line)
 				switch {
-				case strings.Contains(s, "1.2.3.4"):
+				case verdicts && strings.Contains(s, "1.2.3.4"):
 					conn.Write([]byte("$1\r\nf\r\n"))
-				case strings.Contains(s, "1.2.3.5"):
+				case verdicts && strings.Contains(s, "1.2.3.5"):
 					conn.Write([]byte("$1\r\nt\r\n"))
 				case strings.HasPrefix(strings.ToUpper(s), "GET "):
 					conn.Write([]byte("$-1\r\n"))
@@ -98,9 +101,12 @@ func main() {
 	backendAddr := flag.String("backend-addr", "127.0.0.1:8091", "address for the stub upstream service")
 	// AppSec WAF stand-in (the real engine listens on :7422). Not a CRS engine.
 	appsecAddr := flag.String("appsec-addr", "127.0.0.1:8092", "address for the AppSec mock")
-	// Redis stand-in: the mock always serves a hardcoded GET on a plain TCP
-	// port, enough to exercise the plugin's redis cache path.
-	redisAddr := flag.String("redis-addr", "127.0.0.1:8093", "address for the Redis mock")
+	// Redis stand-ins on plain TCP ports, enough to exercise the plugin's redis
+	// cache path. The primary answers every GET with a miss; the replica serves
+	// the hardcoded verdicts, so a scenario pointing redisCacheReadHosts at the
+	// replica proves reads are offloaded to replicas.
+	redisAddr := flag.String("redis-addr", "127.0.0.1:8093", "address for the Redis primary mock (writes; GET always misses)")
+	redisReadAddr := flag.String("redis-read-addr", "127.0.0.1:8094", "address for the Redis replica mock (serves cached verdicts)")
 	// Optional TLS for the LAPI: when both are set the LAPI is served over HTTPS
 	// (cert signed by the scenario's throwaway CA) so the suite can exercise the
 	// bouncer's system-trust-store path. Backend and AppSec stay plaintext.
@@ -144,7 +150,8 @@ func main() {
 		})))
 	}()
 
-	go serveRedis(*redisAddr)
+	go serveRedis(*redisAddr, false)
+	go serveRedis(*redisReadAddr, true)
 
 	mux := http.NewServeMux()
 
@@ -204,9 +211,9 @@ func main() {
 	})
 
 	if *lapiTLSCert != "" && *lapiTLSKey != "" {
-		log.Printf("mocklapi: LAPI on %s (TLS), backend on %s, appsec on %s, redis on %s", *lapiAddr, *backendAddr, *appsecAddr, *redisAddr)
+		log.Printf("mocklapi: LAPI on %s (TLS), backend on %s, appsec on %s, redis on %s (read %s)", *lapiAddr, *backendAddr, *appsecAddr, *redisAddr, *redisReadAddr)
 		log.Fatal(http.ListenAndServeTLS(*lapiAddr, *lapiTLSCert, *lapiTLSKey, mux))
 	}
-	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s, redis on %s", *lapiAddr, *backendAddr, *appsecAddr, *redisAddr)
+	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s, redis on %s (read %s)", *lapiAddr, *backendAddr, *appsecAddr, *redisAddr, *redisReadAddr)
 	log.Fatal(http.ListenAndServe(*lapiAddr, mux))
 }
