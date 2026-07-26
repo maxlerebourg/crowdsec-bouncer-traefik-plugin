@@ -1,6 +1,6 @@
 name: Renovate
 
-# Self-hosted Renovate: opens dependency-update PRs on a weekly schedule.
+# Self-hosted Renovate: opens dependency-update PRs on a daily schedule.
 # Config lives in /renovate.json. Requires a repo/org secret RENOVATE_TOKEN
 # (a PAT with `repo` + `workflow` scope, or a fine-grained token with
 # contents:write + pull-requests:write) so Renovate can push branches and open
@@ -8,7 +8,7 @@ name: Renovate
 
 on:
   schedule:
-    - cron: "0 4 * * 1" # every Monday at 04:00 UTC
+    - cron: "0 4 * * *" # every day at 04:00 UTC
   workflow_dispatch:
     inputs:
       logLevel:
