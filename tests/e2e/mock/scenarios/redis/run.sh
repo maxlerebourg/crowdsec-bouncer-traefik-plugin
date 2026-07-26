@@ -20,7 +20,7 @@ body() {
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] unknown IP (redis miss) must fall through to LAPI and pass"
-  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.5"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.6"
 }
 
 run_scenario "$SCENARIO" "$HERE" body
