@@ -41,6 +41,7 @@ linters-settings:
           - $test
         allow:
           - $gostd
+          - github.com/maxlerebourg/simpleredis
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
