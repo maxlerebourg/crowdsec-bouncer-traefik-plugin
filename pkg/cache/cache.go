@@ -67,23 +67,21 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 
 func (rc *redisCache) get(key string) (string, error) {
 	value, err := rc.nextReader().Get(key)
-	if err == nil {
-		valueString := string(value)
-		if len(valueString) > 0 {
-			return valueString, nil
+	if err != nil {
+		switch err.Error() {
+		case simpleredis.RedisMiss:
+			return "", errors.New(CacheMiss)
+		case simpleredis.RedisUnreachable:
+			return "", errors.New(CacheUnreachable)
+		default:
+			return "", err
 		}
-		// Reachable and no error, but nothing stored: treat as a miss. This
-		// also keeps err non-nil for the switch below, which would otherwise
-		// panic on err.Error().
-		return "", errors.New(CacheMiss)
 	}
-	switch err.Error() {
-	case simpleredis.RedisMiss:
-		return "", errors.New(CacheMiss)
-	case simpleredis.RedisUnreachable:
-		return "", errors.New(CacheUnreachable)
+	valueString := string(value)
+	if len(valueString) > 0 {
+		return valueString, nil
 	}
-	return "", err
+	return "", errors.New(CacheMiss)
 }
 
 func (rc *redisCache) set(key, value string, duration int64) {

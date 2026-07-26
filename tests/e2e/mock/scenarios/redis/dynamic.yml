@@ -25,6 +25,6 @@ http:
           redisCacheHost: "@@REDIS_HOST@@"
           redisCacheReadHosts:
             - "@@REDIS_READ_HOST@@"
-            - "@@REDIS_READ_HOST@@"
+            - "@@REDIS_HOST@@"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
