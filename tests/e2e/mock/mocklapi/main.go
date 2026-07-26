@@ -63,7 +63,6 @@ func serveRedis(addr string, verdicts bool) {
 		log.Fatal(err)
 	}
 	defer ln.Close()
-	log.Printf("mocklapi: Redis mock listening on %s (verdicts:%v)", addr, verdicts)
 
 	for {
 		conn, err := ln.Accept()
