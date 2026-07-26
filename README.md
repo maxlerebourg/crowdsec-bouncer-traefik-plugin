@@ -444,7 +444,12 @@ make run
 - RedisCacheHost
   - string
   - default: "redis:6379"
-  - hostname and port for the Redis service
+  - hostname and port for the Redis write host (primary)
+- RedisCacheReadHosts
+  - []string
+  - default: []
+  - List of Redis replica hostnames (host:port) to use for read operations. Reads are distributed round-robin across replicas. Falls back to RedisCacheHost when empty.
+  - Note: when set, reads are not retried against RedisCacheHost (the primary) if the replicas are unreachable. With RedisCacheUnreachableBlock at its default (true), a replica outage will therefore block/delay requests even though the primary is healthy.
 - RedisCachePassword
   - string
   - default: ""
@@ -640,7 +645,10 @@ http:
           forwardedHeadersCustomName: X-Custom-Header
           remediationHeadersCustomName: cs-remediation
           redisCacheEnabled: false
-          redisCacheHost: "redis:6379"
+          redisCacheHost: "redis-primary:6379"
+          redisCacheReadHosts:
+            - "redis-replica-1:6379"
+            - "redis-replica-2:6379"
           redisCachePassword: password
           redisCacheDatabase: "5"
           redisCacheUnreachableBlock: true
