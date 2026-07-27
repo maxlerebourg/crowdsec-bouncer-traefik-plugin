@@ -384,8 +384,8 @@ make run
   - Transmit only the first number of bytes to Crowdsec Appsec Server.
 - CrowdsecAppsecUnreadableBodyBlock
   - bool
-  - default: false
-  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` (default) the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. Mirrors the reference bouncers' `APPSEC_DROP_UNREADABLE_BODY` option.
+  - default: true
+  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. Mirrors the reference bouncers' `APPSEC_DROP_UNREADABLE_BODY` option.
 - CrowdsecAppsecKey
   - string
   - default: value of `CrowdsecLapiKey`
