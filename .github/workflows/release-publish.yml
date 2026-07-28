@@ -1,0 +1,76 @@
+name: Release (2/2) Publish
+
+# Step 2 of the release process: tag and publish the commit prepared by
+# Release (1/2) Prepare.
+#
+# Triggered by the release PR landing on main. The tag is created on that
+# commit, so version.go inside the released source always matches the tag —
+# no post-release patching, no force-moved tags.
+
+on:
+  push:
+    branches: [main]
+    paths: ["version.go"]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Tag and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: resolve
+        run: |
+          subject="$(git log -1 --pretty=%s)"
+          # Squash merges append " (#123)"; rebase/merge keep the bare subject.
+          if ! [[ "$subject" =~ ^🔖\ release\ (v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?) ]]; then
+            echo "version.go changed outside a release commit, nothing to do"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="${BASH_REMATCH[1]}"
+
+          # The subject and the source must agree, otherwise we would tag a
+          # version the plugin does not report.
+          in_source="$(sed -n 's/.*pluginVersion = "\([^"]*\)".*/\1/p' version.go)"
+          if [ "$in_source" != "$version" ]; then
+            echo "::error::commit says $version but version.go reads $in_source"
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "::error::tag $version already exists"
+            exit 1
+          fi
+
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Anything with a suffix (-alpha, -beta1, …) ships as a pre-release.
+          case "$version" in
+            *-*) echo "prerelease=--prerelease" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "prerelease=" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Tag and create the GitHub release
+        if: steps.resolve.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+          PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
+          # shellcheck disable=SC2086 # $PRERELEASE is an intentional flag or empty
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes \
+            $PRERELEASE

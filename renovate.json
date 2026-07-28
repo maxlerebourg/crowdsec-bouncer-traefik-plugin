@@ -26,16 +26,6 @@
   ],
   "customManagers": [
     {
-      "description": "Plugin self-pin in version.go (pluginVersion)",
-      "customType": "regex",
-      "managerFilePatterns": ["/^version\\.go$/"],
-      "matchStrings": [
-        "pluginVersion\\s*=\\s*\"(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)\""
-      ],
-      "depNameTemplate": "maxlerebourg/crowdsec-bouncer-traefik-plugin",
-      "datasourceTemplate": "github-tags"
-    },
-    {
       "description": "Plugin self-pin in docker-compose CLI args (--experimental.plugins.bouncer.version=vX)",
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)docker-compose[^/]*\\.ya?ml$/"],
