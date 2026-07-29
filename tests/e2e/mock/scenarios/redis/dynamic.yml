@@ -17,16 +17,14 @@ http:
       plugin:
         bouncer:
           enabled: "true"
-          # IP bouncing disabled — this scenario exercises AppSec only.
-          crowdsecMode: appsec
+          crowdsecMode: live
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"
-          crowdsecAppsecEnabled: "true"
-          crowdsecAppsecFailureBlock: "true"
-          crowdsecAppsecBodyLimit: 4
-          crowdsecAppsecUnreachableBlock: "false"
-          crowdsecAppsecScheme: http
-          crowdsecAppsecHost: "@@APPSEC_HOST@@"
+          redisCacheEnabled: "true"
+          redisCacheHost: "@@REDIS_HOST@@"
+          redisCacheReadHosts:
+            - "@@REDIS_READ_HOST@@"
+            - "@@REDIS_HOST@@"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
