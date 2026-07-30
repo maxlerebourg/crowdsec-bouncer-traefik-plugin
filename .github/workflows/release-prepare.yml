@@ -80,8 +80,4 @@ jobs:
           > Keep the PR title as-is: **Release (2/2) Publish** matches on it.
           EOF
 
-          gh pr create \
-            --base main \
-            --head "release/$VERSION" \
-            --title "🔖 release $VERSION" \
-            --body-file /tmp/pr-body.md
+          gh pr create --base main --head "release/$VERSION" --title "🔖 release $VERSION" --body-file /tmp/pr-body.md

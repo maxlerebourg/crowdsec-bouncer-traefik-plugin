@@ -28,35 +28,16 @@ jobs:
       - name: Resolve release version
         id: resolve
         run: |
-          subject="$(git log -1 --pretty=%s)"
-          # Squash merges append " (#123)"; rebase/merge keep the bare subject.
-          if ! [[ "$subject" =~ ^🔖\ release\ (v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?) ]]; then
-            echo "version.go changed outside a release commit, nothing to do"
-            echo "release=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          version="${BASH_REMATCH[1]}"
+          version="$(git log -1 --format='%B' | grep -oP '🔖 release \Kv[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' || true)"
+          [ -z "$version" ] && { echo "version.go changed outside a release commit, nothing to do"; echo "release=false" >> "$GITHUB_OUTPUT"; exit 0; }
 
-          # The subject and the source must agree, otherwise we would tag a
-          # version the plugin does not report.
           in_source="$(sed -n 's/.*pluginVersion = "\([^"]*\)".*/\1/p' version.go)"
-          if [ "$in_source" != "$version" ]; then
-            echo "::error::commit says $version but version.go reads $in_source"
-            exit 1
-          fi
-
-          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
-            echo "::error::tag $version already exists"
-            exit 1
-          fi
+          [ "$in_source" != "$version" ] && { echo "::error::commit says $version but version.go reads $in_source"; exit 1; }
+          git rev-parse -q --verify "refs/tags/$version" >/dev/null && { echo "::error::tag $version already exists"; exit 1; }
 
           echo "release=true" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          # Anything with a suffix (-alpha, -beta1, …) ships as a pre-release.
-          case "$version" in
-            *-*) echo "prerelease=--prerelease" >> "$GITHUB_OUTPUT" ;;
-            *)   echo "prerelease=" >> "$GITHUB_OUTPUT" ;;
-          esac
+          echo "prerelease=$([[ "$version" == *-* ]] && echo '--prerelease')" >> "$GITHUB_OUTPUT"
 
       - name: Tag and create the GitHub release
         if: steps.resolve.outputs.release == 'true'
@@ -70,7 +51,4 @@ jobs:
           git tag -a "$VERSION" -m "$VERSION"
           git push origin "$VERSION"
           # shellcheck disable=SC2086 # $PRERELEASE is an intentional flag or empty
-          gh release create "$VERSION" \
-            --title "$VERSION" \
-            --generate-notes \
-            $PRERELEASE
+          gh release create "$VERSION" --title "$VERSION" --generate-notes $PRERELEASE
