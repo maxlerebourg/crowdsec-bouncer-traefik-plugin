@@ -50,5 +50,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "$VERSION" -m "$VERSION"
           git push origin "$VERSION"
-          # shellcheck disable=SC2086 # $PRERELEASE is an intentional flag or empty
           gh release create "$VERSION" --title "$VERSION" --generate-notes $PRERELEASE
