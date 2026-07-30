@@ -1,0 +1,83 @@
+name: Release (1/2) Prepare
+
+# Step 1 of the release process: bump pluginVersion *before* the tag exists.
+#
+# The version reported to the Crowdsec LAPI lives in version.go, so it has to
+# be correct in the very commit the tag points at. Anything that patches
+# version.go after the release is published is too late: Traefik's plugin
+# service caches the plugin archive per module+version, so users keep the
+# source that was there when the tag was first resolved (see #322, #363).
+#
+# This workflow opens a "release" PR containing only that bump. Merging it
+# triggers Release (2/2) Publish, which creates the tag and the GitHub release
+# on the merged commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. v1.7.1 or v1.8.0-alpha"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    name: Open release PR for ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$VERSION' is not a vX.Y.Z / vX.Y.Z-suffix version"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::tag $VERSION already exists"
+            exit 1
+          fi
+
+      - name: Bump version.go
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          sed -i 's/pluginVersion = "[^"]*"/pluginVersion = "'"$VERSION"'"/' version.go
+          cat version.go
+          if git diff --quiet -- version.go; then
+            echo "::error::version.go already reads $VERSION, nothing to release"
+            exit 1
+          fi
+
+      - name: Push release branch and open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git switch -c "release/$VERSION"
+          git commit -am "🔖 release $VERSION"
+          git push -u origin "release/$VERSION"
+
+          cat > /tmp/pr-body.md <<EOF
+          Bumps \`pluginVersion\` to \`$VERSION\` so the tag carries the version
+          the plugin reports to the Crowdsec LAPI.
+
+          Merging this PR tags \`$VERSION\` on the resulting commit and publishes
+          the GitHub release automatically.
+
+          > Keep the PR title as-is: **Release (2/2) Publish** matches on it.
+          EOF
+
+          gh pr create --base main --head "release/$VERSION" --title "🔖 release $VERSION" --body-file /tmp/pr-body.md
