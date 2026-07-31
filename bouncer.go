@@ -641,7 +641,13 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err.Error() != cache.CacheMiss {
 		return err
 	}
-	bouncer.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, bouncer.updateInterval-1)
+	// The lease expires just before the next tick, but it also has to be stored at all:
+	// the local cache ignores a zero duration and redis rejects a non positive EX.
+	leaseDuration := bouncer.updateInterval - 1
+	if leaseDuration < 1 {
+		leaseDuration = 1
+	}
+	bouncer.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
