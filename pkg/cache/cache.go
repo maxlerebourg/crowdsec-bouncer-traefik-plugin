@@ -11,7 +11,7 @@ import (
 	ttl_map "github.com/leprosus/golang-ttl-map"
 	simpleredis "github.com/maxlerebourg/simpleredis"
 
-	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 const (

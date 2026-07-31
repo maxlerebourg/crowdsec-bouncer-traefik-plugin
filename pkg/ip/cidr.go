@@ -2,38 +2,18 @@ package ip
 
 import (
 	"net"
-	"strconv"
 	"strings"
 )
 
 // CIDRKeys returns all possible CIDR prefixes of an IP, from the most specific (/32 for IPv4, /128 for IPv6) to the least specific (/0).
 func CIDRKeys(ipStr string) []string {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
+	parsed, maxBits := parseForPrefix(ipStr)
+	if parsed == nil {
 		return nil
 	}
-	ip4 := ip.To4()
-	if ip4 != nil {
-		keys := make([]string, 0, 33)
-		for bits := 32; bits >= 0; bits-- {
-			mask := net.CIDRMask(bits, 32)
-			n := make(net.IP, 4)
-			for i := 0; i < 4; i++ {
-				n[i] = ip4[i] & mask[i]
-			}
-			keys = append(keys, n.String()+"/"+strconv.Itoa(bits))
-		}
-		return keys
-	}
-	ip16 := ip.To16()
-	keys := make([]string, 0, 129)
-	for bits := 128; bits >= 0; bits-- {
-		mask := net.CIDRMask(bits, 128)
-		n := make(net.IP, 16)
-		for i := 0; i < 16; i++ {
-			n[i] = ip16[i] & mask[i]
-		}
-		keys = append(keys, n.String()+"/"+strconv.Itoa(bits))
+	keys := make([]string, 0, maxBits+1)
+	for bits := maxBits; bits >= 0; bits-- {
+		keys = append(keys, cidrKey(parsed, bits, maxBits))
 	}
 	return keys
 }
@@ -44,5 +24,25 @@ func NormalizeCIDR(cidrStr string) string {
 	if err != nil {
 		return ""
 	}
+	return ipNet.String()
+}
+
+// parseForPrefix returns the IP in the native form of its family, and that family's bit length.
+func parseForPrefix(ipStr string) (net.IP, int) {
+	parsed := net.ParseIP(ipStr)
+	if parsed == nil {
+		return nil, 0
+	}
+	if parsed4 := parsed.To4(); parsed4 != nil {
+		return parsed4, 32
+	}
+	return parsed.To16(), 128
+}
+
+// cidrKey builds the key of the CIDR of bits length containing the IP.
+// It formats through net.IPNet like NormalizeCIDR, so writes and lookups agree.
+func cidrKey(parsed net.IP, bits, maxBits int) string {
+	mask := net.CIDRMask(bits, maxBits)
+	ipNet := net.IPNet{IP: parsed.Mask(mask), Mask: mask}
 	return ipNet.String()
 }
