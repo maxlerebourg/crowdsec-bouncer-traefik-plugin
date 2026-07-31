@@ -162,10 +162,12 @@ func (c *Client) Set(key string, value string, duration int64) {
 
 // DeleteCIDR removes a CIDR decision from the cache.
 func (c *Client) DeleteCIDR(cidr string) {
-	cidr = ip.NormalizeCIDR(cidr)
-	if cidr == "" {
+	normalized := ip.NormalizeCIDR(cidr)
+	if normalized == "" {
+		c.log.Error(fmt.Sprintf("cache:DeleteCIDR:invalidCIDR cidr:%v decision is left in cache", cidr))
 		return
 	}
+	cidr = normalized
 	c.cache.delete(cidrPrefix + cidr)
 	c.log.Debug(fmt.Sprintf("cache:DeleteCIDR cidr:%v", cidr))
 }
@@ -191,6 +193,7 @@ func (c *Client) SetCIDR(cidr, value string, duration int64) {
 	normalized := ip.NormalizeCIDR(cidr)
 	prefixLen := ip.CIDRPrefixLen(cidr)
 	if normalized == "" || prefixLen < 0 {
+		c.log.Error(fmt.Sprintf("cache:SetCIDR:invalidCIDR cidr:%v value:%v decision is not enforced", cidr, value))
 		return
 	}
 	// Publish the length first, or a concurrent lookup misses the decision.
