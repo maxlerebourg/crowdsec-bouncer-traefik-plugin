@@ -27,7 +27,7 @@ const (
 	CacheMiss = "cache:miss"
 	// CacheUnreachable error string when cache is unreachable.
 	CacheUnreachable = "cache:unreachable"
-	// cidrPrefix store all cidr within the same key
+	// cidrPrefix store all cidr within the same key.
 	cidrPrefix = "cidr:"
 )
 
@@ -149,6 +149,7 @@ func (c *Client) Set(key string, value string, duration int64) {
 	c.cache.set(key, value, duration)
 }
 
+// DeleteCIDR removes a CIDR decision from the cache.
 func (c *Client) DeleteCIDR(cidr string) {
 	cidr = ip.NormalizeCIDR(cidr)
 	if cidr == "" {
@@ -158,6 +159,7 @@ func (c *Client) DeleteCIDR(cidr string) {
 	c.log.Debug(fmt.Sprintf("cache:DeleteCIDR cidr:%v", cidr))
 }
 
+// GetCIDR checks if an IP matches a CIDR decision in the cache.
 func (c *Client) GetCIDR(ipStr string) (string, error) {
 	keys := ip.CIDRKeys(ipStr)
 	if keys == nil {
@@ -172,6 +174,7 @@ func (c *Client) GetCIDR(ipStr string) (string, error) {
 	return "", errors.New(CacheMiss)
 }
 
+// SetCIDR stores a CIDR decision in the cache.
 func (c *Client) SetCIDR(cidr, value string, duration int64) {
 	cidr = ip.NormalizeCIDR(cidr)
 	if cidr == "" {

@@ -75,6 +75,7 @@ linters:
     - mnd
     - exportloopref
     - contextcheck
+    - intrange # not supported by yaegi
 issues:
   exclude-use-default: false
   max-same-issues: 0
