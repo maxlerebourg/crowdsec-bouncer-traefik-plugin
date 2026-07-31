@@ -392,6 +392,16 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
+			cidrValue, cidrErr := bouncer.cacheClient.GetCIDR(remoteIP)
+			if cidrErr == nil {
+				bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cidr:hit isBanned:%v", remoteIP, cidrValue))
+				if cidrValue == cache.NoBannedValue {
+					bouncer.handleNextServeHTTP(rw, req, remoteIP)
+				} else {
+					bouncer.handleRemediationServeHTTP(rw, req, remoteIP, cidrValue)
+				}
+				return
+			}
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
@@ -669,11 +679,19 @@ func handleStreamCache(bouncer *Bouncer) error {
 			default:
 				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 			}
-			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+			if strings.Contains(decision.Value, "/") {
+				bouncer.cacheClient.SetCIDR(decision.Value, value, int64(duration.Seconds()))
+			} else {
+				bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+			}
 		}
 	}
 	for _, decision := range stream.Deleted {
-		bouncer.cacheClient.Delete(decision.Value)
+		if strings.Contains(decision.Value, "/") {
+			bouncer.cacheClient.DeleteCIDR(decision.Value)
+		} else {
+			bouncer.cacheClient.Delete(decision.Value)
+		}
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
 	isCrowdsecStreamStartup = false

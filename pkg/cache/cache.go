@@ -10,6 +10,8 @@ import (
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
 	simpleredis "github.com/maxlerebourg/simpleredis"
+
+	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 const (
@@ -25,6 +27,8 @@ const (
 	CacheMiss = "cache:miss"
 	// CacheUnreachable error string when cache is unreachable.
 	CacheUnreachable = "cache:unreachable"
+	// cidrPrefix store all cidr within the same key
+	cidrPrefix = "cidr:"
 )
 
 //nolint:gochecknoglobals
@@ -143,4 +147,36 @@ func (c *Client) Get(key string) (string, error) {
 func (c *Client) Set(key string, value string, duration int64) {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
 	c.cache.set(key, value, duration)
+}
+
+func (c *Client) DeleteCIDR(cidr string) {
+	cidr = ip.NormalizeCIDR(cidr)
+	if cidr == "" {
+		return
+	}
+	c.cache.delete(cidrPrefix + cidr)
+	c.log.Debug(fmt.Sprintf("cache:DeleteCIDR cidr:%v", cidr))
+}
+
+func (c *Client) GetCIDR(ipStr string) (string, error) {
+	keys := ip.CIDRKeys(ipStr)
+	if keys == nil {
+		return "", errors.New(CacheMiss)
+	}
+	for _, key := range keys {
+		value, err := c.cache.get(cidrPrefix + key)
+		if err == nil {
+			return value, nil
+		}
+	}
+	return "", errors.New(CacheMiss)
+}
+
+func (c *Client) SetCIDR(cidr, value string, duration int64) {
+	cidr = ip.NormalizeCIDR(cidr)
+	if cidr == "" {
+		return
+	}
+	c.cache.set(cidrPrefix+cidr, value, duration)
+	c.log.Debug(fmt.Sprintf("cache:SetCIDR cidr:%v value:%v duration:%vs", cidr, value, duration))
 }

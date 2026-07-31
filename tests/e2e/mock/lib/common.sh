@@ -78,11 +78,11 @@ ensure_mock() {
 # Poll a URL until it returns the expected status code, or fail.
 # Usage: wait_for_status URL CODE [TIMEOUT_SECONDS] [curl args...]
 wait_for_status() {
-  local url="$1" expected="$2" timeout="${3:-30}"
+  local url="$1" expected="$2" timeout="${3:-15}"
   shift 3 || true
   local elapsed=0 got=""
   while (( elapsed < timeout )); do
-    got=$(curl -s -o /dev/null -w '%{http_code}' "$@" "$url" || true)
+    got=$(curl -s -m 1 -o /dev/null -w '%{http_code}' "$@" "$url" || true)
     if [[ "$got" == "$expected" ]]; then
       return 0
     fi
@@ -98,11 +98,11 @@ wait_for_status() {
 # code alone can't tell the states apart (e.g. captcha page vs backend, both 200).
 # Usage: wait_for_body_contains URL NEEDLE [TIMEOUT_SECONDS] [curl args...]
 wait_for_body_contains() {
-  local url="$1" needle="$2" timeout="${3:-30}"
+  local url="$1" needle="$2" timeout="${3:-15}"
   shift 3 || true
   local elapsed=0 body=""
   while (( elapsed < timeout )); do
-    body=$(curl -s "$@" "$url" || true)
+    body=$(curl -s -m 1 "$@" "$url" || true)
     if grep -q "$needle" <<<"$body"; then
       return 0
     fi
@@ -119,7 +119,7 @@ assert_status() {
   local url="$1" expected="$2"
   shift 2 || true
   local got
-  got=$(curl -s -o /dev/null -w '%{http_code}' "$@" "$url")
+  got=$(curl -s -m 1 -o /dev/null -w '%{http_code}' "$@" "$url")
   if [[ "$got" != "$expected" ]]; then
     echo "assert_status: $url expected $expected, got $got" >&2
     return 1
@@ -132,7 +132,7 @@ assert_header() {
   local url="$1" header="$2" expected="$3"
   shift 3 || true
   local got
-  got=$(curl -s -D - -o /dev/null "$@" "$url" | tr -d '\r' \
+  got=$(curl -s -m 1 -D - -o /dev/null "$@" "$url" | tr -d '\r' \
     | awk -v h="${header,,}" -F': ' 'tolower($1) == h { print $2; exit }')
   if [[ "$got" != "$expected" ]]; then
     echo "assert_header: $url header $header expected \"$expected\", got \"$got\"" >&2
@@ -146,7 +146,7 @@ assert_body_contains() {
   local url="$1" needle="$2"
   shift 2 || true
   local body
-  body=$(curl -s "$@" "$url")
+  body=$(curl -s -m 1 "$@" "$url")
   if ! grep -q "$needle" <<<"$body"; then
     echo "assert_body_contains: $url expected to contain \"$needle\", got:" >&2
     echo "$body" >&2
@@ -158,12 +158,20 @@ assert_body_contains() {
 
 lapi_add_decision() {
   local ip="$1" type="${2:-ban}" duration="${3:-4h}"
-  curl -sS -X POST "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}&type=${type}&duration=${duration}" >/dev/null
+  curl -sS -m 1 -X POST "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}&type=${type}&duration=${duration}" >/dev/null
 }
 
 lapi_delete_decision() {
   local ip="$1"
-  curl -sS -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}" >/dev/null
+  curl -sS -m 1 -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}" >/dev/null
+}
+
+lapi_set_stream_fail() {
+  curl -sS -m 1 -X POST "http://127.0.0.1:${LAPI_PORT}/admin/stream-fail" >/dev/null
+}
+
+lapi_clear_stream_fail() {
+  curl -sS -m 1 -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/stream-fail" >/dev/null
 }
 
 # --- stack lifecycle ---------------------------------------------------------

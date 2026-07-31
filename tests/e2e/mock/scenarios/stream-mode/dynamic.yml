@@ -18,7 +18,8 @@ http:
         bouncer:
           enabled: "true"
           crowdsecMode: stream
-          updateIntervalSeconds: "2"
+          updateIntervalSeconds: "1"
+          updateMaxFailure: "2"
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"
