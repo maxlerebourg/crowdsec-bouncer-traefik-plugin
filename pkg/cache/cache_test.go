@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	simpleredis "github.com/maxlerebourg/simpleredis"
 )
 
 func Test_Get(t *testing.T) {
@@ -118,6 +119,43 @@ func Test_Delete(t *testing.T) {
 			}
 			if tt.valueErr != "" && tt.valueErr != err.Error() {
 				t.Errorf("Delete() err = %v, want %v", err.Error(), tt.valueErr)
+			}
+		})
+	}
+}
+
+// indexOfReader returns the position of r inside rc.readers, or -1 when r is the writer (the no-readers fallback).
+func indexOfReader(rc *redisCache, r *simpleredis.SimpleRedis) int {
+	if r == &rc.writer {
+		return -1
+	}
+	for i := range rc.readers {
+		if r == &rc.readers[i] {
+			return i
+		}
+	}
+	return -2
+}
+
+func Test_nextReader(t *testing.T) {
+	// The counter starts at 0, so the first Add(1) yields index 1, then 2, 0, 1, ... over n readers.
+	tests := []struct {
+		name    string
+		readers int
+		want    []int
+	}{
+		{name: "round-robin over three readers", readers: 3, want: []int{1, 2, 0, 1, 2, 0, 1}},
+		{name: "single reader always selected", readers: 1, want: []int{0, 0, 0, 0, 0}},
+		{name: "no readers fall back to writer", readers: 0, want: []int{-1, -1, -1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rc := &redisCache{log: logger.New("INFO", "")}
+			rc.readers = make([]simpleredis.SimpleRedis, tt.readers)
+			for call, want := range tt.want {
+				if got := indexOfReader(rc, rc.nextReader()); got != want {
+					t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d]", call, got, want)
+				}
 			}
 		})
 	}

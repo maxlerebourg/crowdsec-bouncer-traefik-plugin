@@ -277,6 +277,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		log,
 		config.RedisCacheEnabled,
 		config.RedisCacheHost,
+		config.RedisCacheReadHosts,
 		config.RedisCachePassword,
 		config.RedisCacheDatabase,
 	)
@@ -775,7 +776,17 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 // a 403. This mirrors the reference lua-cs-bouncer behavior, which refuses to
 // read the body of an HTTP/2+ request that has no Content-Length.
 func isBodyUnreadable(httpReq *http.Request) bool {
-	return httpReq.Body != nil && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
+	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
+}
+
+// isMethodWithBody used only when isBodyUnreadable returns true but the request method can't have body.
+func isMethodWithBody(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
 }
 
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecResponse, error) {
