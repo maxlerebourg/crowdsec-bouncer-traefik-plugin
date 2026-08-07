@@ -76,8 +76,6 @@ ensure_mock() {
 }
 
 # Poll a URL until it returns the expected status code, or fail.
-# The tight -m is free here: a timed out request is just another attempt. The one shot
-# assertions below use a larger one, where a single slow response fails the test.
 # Usage: wait_for_status URL CODE [TIMEOUT_SECONDS] [curl args...]
 wait_for_status() {
   local url="$1" expected="$2" timeout="${3:-15}"
