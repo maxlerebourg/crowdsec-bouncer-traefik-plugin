@@ -5,7 +5,10 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -120,6 +123,8 @@ type Bouncer struct {
 	cacheClient               *cache.Client
 	captchaClient             *captcha.Client
 	log                       *slog.Logger
+	visitorCookieName         string
+	remediationTraceIDCustomName       string
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -274,6 +279,8 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	)
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
+	bouncer.visitorCookieName = config.VisitorCookieName
+	bouncer.remediationTraceIDCustomName = config.RemediationTraceIDCustomName
 	err = bouncer.captchaClient.New(
 		log,
 		bouncer.cacheClient,
@@ -296,6 +303,9 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		log.Error("CaptchaClient not valid " + err.Error())
 		return nil, err
 	}
+
+	bouncer.captchaClient.VisitorCookieName = config.VisitorCookieName
+	bouncer.captchaClient.RemediationTraceIDCustomName = config.RemediationTraceIDCustomName
 
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && streamTicker == nil {
 		if config.CrowdsecMode == configuration.AloneMode {
@@ -344,6 +354,9 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 		return
 	}
+
+	bouncer.setVisitorCookie(rw, req, remoteIP)
+
 	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
@@ -456,12 +469,11 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 		"ClientIP":          remoteIP,
 	}
 
-	if bouncer.traceCustomHeader != "" {
-		headerVal := req.Header.Get(bouncer.traceCustomHeader)
-
-		if headerVal != "" {
-			templateData["TraceID"] = headerVal
-		}
+	setTraceId(rw, bouncer)
+	if bouncer.remediationTraceIDCustomName != "" {
+		traceid := rw.Header().Get(bouncer.remediationTraceIDCustomName)
+		bouncer.log.Debug("captcha:traceid: " + traceid)
+		templateData["TraceID"] = traceid
 	}
 
 	err := bouncer.banTemplate.Execute(rw, templateData)
@@ -474,10 +486,44 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
-		if bouncer.captchaClient.Check(remoteIP) {
+		
+		captchaKey := bouncer.captchaClient.GetCaptchaCacheKey(req, remoteIP)
+
+		isIPValidated := bouncer.captchaClient.Check(captchaKey)
+
+		// Fixing Error 405
+		if isIPValidated && req.Method == http.MethodPost {
+			
+			// Validation of only small POST requests
+			if req.ContentLength > 0 && req.ContentLength <= 15360 {
+				
+				contentType := req.Header.Get("Content-Type")
+				if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
+					
+					bodyBytes, _ := io.ReadAll(req.Body)
+					
+					// https://medium.com/@xoen/golang-read-from-an-io-readwriter-without-loosing-its-content-2c6911805361
+					req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+					
+					formValues, err := url.ParseQuery(string(bodyBytes))
+					if err == nil {
+						responseKey := bouncer.captchaClient.GetResponseKey()
+						
+						if responseKey != "" && formValues.Get(responseKey) != "" {
+							http.Redirect(rw, req, req.URL.RequestURI(), http.StatusFound)
+							return
+						}
+					}
+				}
+			}
+		}
+
+		if isIPValidated {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}
+
+		setTraceId(rw, bouncer)
 		atomic.AddInt64(&blockedRequests, 1) //  If we serve a captcha that should count as a dropped request.
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
@@ -877,4 +923,55 @@ func reportMetrics(bouncer *Bouncer) error {
 	atomic.StoreInt64(&blockedRequests, 0)
 	lastMetricsPush = now
 	return nil
+}
+
+
+// sets a permanent cookie to track the visitor
+func (bouncer *Bouncer) setVisitorCookie(rw http.ResponseWriter, req *http.Request, remoteIP string) {
+	bouncer.log.Debug("bouncer:visitorCookieName: " + bouncer.visitorCookieName)
+	if bouncer.visitorCookieName == "" {
+		return
+	}
+	
+	// check whether the request already contains the cookie.
+	existingCookie, err := req.Cookie(bouncer.visitorCookieName)
+	if err == nil && existingCookie.Value != "" {
+		bouncer.log.Debug(fmt.Sprintf("setVisitorCookie ip:%s visitorID:%s (existing)", remoteIP, existingCookie.Value))
+		return
+	}
+	
+	// Generate a hash
+	hashInput := fmt.Sprintf("%s_%d_%d", remoteIP, time.Now().Unix(), time.Now().Nanosecond())
+	bouncer.log.Debug(fmt.Sprintf("hashInput: "+hashInput))
+	hash := md5.Sum([]byte(hashInput))
+	visitorID := hex.EncodeToString(hash[:])
+	
+	// set a cookie
+	newCookie := &http.Cookie{
+		Name:     bouncer.visitorCookieName,
+		Value:    visitorID,
+		MaxAge:   315360000,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   false,
+	}
+	http.SetCookie(rw, newCookie)
+	bouncer.log.Debug(fmt.Sprintf("setVisitorCookie ip:%s visitorID:%s (new)", remoteIP, visitorID))
+}
+
+// generates a string of the form "8b1c2d3e4f5a6b7c"
+func generateTraceID() string {
+	var b [8]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}
+
+// Adds a request tracking header to block and CAPTCHA pages.
+func setTraceId(rw http.ResponseWriter, bouncer *Bouncer) {
+	if bouncer.remediationTraceIDCustomName != "" {
+		traceid := generateTraceID()
+		rw.Header().Set(bouncer.remediationTraceIDCustomName, traceid)
+		bouncer.log.Debug("traceid: " + traceid)
+	}
 }

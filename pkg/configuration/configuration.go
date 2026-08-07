@@ -115,6 +115,8 @@ type Config struct {
 	CaptchaSecretKey                           string   `json:"captchaSecretKey,omitempty"`
 	CaptchaSecretKeyFile                       string   `json:"captchaSecretKeyFile,omitempty"`
 	CaptchaGracePeriodSeconds                  int64    `json:"captchaGracePeriodSeconds,omitempty"`
+	VisitorCookieName                          string   `json:"visitorCookieName,omitempty"`
+	RemediationTraceIDCustomName               string   `json:"RemediationTraceIDCustomName,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -177,6 +179,8 @@ func New() *Config {
 		RedisCachePassword:                "",
 		RedisCacheDatabase:                "",
 		RedisCacheUnreachableBlock:        true,
+		VisitorCookieName:                 "",
+		RemediationTraceIDCustomName:      "",
 	}
 }
 
