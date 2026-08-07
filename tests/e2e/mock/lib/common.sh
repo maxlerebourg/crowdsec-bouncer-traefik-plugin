@@ -119,7 +119,7 @@ assert_status() {
   local url="$1" expected="$2"
   shift 2 || true
   local got
-  got=$(curl -s -m 1 -o /dev/null -w '%{http_code}' "$@" "$url")
+  got=$(curl -s --connect-timeout 1 -m 5 -o /dev/null -w '%{http_code}' "$@" "$url")
   if [[ "$got" != "$expected" ]]; then
     echo "assert_status: $url expected $expected, got $got" >&2
     return 1
@@ -132,7 +132,7 @@ assert_header() {
   local url="$1" header="$2" expected="$3"
   shift 3 || true
   local got
-  got=$(curl -s -m 1 -D - -o /dev/null "$@" "$url" | tr -d '\r' \
+  got=$(curl -s --connect-timeout 1 -m 5 -D - -o /dev/null "$@" "$url" | tr -d '\r' \
     | awk -v h="${header,,}" -F': ' 'tolower($1) == h { print $2; exit }')
   if [[ "$got" != "$expected" ]]; then
     echo "assert_header: $url header $header expected \"$expected\", got \"$got\"" >&2
@@ -146,7 +146,7 @@ assert_body_contains() {
   local url="$1" needle="$2"
   shift 2 || true
   local body
-  body=$(curl -s -m 1 "$@" "$url")
+  body=$(curl -s --connect-timeout 1 -m 5 "$@" "$url")
   if ! grep -q "$needle" <<<"$body"; then
     echo "assert_body_contains: $url expected to contain \"$needle\", got:" >&2
     echo "$body" >&2
@@ -158,20 +158,20 @@ assert_body_contains() {
 
 lapi_add_decision() {
   local ip="$1" type="${2:-ban}" duration="${3:-4h}"
-  curl -sS -m 1 -X POST "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}&type=${type}&duration=${duration}" >/dev/null
+  curl -sS --connect-timeout 1 -m 5 -X POST "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}&type=${type}&duration=${duration}" >/dev/null
 }
 
 lapi_delete_decision() {
   local ip="$1"
-  curl -sS -m 1 -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}" >/dev/null
+  curl -sS --connect-timeout 1 -m 5 -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}" >/dev/null
 }
 
 lapi_set_stream_fail() {
-  curl -sS -m 1 -X POST "http://127.0.0.1:${LAPI_PORT}/admin/stream-fail" >/dev/null
+  curl -sS --connect-timeout 1 -m 5 -X POST "http://127.0.0.1:${LAPI_PORT}/admin/stream-fail" >/dev/null
 }
 
 lapi_clear_stream_fail() {
-  curl -sS -m 1 -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/stream-fail" >/dev/null
+  curl -sS --connect-timeout 1 -m 5 -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/stream-fail" >/dev/null
 }
 
 # --- stack lifecycle ---------------------------------------------------------

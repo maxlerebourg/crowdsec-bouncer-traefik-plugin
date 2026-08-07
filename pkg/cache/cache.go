@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 	"sync/atomic"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
 	simpleredis "github.com/maxlerebourg/simpleredis"
 
-	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 const (
@@ -27,8 +29,17 @@ const (
 	CacheMiss = "cache:miss"
 	// CacheUnreachable error string when cache is unreachable.
 	CacheUnreachable = "cache:unreachable"
-	// cidrPrefix store all cidr within the same key.
+	// cidrPrefix namespaces a CIDR decision, one cache key per CIDR.
 	cidrPrefix = "cidr:"
+	// cidrPrefixLensKey holds the prefix lengths that have a decision, so a lookup probes
+	// only those. Its absence means no CIDR decision was ever stored.
+	cidrPrefixLensKey = "cidrprefixlens"
+	// cidrPrefixLensSeparator separates the prefix lengths in cidrPrefixLensKey.
+	cidrPrefixLensSeparator = ","
+	// cidrPrefixLensDuration has to outlive every decision it describes, so it is
+	// effectively infinite. It cannot be zero: the local cache ignores a zero duration
+	// and redis rejects a non positive EX.
+	cidrPrefixLensDuration = 10 * 365 * 24 * 60 * 60
 )
 
 //nolint:gochecknoglobals
@@ -151,23 +162,26 @@ func (c *Client) Set(key string, value string, duration int64) {
 
 // DeleteCIDR removes a CIDR decision from the cache.
 func (c *Client) DeleteCIDR(cidr string) {
-	cidr = ip.NormalizeCIDR(cidr)
-	if cidr == "" {
+	normalized := ip.NormalizeCIDR(cidr)
+	if normalized == "" {
+		c.log.Error(fmt.Sprintf("cache:DeleteCIDR:invalidCIDR cidr:%v decision is left in cache", cidr))
 		return
 	}
+	cidr = normalized
 	c.cache.delete(cidrPrefix + cidr)
 	c.log.Debug(fmt.Sprintf("cache:DeleteCIDR cidr:%v", cidr))
 }
 
 // GetCIDR checks if an IP matches a CIDR decision in the cache.
+// Only probes the prefix lengths that have a decision: it is on the request path.
 func (c *Client) GetCIDR(ipStr string) (string, error) {
-	keys := ip.CIDRKeys(ipStr)
-	if keys == nil {
-		return "", errors.New(CacheMiss)
+	prefixLens, err := c.cache.get(cidrPrefixLensKey)
+	if err != nil {
+		return "", err
 	}
-	for _, key := range keys {
-		value, err := c.cache.get(cidrPrefix + key)
-		if err == nil {
+	for _, key := range ip.CIDRLookupKeys(ipStr, parsePrefixLens(prefixLens)) {
+		value, getErr := c.cache.get(cidrPrefix + key)
+		if getErr == nil {
 			return value, nil
 		}
 	}
@@ -176,10 +190,44 @@ func (c *Client) GetCIDR(ipStr string) (string, error) {
 
 // SetCIDR stores a CIDR decision in the cache.
 func (c *Client) SetCIDR(cidr, value string, duration int64) {
-	cidr = ip.NormalizeCIDR(cidr)
-	if cidr == "" {
+	normalized := ip.NormalizeCIDR(cidr)
+	prefixLen := ip.CIDRPrefixLen(cidr)
+	if normalized == "" || prefixLen < 0 {
+		c.log.Error(fmt.Sprintf("cache:SetCIDR:invalidCIDR cidr:%v value:%v decision is not enforced", cidr, value))
 		return
 	}
-	c.cache.set(cidrPrefix+cidr, value, duration)
-	c.log.Debug(fmt.Sprintf("cache:SetCIDR cidr:%v value:%v duration:%vs", cidr, value, duration))
+	// Publish the length first, or a concurrent lookup misses the decision.
+	c.addCIDRPrefixLen(prefixLen)
+	c.cache.set(cidrPrefix+normalized, value, duration)
+	c.log.Debug(fmt.Sprintf("cache:SetCIDR cidr:%v value:%v duration:%vs", normalized, value, duration))
+}
+
+// addCIDRPrefixLen records a prefix length in the set probed on lookup. The set only grows:
+// a stale length costs one extra read, dropping one too early leaves decisions unmatched.
+func (c *Client) addCIDRPrefixLen(prefixLen int) {
+	prefixLens, err := c.cache.get(cidrPrefixLensKey)
+	if err == nil {
+		for _, known := range parsePrefixLens(prefixLens) {
+			if known == prefixLen {
+				return
+			}
+		}
+		prefixLens += cidrPrefixLensSeparator + strconv.Itoa(prefixLen)
+	} else {
+		prefixLens = strconv.Itoa(prefixLen)
+	}
+	c.cache.set(cidrPrefixLensKey, prefixLens, cidrPrefixLensDuration)
+	c.log.Debug(fmt.Sprintf("cache:addCIDRPrefixLen prefixLens:%v", prefixLens))
+}
+
+// parsePrefixLens decodes the set of prefix lengths stored in cidrPrefixLensKey.
+func parsePrefixLens(value string) []int {
+	fields := strings.Split(value, cidrPrefixLensSeparator)
+	prefixLens := make([]int, 0, len(fields))
+	for _, field := range fields {
+		if prefixLen, err := strconv.Atoi(field); err == nil {
+			prefixLens = append(prefixLens, prefixLen)
+		}
+	}
+	return prefixLens
 }
