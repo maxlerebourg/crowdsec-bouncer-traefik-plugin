@@ -382,6 +382,107 @@ func TestCaptchaMethodBasedLogic(t *testing.T) {
 	}
 }
 
+func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
+	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{
+			"action":"challenge",
+			"http_status":200,
+			"user_body_content":"<html>challenge</html>",
+			"user_cookies":["__crowdsec_challenge=value; Path=/; HttpOnly"],
+			"user_headers":{
+				"Content-Type":["text/html"],
+				"Cache-Control":["no-store"]
+			}
+		}`))
+	}))
+	defer appsec.Close()
+
+	appsecURL, err := url.Parse(appsec.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nextCalled := false
+	bouncer := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+		appsecEnabled:           true,
+		appsecScheme:            appsecURL.Scheme,
+		appsecHost:              appsecURL.Host,
+		appsecPath:              "/",
+		httpAppsecClient:        appsec.Client(),
+		remediationStatusCode:   http.StatusForbidden,
+		remediationCustomHeader: "X-Remediation",
+		log:                     logger.New("DEBUG", ""),
+	}
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+	if nextCalled {
+		t.Fatal("next handler should not be called for appsec challenge")
+	}
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected challenge status 200, got %d", recorder.Code)
+	}
+	if got := recorder.Body.String(); got != "<html>challenge</html>" {
+		t.Fatalf("expected appsec challenge body, got %q", got)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "text/html" {
+		t.Fatalf("expected Content-Type relayed, got %q", got)
+	}
+	if got := recorder.Header().Get("Set-Cookie"); got != "__crowdsec_challenge=value; Path=/; HttpOnly" {
+		t.Fatalf("expected Set-Cookie relayed, got %q", got)
+	}
+	if got := recorder.Header().Get("X-Remediation"); got != "challenge" {
+		t.Fatalf("expected custom remediation header challenge, got %q", got)
+	}
+}
+
+func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
+	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer appsec.Close()
+
+	appsecURL, err := url.Parse(appsec.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nextCalled := false
+	bouncer := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+		appsecEnabled:           true,
+		appsecScheme:            appsecURL.Scheme,
+		appsecHost:              appsecURL.Host,
+		appsecPath:              "/",
+		httpAppsecClient:        appsec.Client(),
+		remediationStatusCode:   http.StatusForbidden,
+		remediationCustomHeader: "X-Remediation",
+		log:                     logger.New("DEBUG", ""),
+	}
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+	if nextCalled {
+		t.Fatal("next handler should not be called for appsec forbidden")
+	}
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected fallback ban status 403, got %d", recorder.Code)
+	}
+	if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+		t.Fatalf("expected fallback remediation header ban, got %q", got)
+	}
+}
+
 // blockingBody simulates a request body that never reaches EOF, like a
 // bidirectional gRPC stream that keeps its body open for the whole life of
 // the connection. Reading from it blocks until the test is done.
@@ -462,7 +563,8 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		finished <- err
 	}()
 
 	select {
@@ -500,7 +602,8 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		finished <- err
 	}()
 
 	select {
