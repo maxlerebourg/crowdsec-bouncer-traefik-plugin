@@ -115,6 +115,7 @@ type Config struct {
 	CaptchaSecretKey                           string   `json:"captchaSecretKey,omitempty"`
 	CaptchaSecretKeyFile                       string   `json:"captchaSecretKeyFile,omitempty"`
 	CaptchaGracePeriodSeconds                  int64    `json:"captchaGracePeriodSeconds,omitempty"`
+	CaptchaBanOrigins                          []string `json:"captchaBanOrigins,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -164,6 +165,7 @@ func New() *Config {
 		CaptchaSiteKey:                    "",
 		CaptchaSecretKey:                  "",
 		CaptchaGracePeriodSeconds:         1800,
+		CaptchaBanOrigins:                 []string{},
 		CaptchaFilePath:                   "/captcha.html",
 		BanFilePath:                       "",
 		TraceHeadersCustomName:            "",

@@ -118,6 +118,7 @@ type Bouncer struct {
 	httpClient                *http.Client
 	httpAppsecClient          *http.Client
 	cacheClient               *cache.Client
+	captchaBanOrigins         []string
 	captchaClient             *captcha.Client
 	log                       *slog.Logger
 }
@@ -257,8 +258,9 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 			},
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
-		cacheClient:   &cache.Client{},
-		captchaClient: &captcha.Client{},
+		cacheClient:       &cache.Client{},
+		captchaBanOrigins: config.CaptchaBanOrigins,
+		captchaClient:     &captcha.Client{},
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		return bouncer, nil
@@ -568,7 +570,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	var decision Decision
 	for _, d := range decisions {
 		decision = d
-		if decision.Type == "ban" {
+		if bouncer.remediationForDecision(decision) == cache.BannedValue {
 			break
 		}
 	}
@@ -576,15 +578,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	if err != nil {
 		return cache.BannedValue, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
-	var value string
-	switch decision.Type {
-	case "ban":
-		value = cache.BannedValue
-	case "captcha":
-		value = cache.CaptchaValue
-	default:
-		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
-	}
+	value := bouncer.remediationForDecision(decision)
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
 		durationSecond := int64(duration.Seconds())
 		if bouncer.defaultDecisionTimeout < durationSecond {
@@ -593,6 +587,30 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		bouncer.cacheClient.Set(remoteIP, value, durationSecond)
 	}
 	return value, errors.New("handleNoStreamCache:banned")
+}
+
+// remediationForDecision returns the cache value to store for a decision.
+//
+// A ban whose origin is listed in CaptchaBanOrigins is stored as a captcha
+// remediation instead. This makes remediation configurable for decisions whose
+// type cannot be changed at the source — most notably the CAPI community
+// blocklist and console-subscribed lists, which always arrive as "ban".
+// When CaptchaBanOrigins is empty (the default) the mapping is a no-op.
+func (bouncer *Bouncer) remediationForDecision(decision Decision) string {
+	switch decision.Type {
+	case "ban":
+		for _, origin := range bouncer.captchaBanOrigins {
+			if origin == decision.Origin {
+				bouncer.log.Debug("remediationForDecision:banToCaptcha origin:" + decision.Origin)
+				return cache.CaptchaValue
+			}
+		}
+		return cache.BannedValue
+	case "captcha":
+		return cache.CaptchaValue
+	}
+	bouncer.log.Info("remediationForDecision:unknownType " + decision.Type)
+	return ""
 }
 
 func getToken(bouncer *Bouncer) error {
@@ -665,16 +683,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
-			var value string
-			switch decision.Type {
-			case "ban":
-				value = cache.BannedValue
-			case "captcha":
-				value = cache.CaptchaValue
-			default:
-				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
-			}
-			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+			bouncer.cacheClient.Set(decision.Value, bouncer.remediationForDecision(decision), int64(duration.Seconds()))
 		}
 	}
 	for _, decision := range stream.Deleted {
