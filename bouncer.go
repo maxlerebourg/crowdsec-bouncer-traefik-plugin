@@ -641,8 +641,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err.Error() != cache.CacheMiss {
 		return err
 	}
-	// The lease expires just before the next tick, but it also has to be stored at all:
-	// the local cache ignores a zero duration and redis rejects a non positive EX.
+	// To avoid every instance trying to update the cache, set 1 second at least
 	leaseDuration := bouncer.updateInterval - 1
 	if leaseDuration < 1 {
 		leaseDuration = 1
