@@ -34,11 +34,10 @@ body() {
   echo "[$SCENARIO] previously CIDR-banned IP must pass again once deletion is polled"
   wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 200 15 -H "X-Forwarded-For: 10.0.0.1"
 
-  echo "[$SCENARIO] making the stream endpoint fail -> bouncer must still pass (updateMaxFailure: 2)"
+  echo "[$SCENARIO] making the stream endpoint fail -> bouncer must pass for one more cycle (updateMaxFailure: 2)"
   lapi_set_stream_fail
-  # No sleep: the bouncer gives up on the third failed poll, so at a 1s interval the
-  # window where it still serves is ~3s wide and never reopens. Assert inside it.
-  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 8.8.8.8"
+  sleep 2 # update cache is every 1 seconds then waiting for minimum 1 cycle
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 200 15 -H "X-Forwarded-For: 8.8.8.8"
 
   echo "[$SCENARIO] bouncer must block everything (isStreamHealthy: false)"
   wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 15 -H "X-Forwarded-For: 8.8.8.8"
