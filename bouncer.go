@@ -544,6 +544,9 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String(), nil)
 	if err != nil {
+		if bouncer.updateMaxFailure == -1 {
+			return cache.NoBannedValue, err
+		}
 		return cache.BannedValue, err
 	}
 
