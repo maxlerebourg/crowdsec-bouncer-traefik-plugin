@@ -14,7 +14,7 @@
 set -euo pipefail
 
 # Pinned to match the Docker suite (tests/e2e/scenarios/*/docker-compose.yml).
-TRAEFIK_VERSION="${TRAEFIK_VERSION:-v3.7.9}"
+TRAEFIK_VERSION="${TRAEFIK_VERSION:-v3.7.11}"
 
 WEB_PORT="${WEB_PORT:-8000}"
 LAPI_PORT="${LAPI_PORT:-8090}"
