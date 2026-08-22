@@ -73,6 +73,8 @@ var (
 	metricsTicker           chan bool
 	lastMetricsPush         time.Time
 	blockedRequests         int64
+	lastStreamTickerRun     int64
+	streamUpdateInProgress  int32
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -326,6 +328,9 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 			handleStreamTicker(bouncer)
 		})
+		startTicker("stream_watchdog", config.UpdateIntervalSeconds, log, func() {
+			handleStreamWatchdog(bouncer)
+		})
 	}
 
 	// Start metrics ticker if not already running
@@ -544,6 +549,13 @@ func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, re
 }
 
 func handleStreamTicker(bouncer *Bouncer) {
+	if !atomic.CompareAndSwapInt32(&streamUpdateInProgress, 0, 1) {
+		bouncer.log.Debug("handleStreamTicker:alreadyRunning")
+		return
+	}
+	atomic.StoreInt64(&lastStreamTickerRun, time.Now().UnixNano())
+	defer atomic.StoreInt32(&streamUpdateInProgress, 0)
+
 	if err := handleStreamCache(bouncer); err != nil {
 		bouncer.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
 		if bouncer.updateMaxFailure != -1 && updateFailure >= bouncer.updateMaxFailure && isCrowdsecStreamHealthy {
@@ -557,7 +569,37 @@ func handleStreamTicker(bouncer *Bouncer) {
 	}
 }
 
+func streamTickerNeedsRecovery(lastRun int64, now time.Time, updateInterval int64) bool {
+	if updateInterval < 1 {
+		return false
+	}
+	if lastRun == 0 {
+		return true
+	}
+
+	lastRunAt := time.Unix(0, lastRun)
+	return !now.Before(lastRunAt) && now.Sub(lastRunAt) >= 2*time.Duration(updateInterval)*time.Second
+}
+
+func handleStreamWatchdog(bouncer *Bouncer) {
+	if bouncer.crowdsecMode != configuration.StreamMode && bouncer.crowdsecMode != configuration.AloneMode {
+		return
+	}
+	if atomic.LoadInt32(&streamUpdateInProgress) != 0 {
+		return
+	}
+
+	lastRun := atomic.LoadInt64(&lastStreamTickerRun)
+	if !streamTickerNeedsRecovery(lastRun, time.Now(), bouncer.updateInterval) {
+		return
+	}
+
+	bouncer.log.Warn("handleStreamWatchdog: stream ticker stale, forcing a refresh")
+	handleStreamTicker(bouncer)
+}
+
 func handleMetricsTicker(bouncer *Bouncer) {
+	handleStreamWatchdog(bouncer)
 	if err := reportMetrics(bouncer); err != nil {
 		bouncer.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
 	}
