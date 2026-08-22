@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -161,6 +162,100 @@ func Test_handleStreamCache(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+func Test_streamTickerNeedsRecovery(t *testing.T) {
+	now := time.Date(2026, time.August, 22, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name           string
+		lastRun        int64
+		updateInterval int64
+		want           bool
+	}{
+		{name: "missing heartbeat", lastRun: 0, updateInterval: 60, want: true},
+		{name: "fresh heartbeat", lastRun: now.Add(-119 * time.Second).UnixNano(), updateInterval: 60, want: false},
+		{name: "threshold reached", lastRun: now.Add(-120 * time.Second).UnixNano(), updateInterval: 60, want: true},
+		{name: "stale heartbeat", lastRun: now.Add(-20 * time.Minute).UnixNano(), updateInterval: 60, want: true},
+		{name: "clock moved backwards", lastRun: now.Add(time.Second).UnixNano(), updateInterval: 60, want: false},
+		{name: "invalid interval", lastRun: 0, updateInterval: 0, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := streamTickerNeedsRecovery(tt.lastRun, now, tt.updateInterval); got != tt.want {
+				t.Errorf("streamTickerNeedsRecovery() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_handleStreamWatchdogRecoversStaleTicker(t *testing.T) {
+	previousStartup := isCrowdsecStreamStartup
+	previousHealthy := isCrowdsecStreamHealthy
+	previousUpdateFailure := updateFailure
+	previousLastRun := atomic.LoadInt64(&lastStreamTickerRun)
+	previousInProgress := atomic.LoadInt32(&streamUpdateInProgress)
+
+	var requests int32
+	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/v1/decisions/stream" {
+			t.Errorf("unexpected LAPI path: %s", req.URL.Path)
+		}
+		atomic.AddInt32(&requests, 1)
+		rw.Header().Set("Content-Type", "application/json")
+		_, _ = rw.Write([]byte(`{"deleted":[],"new":[]}`))
+	}))
+	t.Cleanup(lapi.Close)
+
+	lapiURL, err := url.Parse(lapi.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log := logger.New("ERROR", "")
+	cacheClient := &cache.Client{}
+	cacheClient.New(log, false, "", nil, "", "")
+	cacheClient.Delete(cacheTimeoutKey)
+	t.Cleanup(func() {
+		cacheClient.Delete(cacheTimeoutKey)
+		isCrowdsecStreamStartup = previousStartup
+		isCrowdsecStreamHealthy = previousHealthy
+		updateFailure = previousUpdateFailure
+		atomic.StoreInt64(&lastStreamTickerRun, previousLastRun)
+		atomic.StoreInt32(&streamUpdateInProgress, previousInProgress)
+	})
+
+	bouncer := &Bouncer{
+		crowdsecMode:        configuration.StreamMode,
+		crowdsecScheme:      lapiURL.Scheme,
+		crowdsecHost:        lapiURL.Host,
+		crowdsecPath:        "/",
+		crowdsecKey:         "test",
+		crowdsecStreamRoute: crowdsecLapiStreamRoute,
+		crowdsecHeader:      crowdsecLapiHeader,
+		updateInterval:      60,
+		updateMaxFailure:    0,
+		httpClient:          lapi.Client(),
+		cacheClient:         cacheClient,
+		log:                 log,
+	}
+
+	atomic.StoreInt64(&lastStreamTickerRun, time.Now().Add(-2*time.Minute).UnixNano())
+	atomic.StoreInt32(&streamUpdateInProgress, 1)
+	handleStreamWatchdog(bouncer)
+	if got := atomic.LoadInt32(&requests); got != 0 {
+		t.Fatalf("watchdog sent %d LAPI requests while an update was in progress, want 0", got)
+	}
+
+	atomic.StoreInt32(&streamUpdateInProgress, 0)
+	handleStreamWatchdog(bouncer)
+
+	if got := atomic.LoadInt32(&requests); got != 1 {
+		t.Fatalf("watchdog sent %d LAPI requests, want 1", got)
+	}
+	if streamTickerNeedsRecovery(atomic.LoadInt64(&lastStreamTickerRun), time.Now(), bouncer.updateInterval) {
+		t.Fatal("stream ticker heartbeat remained stale after watchdog recovery")
 	}
 }
 
