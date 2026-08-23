@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"text/template"
 	"time"
@@ -63,14 +64,36 @@ const (
 
 //nolint:gochecknoglobals
 var (
-	isCrowdsecStreamStartup = true
-	isCrowdsecStreamHealthy = true
+	isCrowdsecStreamStartup int32 = 1
+	isCrowdsecStreamHealthy int32 = 1
 	updateFailure           int64
-	streamTicker            chan bool
-	metricsTicker           chan bool
 	lastMetricsPush         time.Time
 	blockedRequests         int64
+	processStart            = time.Now()
+	lastStreamTickerRun     int64
+	tickers                 tickerRuntime
 )
+
+type tickerRuntime struct {
+	streamOnce           sync.Once
+	metricsOnce          sync.Once
+	streamTicker         chan bool
+	streamWatchdogTicker chan bool
+	metricsTicker        chan bool
+	streamInitialization error
+}
+
+func atomicBoolLoad(value *int32) bool {
+	return atomic.LoadInt32(value) != 0
+}
+
+func atomicBoolStore(value *int32, enabled bool) {
+	var raw int32
+	if enabled {
+		raw = 1
+	}
+	atomic.StoreInt32(value, raw)
+}
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *configuration.Config {
@@ -124,7 +147,7 @@ type Bouncer struct {
 
 // New creates the crowdsec bouncer plugin.
 //
-//nolint:nestif,gocyclo,gocognit,funlen,maintidx
+//nolint:gocyclo
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
@@ -297,30 +320,14 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		return nil, err
 	}
 
-	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && streamTicker == nil {
-		if config.CrowdsecMode == configuration.AloneMode {
-			if err := getToken(bouncer); err != nil {
-				bouncer.log.Error("New:getToken " + err.Error())
-				return nil, err
-			}
+	if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
+		if err := tickers.startStream(bouncer, config, log); err != nil {
+			return nil, err
 		}
-		if config.StreamStartupBlock {
-			handleStreamTicker(bouncer)
-		} else {
-			go handleStreamTicker(bouncer)
-		}
-		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
-			handleStreamTicker(bouncer)
-		})
 	}
 
-	// Start metrics ticker if not already running
-	if metricsTicker == nil && config.MetricsUpdateIntervalSeconds > 0 {
-		lastMetricsPush = time.Now() // Initialize lastMetricsPush when starting the metrics ticker
-		go handleMetricsTicker(bouncer)
-		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
-			handleMetricsTicker(bouncer)
-		})
+	if config.MetricsUpdateIntervalSeconds > 0 {
+		tickers.startMetrics(bouncer, config, log)
 	}
 
 	bouncer.log.Debug("New initialized mode:" + config.CrowdsecMode)
@@ -391,10 +398,10 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
-		if isCrowdsecStreamHealthy {
+		if atomicBoolLoad(&isCrowdsecStreamHealthy) {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 		} else {
-			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
+			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, atomic.LoadInt64(&updateFailure)))
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 		}
 	} else {
@@ -497,20 +504,53 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 }
 
 func handleStreamTicker(bouncer *Bouncer) {
+	markStreamRun()
+
 	if err := handleStreamCache(bouncer); err != nil {
-		bouncer.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
-		if bouncer.updateMaxFailure != -1 && updateFailure >= bouncer.updateMaxFailure && isCrowdsecStreamHealthy {
-			isCrowdsecStreamHealthy = false
-			bouncer.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", updateFailure, err.Error()))
+		failures := atomic.AddInt64(&updateFailure, 1)
+		healthy := atomicBoolLoad(&isCrowdsecStreamHealthy)
+		bouncer.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", failures-1, healthy, err.Error()))
+		if bouncer.updateMaxFailure != -1 && failures > bouncer.updateMaxFailure && healthy {
+			atomicBoolStore(&isCrowdsecStreamHealthy, false)
+			bouncer.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", failures-1, err.Error()))
 		}
-		updateFailure++
 	} else {
-		isCrowdsecStreamHealthy = true
-		updateFailure = 0
+		atomicBoolStore(&isCrowdsecStreamHealthy, true)
+		atomic.StoreInt64(&updateFailure, 0)
 	}
 }
 
+func markStreamRun() {
+	atomic.StoreInt64(&lastStreamTickerRun, int64(time.Since(processStart)))
+}
+
+func streamTickerNeedsRecovery(lastRun int64, elapsed time.Duration, updateInterval int64) bool {
+	if updateInterval < 1 {
+		return false
+	}
+	if lastRun == 0 {
+		return true
+	}
+
+	lastRunElapsed := time.Duration(lastRun)
+	return elapsed >= lastRunElapsed && elapsed-lastRunElapsed >= 2*time.Duration(updateInterval)*time.Second
+}
+
+func handleStreamWatchdog(bouncer *Bouncer) {
+	if bouncer.crowdsecMode != configuration.StreamMode && bouncer.crowdsecMode != configuration.AloneMode {
+		return
+	}
+	lastRun := atomic.LoadInt64(&lastStreamTickerRun)
+	if !streamTickerNeedsRecovery(lastRun, time.Since(processStart), bouncer.updateInterval) {
+		return
+	}
+
+	bouncer.log.Warn("handleStreamWatchdog: stream ticker stale, forcing a refresh")
+	go handleStreamTicker(bouncer)
+}
+
 func handleMetricsTicker(bouncer *Bouncer) {
+	handleStreamWatchdog(bouncer)
 	if err := reportMetrics(bouncer); err != nil {
 		bouncer.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
 	}
@@ -520,6 +560,7 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
+		defer ticker.Stop()
 		defer log.Debug(name + "_ticker:stopped")
 		for {
 			select {
@@ -531,6 +572,52 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 		}
 	}()
 	return stop
+}
+
+func (runtime *tickerRuntime) startStream(bouncer *Bouncer, config *configuration.Config, log *slog.Logger) error {
+	runtime.streamOnce.Do(func() {
+		if config.CrowdsecMode == configuration.AloneMode {
+			if err := getToken(bouncer); err != nil {
+				bouncer.log.Error("New:getToken " + err.Error())
+				runtime.streamInitialization = err
+				return
+			}
+		}
+		if config.StreamStartupBlock {
+			handleStreamTicker(bouncer)
+		} else {
+			go handleStreamTicker(bouncer)
+		}
+		runtime.streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
+			handleStreamTicker(bouncer)
+		})
+		runtime.streamWatchdogTicker = startTicker("stream_watchdog", config.UpdateIntervalSeconds, log, func() {
+			handleStreamWatchdog(bouncer)
+		})
+	})
+	return runtime.streamInitialization
+}
+
+func (runtime *tickerRuntime) startMetrics(bouncer *Bouncer, config *configuration.Config, log *slog.Logger) {
+	runtime.metricsOnce.Do(func() {
+		lastMetricsPush = time.Now()
+		go handleMetricsTicker(bouncer)
+		runtime.metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
+			handleMetricsTicker(bouncer)
+		})
+	})
+}
+
+func stopTicker(ticker chan bool) {
+	if ticker != nil {
+		ticker <- true
+	}
+}
+
+func (runtime *tickerRuntime) stop() {
+	stopTicker(runtime.streamTicker)
+	stopTicker(runtime.streamWatchdogTicker)
+	stopTicker(runtime.metricsTicker)
 }
 
 // We are now in none or live mode.
@@ -635,7 +722,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	_, err := bouncer.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
 		bouncer.log.Debug("handleStreamCache:alreadyUpdated")
-		isCrowdsecStreamStartup = false
+		atomicBoolStore(&isCrowdsecStreamStartup, false)
 		return nil
 	}
 	if err.Error() != cache.CacheMiss {
@@ -651,7 +738,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup),
+		RawQuery: fmt.Sprintf("startup=%t", !atomicBoolLoad(&isCrowdsecStreamHealthy) || atomicBoolLoad(&isCrowdsecStreamStartup)),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
@@ -681,7 +768,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
-	isCrowdsecStreamStartup = false
+	atomicBoolStore(&isCrowdsecStreamStartup, false)
 	return nil
 }
 
