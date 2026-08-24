@@ -651,7 +651,12 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err.Error() != cache.CacheMiss {
 		return err
 	}
-	bouncer.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, bouncer.updateInterval-1)
+	// To avoid every instance trying to update the cache, set 1 second at least
+	leaseDuration := bouncer.updateInterval - 1
+	if leaseDuration < 1 {
+		leaseDuration = 1
+	}
+	bouncer.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
