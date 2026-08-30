@@ -34,7 +34,8 @@ For the `ban` remediation the user will be blocked in Traefik (HTTP 403).
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
 
 Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), `Country`, and `AS`.  
-Country and AS matching use existing request headers named by `countryHeader` and `asnHeader` (for example a CDN `CF-IPCountry` / `CF-ASN`). The plugin does not resolve GeoIP itself. Other CrowdSec scopes (`username`, `session`, …) are ignored.
+Country and AS matching use existing request headers named by `countryHeader` and `asnHeader` (for example a CDN `CF-IPCountry` / `CF-ASN`). The plugin does not resolve GeoIP itself. Other CrowdSec scopes (`username`, `session`, …) are ignored.  
+Those headers must be set by a trusted hop. If Traefik is the first hop, a client can send them and change Country or AS matching.
 
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
