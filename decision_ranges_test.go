@@ -9,7 +9,7 @@ import (
 
 func newTestDecisionCache() *cache.Client {
 	client := &cache.Client{}
-	client.New(logger.New("ERROR", ""), false, "", "", "")
+	client.New(logger.New("ERROR", ""), false, "", nil, "", "")
 	return client
 }
 

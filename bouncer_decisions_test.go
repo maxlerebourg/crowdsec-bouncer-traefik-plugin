@@ -20,7 +20,7 @@ func newTestMatchBouncer(t *testing.T) *Bouncer {
 		t.Fatal(err)
 	}
 	cacheClient := &cache.Client{}
-	cacheClient.New(log, false, "", "", "")
+	cacheClient.New(log, false, "", nil, "", "")
 	return &Bouncer{
 		next: http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 			rw.WriteHeader(http.StatusOK)
