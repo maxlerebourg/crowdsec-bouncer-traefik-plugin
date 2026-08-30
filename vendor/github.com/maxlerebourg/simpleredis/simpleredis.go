@@ -1,5 +1,5 @@
 // Package simpleredis implements utility routines for interacting.
-// It supports currently the following operations: GET, MGET, SET, DELETE,
+// It supports currently the following operations: GET, SET, DELETE,
 // and support timetoleave for keys.
 package simpleredis
 
@@ -25,9 +25,7 @@ const (
 type redisCmd struct {
 	Command  string
 	Name     string
-	Names    []string
 	Data     []byte
-	Multi    [][]byte
 	Duration int64
 	Error    error
 }
@@ -126,24 +124,6 @@ func (sr *SimpleRedis) askRedis(cmd redisCmd, channel chan redisCmd) redisCmd {
 				return redisCmd{Data: read}
 			}
 		}
-	case "MGET":
-		args := [][]byte{[]byte("MGET")}
-		for _, name := range cmd.Names {
-			args = append(args, []byte(name))
-		}
-		send(writer, "mget", genRedisArray(args...))
-		for {
-			select {
-			case <-time.After(time.Second * 1):
-				return redisCmd{Error: fmt.Errorf(RedisTimeout)}
-			default:
-				values, err := readRedisBulkArray(reader)
-				if err != nil {
-					return redisCmd{Error: err}
-				}
-				return redisCmd{Multi: values}
-			}
-		}
 	}
 	return redisCmd{Error: fmt.Errorf(RedisIssue)}
 }
@@ -153,44 +133,6 @@ func (sr *SimpleRedis) Init(host, pass, database string) {
 	sr.host = host
 	sr.pass = pass
 	sr.database = database
-}
-
-func readRedisBulkArray(reader *textproto.Reader) ([][]byte, error) {
-	header, err := reader.ReadLineBytes()
-	if err != nil {
-		return nil, fmt.Errorf(RedisUnreachable)
-	}
-	str := string(header)
-	if strings.Contains(str, "-NOAUTH") {
-		return nil, fmt.Errorf(RedisNoAuth)
-	}
-	if strings.HasPrefix(str, "-") || !strings.HasPrefix(str, "*") {
-		return nil, fmt.Errorf(RedisIssue)
-	}
-	var count int
-	if _, scanErr := fmt.Sscanf(str, "*%d", &count); scanErr != nil || count < 0 {
-		return nil, fmt.Errorf(RedisIssue)
-	}
-	out := make([][]byte, count)
-	for i := 0; i < count; i++ {
-		meta, metaErr := reader.ReadLineBytes()
-		if metaErr != nil {
-			return nil, fmt.Errorf(RedisUnreachable)
-		}
-		metaStr := string(meta)
-		if metaStr == "$-1" {
-			continue
-		}
-		if !strings.HasPrefix(metaStr, "$") {
-			return nil, fmt.Errorf(RedisIssue)
-		}
-		payload, payloadErr := reader.ReadLineBytes()
-		if payloadErr != nil {
-			return nil, fmt.Errorf(RedisUnreachable)
-		}
-		out[i] = payload
-	}
-	return out, nil
 }
 
 // Get fetches the value for key name in redis.
@@ -205,23 +147,6 @@ func (sr *SimpleRedis) Get(name string) ([]byte, error) {
 		return nil, resp.Error
 	}
 	return resp.Data, nil
-}
-
-// MGet fetches the values for key names in redis. A missing key is a nil slot.
-func (sr *SimpleRedis) MGet(names []string) ([][]byte, error) {
-	if len(names) == 0 {
-		return nil, nil
-	}
-	cmd := redisCmd{
-		Command: "MGET",
-		Names:   names,
-	}
-	channel := make(chan redisCmd)
-	resp := sr.askRedis(cmd, channel)
-	if resp.Error != nil {
-		return nil, resp.Error
-	}
-	return resp.Multi, nil
 }
 
 // Set updates the value for key name in redis with value data for duration.
