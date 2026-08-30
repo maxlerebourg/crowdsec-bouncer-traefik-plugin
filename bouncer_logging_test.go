@@ -63,7 +63,7 @@ func getTestConfig() *configuration.Config {
 // loggingTestDir is a temp dir whose cleanup ignores a still-open log file (Windows).
 func loggingTestDir(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "bouncer-log-")
+	dir, err := os.MkdirTemp("", "bouncer-log-") //nolint:usetesting // Windows cannot delete t.TempDir while the logger holds the file.
 	if err != nil {
 		t.Fatal(err)
 	}
