@@ -69,6 +69,7 @@ func preferRemediation(current, incoming string) string {
 
 // lookupCachedRemediation checks Ip, Range, Country, AS, then other configured header scopes.
 // One GetMany loads the IP, present header-scope keys, and range-index (stream/alone).
+// Redis GetMany is one GET per key until simpleredis grows MGET.
 // Range verdicts live on range-index (cidr=remediation). Live/none expand Range via LAPI ?ip=.
 func lookupCachedRemediation(bouncer *Bouncer, remoteIP string, scopes map[string]string) (string, error) {
 	useRangeIndex := bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode

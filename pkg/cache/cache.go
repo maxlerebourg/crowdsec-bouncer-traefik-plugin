@@ -115,33 +115,31 @@ func (rc *redisCache) delete(key string) {
 }
 
 func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
-	names := make([]string, 0, len(keys))
-	for _, key := range keys {
-		if key != "" {
-			names = append(names, key)
-		}
-	}
-	if len(names) == 0 {
-		return map[string]string{}, nil
-	}
-	values, err := rc.nextReader().MGet(names)
-	if err != nil {
-		switch err.Error() {
-		case simpleredis.RedisMiss:
-			return map[string]string{}, nil
-		case simpleredis.RedisUnreachable:
-			return nil, errors.New(CacheUnreachable)
-		default:
-			rc.log.Error("cache:getManyRedisCache " + err.Error())
-			return nil, errors.New(CacheUnreachable)
-		}
-	}
+	// Upstream github.com/maxlerebourg/simpleredis v1.0.12 exposes GET only.
+	// CI runs `go mod vendor` and restores that module, so a vendored MGET
+	// does not survive. One nextReader() keeps redis e2e rotation; loop Get
+	// until maxlerebourg/simpleredis#9 adds MGET.
+	reader := rc.nextReader()
 	out := make(map[string]string)
-	for i, name := range names {
-		if i >= len(values) || values[i] == nil || len(values[i]) == 0 {
+	for _, key := range keys {
+		if key == "" {
 			continue
 		}
-		out[name] = string(values[i])
+		value, err := reader.Get(key)
+		if err != nil {
+			switch err.Error() {
+			case simpleredis.RedisMiss:
+				continue
+			case simpleredis.RedisUnreachable:
+				return nil, errors.New(CacheUnreachable)
+			default:
+				return nil, err
+			}
+		}
+		valueString := string(value)
+		if len(valueString) > 0 {
+			out[key] = valueString
+		}
 	}
 	return out, nil
 }
@@ -190,8 +188,8 @@ func (c *Client) Get(key string) (string, error) {
 	return c.cache.get(key)
 }
 
-// GetMany returns the values for the given keys in one backend round-trip.
-// Missing keys are omitted. An unreachable backend returns CacheUnreachable.
+// GetMany returns the values for the given keys. Missing keys are omitted.
+// Redis issues one GET per key (simpleredis v1.0.12 has no MGET). Unreachable returns CacheUnreachable.
 func (c *Client) GetMany(keys []string) (map[string]string, error) {
 	c.log.Debug(fmt.Sprintf("cache:GetMany keys:%v", keys))
 	return c.cache.getMany(keys)

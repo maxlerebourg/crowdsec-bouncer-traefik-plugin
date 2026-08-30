@@ -50,5 +50,5 @@ http:
 - Cloudflare `XX` and `T1` do not match a Country decision.
 - Custom scopes compare the trimmed header string to the decision value. The scope name must match what LAPI stored (`username` is not `user`).
 - Range membership and verdict live on one shared key (`range-index`, lines `cidr=remediation`) so instances that do not ingest the stream can still match.
-- Request lookup is one `GetMany` for the IP, present header-scope keys, and `range-index` (stream/alone only). A missed stream `Deleted` stays on the index until the next full refresh.
+- Request lookup is one `GetMany` for the IP, present header-scope keys, and `range-index` (stream/alone only). Redis still issues one `GET` per key (`simpleredis` v1.0.12 has no `MGET`). A missed stream `Deleted` stays on the index until the next full refresh.
 - Scope headers are not authenticated. If Traefik is the edge, the client can send them.
