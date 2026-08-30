@@ -9,7 +9,6 @@ import (
 	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	decision "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decision"
 )
 
 // requestCountry reads and normalizes the configured country header.
@@ -17,7 +16,7 @@ func requestCountry(bouncer *Bouncer, req *http.Request) string {
 	if bouncer.countryHeader == "" {
 		return ""
 	}
-	return decision.NormalizeCountry(req.Header.Get(bouncer.countryHeader))
+	return normalizeCountry(req.Header.Get(bouncer.countryHeader))
 }
 
 // requestASN reads and normalizes the configured ASN header.
@@ -25,7 +24,7 @@ func requestASN(bouncer *Bouncer, req *http.Request) string {
 	if bouncer.asnHeader == "" {
 		return ""
 	}
-	return decision.NormalizeASN(req.Header.Get(bouncer.asnHeader))
+	return normalizeASN(req.Header.Get(bouncer.asnHeader))
 }
 
 // isActiveRemediation reports whether value is ban or captcha.
@@ -65,13 +64,13 @@ func lookupCachedRemediation(bouncer *Bouncer, remoteIP, country, asn string) (s
 	case err != nil && err.Error() != cache.CacheMiss:
 		return "", err
 	}
-	if rangeValue := decision.MatchRange(bouncer.cacheClient, remoteIP); isActiveRemediation(rangeValue) {
+	if rangeValue := matchRange(bouncer.cacheClient, remoteIP); isActiveRemediation(rangeValue) {
 		return rangeValue, nil
 	}
-	if countryValue, countryErr := lookupScopeKey(bouncer, decision.CountryKey(country), country); countryErr != nil || countryValue != "" {
+	if countryValue, countryErr := lookupScopeKey(bouncer, countryKey(country), country); countryErr != nil || countryValue != "" {
 		return countryValue, countryErr
 	}
-	if asnValue, asnErr := lookupScopeKey(bouncer, decision.ASKey(asn), asn); asnErr != nil || asnValue != "" {
+	if asnValue, asnErr := lookupScopeKey(bouncer, asKey(asn), asn); asnErr != nil || asnValue != "" {
 		return asnValue, asnErr
 	}
 	if err == nil {
@@ -123,23 +122,23 @@ func storeStreamDecision(bouncer *Bouncer, item Decision, duration int64) {
 		bouncer.log.Debug("handleStreamCache:unknownType " + item.Type)
 		return
 	}
-	switch decision.NormalizeScope(item.Scope) {
-	case decision.ScopeIP, "":
-		bouncer.cacheClient.Set(decision.IPCacheKey(item.Value), value, duration)
-	case decision.ScopeRange:
-		decision.AddRange(bouncer.cacheClient, item.Value, value, duration)
-	case decision.ScopeCountry:
-		code := decision.NormalizeCountry(item.Value)
+	switch normalizeScope(item.Scope) {
+	case scopeIP, "":
+		bouncer.cacheClient.Set(ipCacheKey(item.Value), value, duration)
+	case scopeRange:
+		addRange(bouncer.cacheClient, item.Value, value, duration)
+	case scopeCountry:
+		code := normalizeCountry(item.Value)
 		if code == "" {
 			return
 		}
-		bouncer.cacheClient.Set(decision.CountryKey(code), value, duration)
-	case decision.ScopeAS:
-		asn := decision.NormalizeASN(item.Value)
+		bouncer.cacheClient.Set(countryKey(code), value, duration)
+	case scopeAS:
+		asn := normalizeASN(item.Value)
 		if asn == "" {
 			return
 		}
-		bouncer.cacheClient.Set(decision.ASKey(asn), value, duration)
+		bouncer.cacheClient.Set(asKey(asn), value, duration)
 	default:
 		bouncer.log.Debug("handleStreamCache:ignoredScope " + item.Scope)
 	}
@@ -147,21 +146,21 @@ func storeStreamDecision(bouncer *Bouncer, item Decision, duration int64) {
 
 // deleteStreamDecision removes one stream Deleted decision from the shared cache.
 func deleteStreamDecision(bouncer *Bouncer, item Decision) {
-	switch decision.NormalizeScope(item.Scope) {
-	case decision.ScopeIP, "":
-		bouncer.cacheClient.Delete(decision.IPCacheKey(item.Value))
+	switch normalizeScope(item.Scope) {
+	case scopeIP, "":
+		bouncer.cacheClient.Delete(ipCacheKey(item.Value))
 		bouncer.cacheClient.Delete(item.Value)
-	case decision.ScopeRange:
-		decision.RemoveRange(bouncer.cacheClient, item.Value)
-	case decision.ScopeCountry:
-		code := decision.NormalizeCountry(item.Value)
+	case scopeRange:
+		removeRange(bouncer.cacheClient, item.Value)
+	case scopeCountry:
+		code := normalizeCountry(item.Value)
 		if code != "" {
-			bouncer.cacheClient.Delete(decision.CountryKey(code))
+			bouncer.cacheClient.Delete(countryKey(code))
 		}
-	case decision.ScopeAS:
-		asn := decision.NormalizeASN(item.Value)
+	case scopeAS:
+		asn := normalizeASN(item.Value)
 		if asn != "" {
-			bouncer.cacheClient.Delete(decision.ASKey(asn))
+			bouncer.cacheClient.Delete(asKey(asn))
 		}
 	default:
 		bouncer.cacheClient.Delete(item.Value)

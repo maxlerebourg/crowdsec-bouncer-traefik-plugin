@@ -8,7 +8,6 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	decision "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decision"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -74,7 +73,7 @@ func TestStreamQueryCAPIOmitsScopes(t *testing.T) {
 func TestServeHTTPRangeDecision(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	decision.AddRange(bouncer.cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
+	addRange(bouncer.cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "10.1.2.3:1234"
 	recorder := httptest.NewRecorder()
@@ -87,7 +86,7 @@ func TestServeHTTPRangeDecision(t *testing.T) {
 func TestServeHTTPCountryDecision(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.cacheClient.Set(decision.CountryKey("FR"), cache.BannedValue, 60)
+	bouncer.cacheClient.Set(countryKey("FR"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
 	req.Header.Set("Cf-Ipcountry", "fr")
@@ -101,7 +100,7 @@ func TestServeHTTPCountryDecision(t *testing.T) {
 func TestServeHTTPCountryPlaceholderDoesNotMatch(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.cacheClient.Set(decision.CountryKey("FR"), cache.BannedValue, 60)
+	bouncer.cacheClient.Set(countryKey("FR"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
 	req.Header.Set("Cf-Ipcountry", "XX")
@@ -115,7 +114,7 @@ func TestServeHTTPCountryPlaceholderDoesNotMatch(t *testing.T) {
 func TestServeHTTPASNDecision(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.cacheClient.Set(decision.ASKey("13335"), cache.BannedValue, 60)
+	bouncer.cacheClient.Set(asKey("13335"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
 	req.Header.Set("Cf-Asn", "AS13335")

@@ -22,7 +22,6 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	decision "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decision"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -553,7 +552,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP, country, asn string) (strin
 		if headerErr != nil {
 			bouncer.log.Debug("handleNoStreamCache:countryQuery " + headerErr.Error())
 		} else {
-			cacheLiveScope(bouncer, decision.CountryKey(country), headerChosen, headerDuration, isLiveMode)
+			cacheLiveScope(bouncer, countryKey(country), headerChosen, headerDuration, isLiveMode)
 			chosen = preferRemediation(chosen, headerChosen)
 			if headerChosen == chosen {
 				parsedDuration = headerDuration
@@ -565,7 +564,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP, country, asn string) (strin
 		if headerErr != nil {
 			bouncer.log.Debug("handleNoStreamCache:asnQuery " + headerErr.Error())
 		} else {
-			cacheLiveScope(bouncer, decision.ASKey(asn), headerChosen, headerDuration, isLiveMode)
+			cacheLiveScope(bouncer, asKey(asn), headerChosen, headerDuration, isLiveMode)
 			next := preferRemediation(chosen, headerChosen)
 			if next != chosen {
 				parsedDuration = headerDuration

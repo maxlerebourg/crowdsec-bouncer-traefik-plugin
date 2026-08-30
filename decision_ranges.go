@@ -1,4 +1,4 @@
-package decision
+package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"strings"
@@ -7,13 +7,33 @@ import (
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
-// AddRange stores a Range decision and lists its CIDR on the shared index.
-func AddRange(cacheClient *cache.Client, cidr, remediation string, duration int64) {
+const (
+	countryKeyPrefix = "country:"
+	asKeyPrefix      = "as:"
+	rangeKeyPrefix   = "range:"
+	rangeIndexKey    = "range-index"
+	rangeIndexTTL    = 365 * 24 * 3600
+)
+
+func countryKey(country string) string {
+	return countryKeyPrefix + country
+}
+
+func asKey(asn string) string {
+	return asKeyPrefix + asn
+}
+
+func rangeKey(cidr string) string {
+	return rangeKeyPrefix + cidr
+}
+
+// addRange stores a Range decision and lists its CIDR on the shared index.
+func addRange(cacheClient *cache.Client, cidr, remediation string, duration int64) {
 	network := strings.TrimSpace(cidr)
 	if network == "" {
 		return
 	}
-	cacheClient.Set(RangeKey(network), remediation, duration)
+	cacheClient.Set(rangeKey(network), remediation, duration)
 	index := readRangeIndex(cacheClient)
 	if !indexHasCIDR(index, network) {
 		if index == "" {
@@ -25,10 +45,10 @@ func AddRange(cacheClient *cache.Client, cidr, remediation string, duration int6
 	cacheClient.Set(rangeIndexKey, index, rangeIndexTTL)
 }
 
-// RemoveRange drops a Range decision and removes its CIDR from the index.
-func RemoveRange(cacheClient *cache.Client, cidr string) {
+// removeRange drops a Range decision and removes its CIDR from the index.
+func removeRange(cacheClient *cache.Client, cidr string) {
 	network := strings.TrimSpace(cidr)
-	cacheClient.Delete(RangeKey(network))
+	cacheClient.Delete(rangeKey(network))
 	index := readRangeIndex(cacheClient)
 	next := removeCIDRFromIndex(index, network)
 	if next == "" {
@@ -38,9 +58,8 @@ func RemoveRange(cacheClient *cache.Client, cidr string) {
 	cacheClient.Set(rangeIndexKey, next, rangeIndexTTL)
 }
 
-// MatchRange returns the remediation for the first containing CIDR.
-// Ban wins if several ranges match.
-func MatchRange(cacheClient *cache.Client, remoteIP string) string {
+// matchRange returns the remediation for a containing CIDR. Ban wins if several match.
+func matchRange(cacheClient *cache.Client, remoteIP string) string {
 	index := readRangeIndex(cacheClient)
 	if index == "" {
 		return ""
@@ -54,7 +73,7 @@ func MatchRange(cacheClient *cache.Client, remoteIP string) string {
 		if err != nil || !inside {
 			continue
 		}
-		remediation, err := cacheClient.Get(RangeKey(network))
+		remediation, err := cacheClient.Get(rangeKey(network))
 		if err != nil {
 			continue
 		}

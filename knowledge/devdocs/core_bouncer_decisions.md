@@ -36,7 +36,7 @@ http:
 
 ## Key files
 
-- `pkg/decision/` — scope normalize, cache keys, range index
+- `decision_scope.go`, `decision_ranges.go` — scope normalize, cache keys, range index
 - `bouncer_decisions.go` — stream scopes, live extra queries, cache lookup
 - `pkg/configuration/configuration.go` — `CountryHeader`, `AsnHeader`
 
