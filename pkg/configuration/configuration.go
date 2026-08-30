@@ -92,6 +92,8 @@ type Config struct {
 	TraceHeadersCustomName                     string   `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string   `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName                 string   `json:"forwardedHeadersCustomName,omitempty"`
+	CountryHeader                              string   `json:"countryHeader,omitempty"`
+	AsnHeader                                  string   `json:"asnHeader,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                           []string `json:"clientTrustedIps,omitempty"`
 	RedisCacheEnabled                          bool     `json:"redisCacheEnabled,omitempty"`
@@ -169,6 +171,8 @@ func New() *Config {
 		TraceHeadersCustomName:            "",
 		RemediationHeadersCustomName:      "",
 		ForwardedHeadersCustomName:        "X-Forwarded-For",
+		CountryHeader:                     "",
+		AsnHeader:                         "",
 		ForwardedHeadersTrustedIPs:        []string{},
 		ClientTrustedIPs:                  []string{},
 		RedisCacheEnabled:                 false,

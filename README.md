@@ -33,6 +33,9 @@ Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) an
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
 
+Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), `Country`, and `AS`.  
+Country and AS matching use existing request headers named by `countryHeader` and `asnHeader` (for example a CDN `CF-IPCountry` / `CF-ASN`). The plugin does not resolve GeoIP itself. Other CrowdSec scopes (`username`, `session`, …) are ignored.
+
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
 
@@ -433,6 +436,14 @@ make run
   - string
   - default: "X-Forwarded-For"
   - Name of the header where the real IP of the client should be retrieved
+- CountryHeader
+  - string
+  - default: ""
+  - Request header that already contains the client country as an ISO 3166-1 alpha-2 code (for example `CF-IPCountry`). Empty disables Country decisions.
+- AsnHeader
+  - string
+  - default: ""
+  - Request header that already contains the client ASN (decimal or `AS13335`). Empty disables AS decisions.
 - ForwardedHeadersTrustedIPs
   - []string
   - default: []
@@ -610,6 +621,8 @@ http:
           enabled: false
           logLevel: DEBUG
           logFormat: common
+          countryHeader: ""
+          asnHeader: ""
           LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0
