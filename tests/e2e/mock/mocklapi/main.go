@@ -15,6 +15,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -69,11 +70,10 @@ func list(m map[string]Decision) []Decision {
 // --- Redis mock (inline-command wire format, as spoken by simpleredis) ---
 
 // serveRedis is a hardcoded stand-in. When verdicts is true it plays a replica
-// that holds decisions: every line is scanned for known IPs, 1.2.3.4 → "f"
-// (clean), 1.2.3.5 → "t" (banned); any other GET is a miss ($-1). When verdicts
-// is false it plays the primary and answers every GET with a miss, so a
-// scenario can prove reads are served from the replica and not the primary.
-// SET, DEL, AUTH, SELECT get +OK (they don't read the response anyway).
+// that holds decisions: 1.2.3.4 → "f" (clean), 1.2.3.5 → "t" (banned); any
+// other key is a miss ($-1). When verdicts is false it plays the primary and
+// answers every GET/MGET with a miss, so a scenario can prove reads are served
+// from the replica and not the primary. SET, DEL, AUTH, SELECT get +OK.
 func serveRedis(addr string, verdicts bool) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -94,19 +94,56 @@ func serveRedis(addr string, verdicts bool) {
 				if err != nil {
 					return
 				}
-				s := string(line)
-				switch {
-				case verdicts && strings.Contains(s, "1.2.3.4"):
-					conn.Write([]byte("$1\r\nf\r\n"))
-				case verdicts && strings.Contains(s, "1.2.3.5"):
-					conn.Write([]byte("$1\r\nt\r\n"))
-				case strings.HasPrefix(strings.ToUpper(s), "GET "):
-					conn.Write([]byte("$-1\r\n"))
-				default:
-					conn.Write([]byte("+OK\r\n"))
-				}
+				writeRedisReply(conn, string(line), verdicts)
 			}
 		}(conn)
+	}
+}
+
+func redisBulk(value string) []byte {
+	if value == "" {
+		return []byte("$-1\r\n")
+	}
+	return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(value), value))
+}
+
+func redisVerdict(key string, verdicts bool) string {
+	if !verdicts {
+		return ""
+	}
+	switch key {
+	case "1.2.3.4":
+		return "f"
+	case "1.2.3.5":
+		return "t"
+	default:
+		return ""
+	}
+}
+
+func writeRedisReply(conn net.Conn, line string, verdicts bool) {
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		_, _ = conn.Write([]byte("+OK\r\n"))
+		return
+	}
+	switch strings.ToUpper(fields[0]) {
+	case "GET":
+		key := ""
+		if len(fields) > 1 {
+			key = fields[1]
+		}
+		_, _ = conn.Write(redisBulk(redisVerdict(key, verdicts)))
+	case "MGET":
+		keys := fields[1:]
+		var body strings.Builder
+		fmt.Fprintf(&body, "*%d\r\n", len(keys))
+		for _, key := range keys {
+			body.Write(redisBulk(redisVerdict(key, verdicts)))
+		}
+		_, _ = conn.Write([]byte(body.String()))
+	default:
+		_, _ = conn.Write([]byte("+OK\r\n"))
 	}
 }
 
@@ -118,9 +155,9 @@ func main() {
 	// AppSec WAF stand-in (the real engine listens on :7422). Not a CRS engine.
 	appsecAddr := flag.String("appsec-addr", "127.0.0.1:8092", "address for the AppSec mock")
 	// Redis stand-ins on plain TCP ports, enough to exercise the plugin's redis
-	// cache path. The primary answers every GET with a miss; the replica serves
-	// the hardcoded verdicts, so a scenario pointing redisCacheReadHosts at the
-	// replica proves reads are offloaded to replicas.
+	// cache path. The primary answers every GET/MGET with a miss; the replica
+	// serves the hardcoded verdicts, so a scenario pointing redisCacheReadHosts
+	// at the replica proves reads are offloaded to replicas.
 	redisAddr := flag.String("redis-addr", "127.0.0.1:8093", "address for the Redis primary mock (writes; GET always misses)")
 	redisReadAddr := flag.String("redis-read-addr", "127.0.0.1:8094", "address for the Redis replica mock (serves cached verdicts)")
 	// Optional TLS for the LAPI: when both are set the LAPI is served over HTTPS

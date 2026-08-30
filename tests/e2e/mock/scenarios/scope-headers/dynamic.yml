@@ -24,7 +24,7 @@ http:
           crowdsecLapiKey: "@@APIKEY@@"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
-          scopeHeaders:
+          decisionScopeHeaders:
             Country: CF-IPCountry
             AS: CF-ASN
             username: X-User

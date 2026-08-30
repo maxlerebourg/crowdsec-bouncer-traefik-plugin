@@ -1,0 +1,2 @@
+# CI runs these on Linux. CRLF breaks `set -euo pipefail` before any logs exist.
+*.sh text eol=lf

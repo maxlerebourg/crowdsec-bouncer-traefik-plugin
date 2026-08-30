@@ -62,8 +62,8 @@ func TestNormalizeASN(t *testing.T) {
 	}
 }
 
-func TestNormalizeScopeHeaders(t *testing.T) {
-	got := normalizeScopeHeaders(map[string]string{
+func TestNormalizeDecisionScopeHeaders(t *testing.T) {
+	got := normalizeDecisionScopeHeaders(map[string]string{
 		"country":  "CF-IPCountry",
 		"AS":       "CF-ASN",
 		"username": "X-User",
@@ -116,11 +116,11 @@ func TestIPCacheKey(t *testing.T) {
 	}
 }
 
-func TestNormalizeScopeHeadersNil(t *testing.T) {
-	if got := normalizeScopeHeaders(nil); got != nil {
+func TestNormalizeDecisionScopeHeadersNil(t *testing.T) {
+	if got := normalizeDecisionScopeHeaders(nil); got != nil {
 		t.Fatalf("nil input: %+v", got)
 	}
-	if got := normalizeScopeHeaders(map[string]string{}); got != nil {
+	if got := normalizeDecisionScopeHeaders(map[string]string{}); got != nil {
 		t.Fatalf("empty input: %+v", got)
 	}
 }

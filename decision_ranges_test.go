@@ -33,3 +33,18 @@ func TestRemoveRange(t *testing.T) {
 		t.Fatalf("removed range still matched: %q", got)
 	}
 }
+
+func TestAddRangeUpdatesRemediation(t *testing.T) {
+	client := newTestDecisionCache()
+	addRange(client, "10.0.0.0/8", cache.CaptchaValue, 60)
+	addRange(client, "10.0.0.0/8", cache.BannedValue, 60)
+	if got := matchRange(client, "10.1.2.3"); got != cache.BannedValue {
+		t.Fatalf("upsert got %q, want ban", got)
+	}
+}
+
+func TestMatchRangeFromIndexInline(t *testing.T) {
+	if got := matchRangeFromIndex("10.0.0.0/8="+cache.CaptchaValue+"\n10.1.0.0/16="+cache.BannedValue, "10.1.2.3"); got != cache.BannedValue {
+		t.Fatalf("inline index got %q", got)
+	}
+}

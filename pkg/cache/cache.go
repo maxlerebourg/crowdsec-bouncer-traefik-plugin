@@ -49,6 +49,24 @@ func (localCache) delete(key string) {
 	cache.Del(key)
 }
 
+func (lc localCache) getMany(keys []string) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		value, err := lc.get(key)
+		if err == nil {
+			out[key] = value
+			continue
+		}
+		if err.Error() == CacheUnreachable {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 type redisCache struct {
 	log     *slog.Logger
 	writer  simpleredis.SimpleRedis
@@ -96,9 +114,42 @@ func (rc *redisCache) delete(key string) {
 	}
 }
 
+func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
+	names := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key != "" {
+			names = append(names, key)
+		}
+	}
+	if len(names) == 0 {
+		return map[string]string{}, nil
+	}
+	values, err := rc.nextReader().MGet(names)
+	if err != nil {
+		switch err.Error() {
+		case simpleredis.RedisMiss:
+			return map[string]string{}, nil
+		case simpleredis.RedisUnreachable:
+			return nil, errors.New(CacheUnreachable)
+		default:
+			rc.log.Error("cache:getManyRedisCache " + err.Error())
+			return nil, errors.New(CacheUnreachable)
+		}
+	}
+	out := make(map[string]string)
+	for i, name := range names {
+		if i >= len(values) || values[i] == nil || len(values[i]) == 0 {
+			continue
+		}
+		out[name] = string(values[i])
+	}
+	return out, nil
+}
+
 type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
+	getMany(keys []string) (map[string]string, error)
 	delete(key string)
 }
 
@@ -137,6 +188,13 @@ func (c *Client) Delete(key string) {
 func (c *Client) Get(key string) (string, error) {
 	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
 	return c.cache.get(key)
+}
+
+// GetMany returns the values for the given keys in one backend round-trip.
+// Missing keys are omitted. An unreachable backend returns CacheUnreachable.
+func (c *Client) GetMany(keys []string) (map[string]string, error) {
+	c.log.Debug(fmt.Sprintf("cache:GetMany keys:%v", keys))
+	return c.cache.getMany(keys)
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.

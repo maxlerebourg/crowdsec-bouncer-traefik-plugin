@@ -29,7 +29,7 @@ func newTestMatchBouncer(t *testing.T) *Bouncer {
 		enabled:               true,
 		crowdsecMode:          configuration.StreamMode,
 		forwardedCustomHeader: "X-Forwarded-For",
-		scopeHeaders: map[string]string{
+		decisionScopeHeaders: map[string]string{
 			scopeCountry: "CF-IPCountry",
 			scopeAS:      "CF-ASN",
 		},
@@ -47,7 +47,7 @@ func TestStreamScopeList(t *testing.T) {
 	if got := streamScopeList(bouncer); got != "ip,range" {
 		t.Fatalf("default scopes %q", got)
 	}
-	bouncer.scopeHeaders = map[string]string{
+	bouncer.decisionScopeHeaders = map[string]string{
 		scopeCountry: "CF-IPCountry",
 		scopeAS:      "CF-ASN",
 		"username":   "X-User",
@@ -59,8 +59,8 @@ func TestStreamScopeList(t *testing.T) {
 
 func TestStreamQueryLAPIIncludesScopes(t *testing.T) {
 	bouncer := &Bouncer{
-		crowdsecStreamRoute: crowdsecLapiStreamRoute,
-		scopeHeaders:        map[string]string{scopeCountry: "CF-IPCountry"},
+		crowdsecStreamRoute:  crowdsecLapiStreamRoute,
+		decisionScopeHeaders: map[string]string{scopeCountry: "CF-IPCountry"},
 	}
 	query := streamQuery(bouncer)
 	if query != "startup=true&scopes=ip,range,country" && query != "startup=false&scopes=ip,range,country" {
@@ -145,7 +145,7 @@ func TestStoreStreamDecisionIgnoresUsername(t *testing.T) {
 func TestServeHTTPCustomScopeDecision(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.scopeHeaders["username"] = "X-User"
+	bouncer.decisionScopeHeaders["username"] = "X-User"
 	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "alice"}, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
@@ -160,7 +160,7 @@ func TestServeHTTPCustomScopeDecision(t *testing.T) {
 func TestServeHTTPCustomScopeMissingHeaderSkips(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.scopeHeaders["username"] = "X-User"
+	bouncer.decisionScopeHeaders["username"] = "X-User"
 	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "alice"}, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
@@ -172,7 +172,7 @@ func TestServeHTTPCustomScopeMissingHeaderSkips(t *testing.T) {
 }
 
 func TestRequestScopeValues(t *testing.T) {
-	bouncer := &Bouncer{scopeHeaders: map[string]string{
+	bouncer := &Bouncer{decisionScopeHeaders: map[string]string{
 		scopeCountry: "CF-IPCountry",
 		scopeAS:      "CF-ASN",
 		"username":   "X-User",
@@ -197,13 +197,13 @@ func TestRequestScopeValues(t *testing.T) {
 		t.Fatal("invalid ASN must skip AS")
 	}
 	if requestScopeValues(&Bouncer{}, req) != nil {
-		t.Fatal("empty scopeHeaders must return nil")
+		t.Fatal("empty decisionScopeHeaders must return nil")
 	}
 }
 
 func TestStoreAndDeleteStreamDecisions(t *testing.T) {
 	bouncer := newTestMatchBouncer(t)
-	bouncer.scopeHeaders["username"] = "X-User"
+	bouncer.decisionScopeHeaders["username"] = "X-User"
 
 	storeStreamDecision(bouncer, Decision{Type: "throttle", Scope: "Ip", Value: "1.2.3.4"}, 60)
 	if _, err := bouncer.cacheClient.Get("1.2.3.4"); err == nil {
@@ -266,6 +266,14 @@ func TestStoreAndDeleteStreamDecisions(t *testing.T) {
 	}
 }
 
+func TestLookupCacheMissWhenEmpty(t *testing.T) {
+	bouncer := newTestMatchBouncer(t)
+	got, err := lookupCachedRemediation(bouncer, "198.51.100.99", nil)
+	if err == nil || err.Error() != cache.CacheMiss || got != "" {
+		t.Fatalf("empty cache must be CacheMiss: %q %v", got, err)
+	}
+}
+
 func TestLookupOrderIPBeatsCountry(t *testing.T) {
 	bouncer := newTestMatchBouncer(t)
 	bouncer.cacheClient.Set("198.51.100.10", cache.CaptchaValue, 60)
@@ -300,7 +308,7 @@ func TestServeHTTPCountryT1AndMissingHeader(t *testing.T) {
 func TestServeHTTPCustomScopeWhitespace(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.scopeHeaders["username"] = "X-User"
+	bouncer.decisionScopeHeaders["username"] = "X-User"
 	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "alice"}, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
@@ -335,7 +343,7 @@ func TestPreferRemediationAndPickDecision(t *testing.T) {
 }
 
 func TestStreamScopeListCustomOnly(t *testing.T) {
-	bouncer := &Bouncer{scopeHeaders: map[string]string{"username": "X-User", "session": "X-Session"}}
+	bouncer := &Bouncer{decisionScopeHeaders: map[string]string{"username": "X-User", "session": "X-Session"}}
 	if got := streamScopeList(bouncer); got != "ip,range,session,username" {
 		t.Fatalf("sorted extras %q", got)
 	}

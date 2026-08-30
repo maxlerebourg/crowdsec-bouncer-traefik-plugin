@@ -107,7 +107,7 @@ type Bouncer struct {
 	remediationStatusCode     int
 	remediationCustomHeader   string
 	forwardedCustomHeader     string
-	scopeHeaders              map[string]string
+	decisionScopeHeaders      map[string]string
 	crowdsecStreamRoute       string
 	crowdsecHeader            string
 	redisUnreachableBlock     bool
@@ -227,7 +227,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		updateMaxFailure:          config.UpdateMaxFailure,
 		remediationCustomHeader:   config.RemediationHeadersCustomName,
 		forwardedCustomHeader:     config.ForwardedHeadersCustomName,
-		scopeHeaders:              normalizeScopeHeaders(config.ScopeHeaders),
+		decisionScopeHeaders:      normalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		defaultDecisionTimeout:    config.DefaultDecisionSeconds,
 		remediationStatusCode:     config.RemediationStatusCode,
 		redisUnreachableBlock:     config.RedisCacheUnreachableBlock,

@@ -92,7 +92,7 @@ type Config struct {
 	TraceHeadersCustomName                     string            `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string            `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName                 string            `json:"forwardedHeadersCustomName,omitempty"`
-	ScopeHeaders                               map[string]string `json:"scopeHeaders,omitempty"`
+	DecisionScopeHeaders                       map[string]string `json:"decisionScopeHeaders,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string          `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                           []string          `json:"clientTrustedIps,omitempty"`
 	RedisCacheEnabled                          bool              `json:"redisCacheEnabled,omitempty"`
@@ -170,7 +170,7 @@ func New() *Config {
 		TraceHeadersCustomName:            "",
 		RemediationHeadersCustomName:      "",
 		ForwardedHeadersCustomName:        "X-Forwarded-For",
-		ScopeHeaders:                      map[string]string{},
+		DecisionScopeHeaders:              map[string]string{},
 		ForwardedHeadersTrustedIPs:        []string{},
 		ClientTrustedIPs:                  []string{},
 		RedisCacheEnabled:                 false,
@@ -404,18 +404,18 @@ func validateParamsTLS(config *Config) error {
 	return nil
 }
 
-func validateScopeHeaders(config *Config) error {
-	for rawScope, rawHeader := range config.ScopeHeaders {
+func validateDecisionScopeHeaders(config *Config) error {
+	for rawScope, rawHeader := range config.DecisionScopeHeaders {
 		scope := strings.TrimSpace(rawScope)
 		if scope == "" {
-			return errors.New("scopeHeaders: scope name cannot be empty")
+			return errors.New("decisionScopeHeaders: scope name cannot be empty")
 		}
 		switch strings.ToLower(scope) {
 		case "ip", "range":
-			return fmt.Errorf("scopeHeaders: %q cannot be mapped to a header", scope)
+			return fmt.Errorf("decisionScopeHeaders: %q cannot be mapped to a header", scope)
 		}
 		if strings.TrimSpace(rawHeader) == "" {
-			return fmt.Errorf("scopeHeaders: header for %q cannot be empty", scope)
+			return fmt.Errorf("decisionScopeHeaders: header for %q cannot be empty", scope)
 		}
 	}
 	return nil
@@ -498,7 +498,7 @@ func validateParamsRequired(config *Config) error {
 	if !contains([]string{HTTP, HTTPS, ""}, config.CrowdsecAppsecScheme) {
 		return errors.New("CrowdsecAppsecScheme: must be one of 'http' or 'https'")
 	}
-	return validateScopeHeaders(config)
+	return validateDecisionScopeHeaders(config)
 }
 
 func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insecureVerify bool) (*tls.Config, error) {

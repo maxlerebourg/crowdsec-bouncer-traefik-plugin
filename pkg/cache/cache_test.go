@@ -86,6 +86,22 @@ func Test_Set(t *testing.T) {
 	}
 }
 
+func Test_GetMany(t *testing.T) {
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
+	client.Set("10.0.0.10", BannedValue, 10)
+	client.Set("country:FR", CaptchaValue, 10)
+	got, err := client.GetMany([]string{"10.0.0.10", "country:FR", "as:13335", ""})
+	if err != nil {
+		t.Fatalf("GetMany error %v", err)
+	}
+	if got["10.0.0.10"] != BannedValue || got["country:FR"] != CaptchaValue {
+		t.Fatalf("GetMany hits %v", got)
+	}
+	if _, ok := got["as:13335"]; ok {
+		t.Fatalf("GetMany should omit misses: %v", got)
+	}
+}
+
 func Test_Delete(t *testing.T) {
 	IPInCache := "10.0.0.12"
 	IPNotInCache := "10.0.0.22"

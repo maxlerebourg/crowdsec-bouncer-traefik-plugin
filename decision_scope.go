@@ -68,8 +68,8 @@ func headerScopeKey(scope, value string) string {
 	return strings.ToLower(scope) + ":" + value
 }
 
-// normalizeScopeHeaders keeps configured header scopes. Ip and Range are not header scopes.
-func normalizeScopeHeaders(in map[string]string) map[string]string {
+// normalizeDecisionScopeHeaders keeps configured header scopes. Ip and Range are not header scopes.
+func normalizeDecisionScopeHeaders(in map[string]string) map[string]string {
 	if len(in) == 0 {
 		return nil
 	}

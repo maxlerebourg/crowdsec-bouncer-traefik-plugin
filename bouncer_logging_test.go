@@ -60,6 +60,19 @@ func getTestConfig() *configuration.Config {
 	}
 }
 
+// loggingTestDir is a temp dir whose cleanup ignores a still-open log file (Windows).
+func loggingTestDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "bouncer-log-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(dir)
+	})
+	return dir
+}
+
 // Helper function to create and execute a bouncer request for testing
 func createAndExecuteBouncerRequest(t *testing.T, config *configuration.Config) {
 	t.Helper()
@@ -209,7 +222,7 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temporary directory for log file
-			tmpDir := t.TempDir()
+			tmpDir := loggingTestDir(t)
 			logFile := filepath.Join(tmpDir, "bouncer.log")
 
 			// Get test config and override specific fields
@@ -244,7 +257,7 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 
 func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 	// Create temporary directory for log file
-	tmpDir := t.TempDir()
+	tmpDir := loggingTestDir(t)
 	logFile := filepath.Join(tmpDir, "bouncer-common.log")
 
 	// Get test config and override specific fields

@@ -3,6 +3,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,15 +12,16 @@ import (
 	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 // requestScopeValues reads configured scope headers and normalizes Country and AS ad-hoc.
 func requestScopeValues(bouncer *Bouncer, req *http.Request) map[string]string {
-	if len(bouncer.scopeHeaders) == 0 {
+	if len(bouncer.decisionScopeHeaders) == 0 {
 		return nil
 	}
-	out := make(map[string]string, len(bouncer.scopeHeaders))
-	for scope, header := range bouncer.scopeHeaders {
+	out := make(map[string]string, len(bouncer.decisionScopeHeaders))
+	for scope, header := range bouncer.decisionScopeHeaders {
 		raw := req.Header.Get(header)
 		var value string
 		switch scope {
@@ -66,48 +68,72 @@ func preferRemediation(current, incoming string) string {
 }
 
 // lookupCachedRemediation checks Ip, Range, Country, AS, then other configured header scopes.
+// One GetMany loads the IP, present header-scope keys, and range-index (stream/alone).
+// Range verdicts live on range-index (cidr=remediation). Live/none expand Range via LAPI ?ip=.
 func lookupCachedRemediation(bouncer *Bouncer, remoteIP string, scopes map[string]string) (string, error) {
-	value, err := bouncer.cacheClient.Get(remoteIP)
-	switch {
-	case err == nil && isActiveRemediation(value):
-		return value, nil
-	case err != nil && err.Error() != cache.CacheMiss:
+	useRangeIndex := bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode
+	found, err := bouncer.cacheClient.GetMany(lookupCacheKeys(remoteIP, scopes, useRangeIndex))
+	if err != nil {
 		return "", err
 	}
-	if rangeValue := matchRange(bouncer.cacheClient, remoteIP); isActiveRemediation(rangeValue) {
-		return rangeValue, nil
+	if value := found[remoteIP]; isActiveRemediation(value) {
+		return value, nil
 	}
-	if countryValue, countryErr := lookupScopeKey(bouncer, countryKey(scopes[scopeCountry]), scopes[scopeCountry]); countryErr != nil || countryValue != "" {
-		return countryValue, countryErr
+	if useRangeIndex {
+		if rangeValue := matchRangeFromIndex(found[rangeIndexKey], remoteIP); isActiveRemediation(rangeValue) {
+			return rangeValue, nil
+		}
 	}
-	if asnValue, asnErr := lookupScopeKey(bouncer, asKey(scopes[scopeAS]), scopes[scopeAS]); asnErr != nil || asnValue != "" {
-		return asnValue, asnErr
+	if value := lookupFoundScope(found, countryKey(scopes[scopeCountry]), scopes[scopeCountry]); value != "" {
+		return value, nil
+	}
+	if value := lookupFoundScope(found, asKey(scopes[scopeAS]), scopes[scopeAS]); value != "" {
+		return value, nil
 	}
 	for _, scope := range extraHeaderScopes(bouncer) {
 		identifier := scopes[scope]
-		if headerValue, headerErr := lookupScopeKey(bouncer, headerScopeKey(scope, identifier), identifier); headerErr != nil || headerValue != "" {
-			return headerValue, headerErr
+		if value := lookupFoundScope(found, headerScopeKey(scope, identifier), identifier); value != "" {
+			return value, nil
 		}
 	}
-	if err == nil {
+	if value, ok := found[remoteIP]; ok {
 		return value, nil
 	}
-	return "", err
+	return "", errors.New(cache.CacheMiss)
 }
 
-// lookupScopeKey returns an active remediation for a header-scope cache key.
-func lookupScopeKey(bouncer *Bouncer, key, identifier string) (string, error) {
+// lookupCacheKeys is the first GetMany: IP, optional range-index, then present header scopes.
+func lookupCacheKeys(remoteIP string, scopes map[string]string, useRangeIndex bool) []string {
+	keys := []string{remoteIP}
+	if useRangeIndex {
+		keys = append(keys, rangeIndexKey)
+	}
+	for scope, identifier := range scopes {
+		if identifier == "" {
+			continue
+		}
+		switch scope {
+		case scopeCountry:
+			keys = append(keys, countryKey(identifier))
+		case scopeAS:
+			keys = append(keys, asKey(identifier))
+		default:
+			keys = append(keys, headerScopeKey(scope, identifier))
+		}
+	}
+	return keys
+}
+
+// lookupFoundScope returns an active remediation already loaded by GetMany.
+func lookupFoundScope(found map[string]string, key, identifier string) string {
 	if identifier == "" {
-		return "", nil
+		return ""
 	}
-	value, err := bouncer.cacheClient.Get(key)
-	if err == nil && isActiveRemediation(value) {
-		return value, nil
+	value := found[key]
+	if isActiveRemediation(value) {
+		return value
 	}
-	if err != nil && err.Error() != cache.CacheMiss {
-		return "", err
-	}
-	return "", nil
+	return ""
 }
 
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.
@@ -122,10 +148,10 @@ func streamQuery(bouncer *Bouncer) string {
 // streamScopeList is the LAPI scopes query value for this bouncer config.
 func streamScopeList(bouncer *Bouncer) string {
 	parts := []string{"ip", "range"}
-	if _, ok := bouncer.scopeHeaders[scopeCountry]; ok {
+	if _, ok := bouncer.decisionScopeHeaders[scopeCountry]; ok {
 		parts = append(parts, "country")
 	}
-	if _, ok := bouncer.scopeHeaders[scopeAS]; ok {
+	if _, ok := bouncer.decisionScopeHeaders[scopeAS]; ok {
 		parts = append(parts, "AS")
 	}
 	return strings.Join(append(parts, extraHeaderScopes(bouncer)...), ",")
@@ -134,7 +160,7 @@ func streamScopeList(bouncer *Bouncer) string {
 // extraHeaderScopes is configured header scopes other than Country and AS, sorted.
 func extraHeaderScopes(bouncer *Bouncer) []string {
 	extras := make([]string, 0)
-	for scope := range bouncer.scopeHeaders {
+	for scope := range bouncer.decisionScopeHeaders {
 		if scope == scopeCountry || scope == scopeAS {
 			continue
 		}
@@ -170,7 +196,7 @@ func storeStreamDecision(bouncer *Bouncer, item Decision, duration int64) {
 		bouncer.cacheClient.Set(asKey(asn), value, duration)
 	default:
 		scope := normalizeScope(item.Scope)
-		if _, ok := bouncer.scopeHeaders[scope]; !ok {
+		if _, ok := bouncer.decisionScopeHeaders[scope]; !ok {
 			bouncer.log.Debug("handleStreamCache:ignoredScope " + item.Scope)
 			return
 		}
