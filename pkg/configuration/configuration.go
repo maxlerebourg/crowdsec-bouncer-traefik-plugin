@@ -43,80 +43,79 @@ const (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled                                    bool     `json:"enabled,omitempty"`
-	LogLevel                                   string   `json:"logLevel,omitempty"`
-	LogFormat                                  string   `json:"logFormat,omitempty"`
-	LogFilePath                                string   `json:"logFilePath,omitempty"`
-	CrowdsecMode                               string   `json:"crowdsecMode,omitempty"`
-	CrowdsecAppsecEnabled                      bool     `json:"crowdsecAppsecEnabled,omitempty"`
-	CrowdsecAppsecScheme                       string   `json:"crowdsecAppsecScheme,omitempty"`
-	CrowdsecAppsecHost                         string   `json:"crowdsecAppsecHost,omitempty"`
-	CrowdsecAppsecPath                         string   `json:"crowdsecAppsecPath,omitempty"`
-	CrowdsecAppsecKey                          string   `json:"crowdsecAppsecKey,omitempty"`
-	CrowdsecAppsecKeyFile                      string   `json:"crowdsecAppsecKeyFile,omitempty"`
-	CrowdsecAppsecTLSInsecureVerify            bool     `json:"crowdsecAppsecTlsInsecureVerify,omitempty"`
-	CrowdsecAppsecTLSCertificateAuthority      string   `json:"crowdsecAppsecTlsCertificateAuthority,omitempty"`
-	CrowdsecAppsecTLSCertificateAuthorityFile  string   `json:"crowdsecAppsecTlsCertificateAuthorityFile,omitempty"`
-	CrowdsecAppsecTLSCertificateBouncer        string   `json:"crowdsecAppsecTlsCertificateBouncer,omitempty"`
-	CrowdsecAppsecTLSCertificateBouncerFile    string   `json:"crowdsecAppsecTlsCertificateBouncerFile,omitempty"`
-	CrowdsecAppsecTLSCertificateBouncerKey     string   `json:"crowdsecAppsecTlsCertificateBouncerKey,omitempty"`
-	CrowdsecAppsecTLSCertificateBouncerKeyFile string   `json:"crowdsecAppsecTlsCertificateBouncerKeyFile,omitempty"`
-	CrowdsecAppsecFailureBlock                 bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
-	CrowdsecAppsecUnreachableBlock             bool     `json:"crowdsecAppsecUnreachableBlock,omitempty"`
-	CrowdsecAppsecUnreadableBodyBlock          bool     `json:"crowdsecAppsecUnreadableBodyBlock,omitempty"`
-	CrowdsecAppsecBodyLimit                    int64    `json:"crowdsecAppsecBodyLimit,omitempty"`
-	CrowdsecLapiScheme                         string   `json:"crowdsecLapiScheme,omitempty"`
-	CrowdsecLapiHost                           string   `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiPath                           string   `json:"crowdsecLapiPath,omitempty"`
-	CrowdsecLapiKey                            string   `json:"crowdsecLapiKey,omitempty"`
-	CrowdsecLapiKeyFile                        string   `json:"crowdsecLapiKeyFile,omitempty"`
-	CrowdsecLapiTLSInsecureVerify              bool     `json:"crowdsecLapiTlsInsecureVerify,omitempty"`
-	CrowdsecLapiTLSCertificateAuthority        string   `json:"crowdsecLapiTlsCertificateAuthority,omitempty"`
-	CrowdsecLapiTLSCertificateAuthorityFile    string   `json:"crowdsecLapiTlsCertificateAuthorityFile,omitempty"`
-	CrowdsecLapiTLSCertificateBouncer          string   `json:"crowdsecLapiTlsCertificateBouncer,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerFile      string   `json:"crowdsecLapiTlsCertificateBouncerFile,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerKey       string   `json:"crowdsecLapiTlsCertificateBouncerKey,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerKeyFile   string   `json:"crowdsecLapiTlsCertificateBouncerKeyFile,omitempty"`
-	CrowdsecCapiMachineID                      string   `json:"crowdsecCapiMachineId,omitempty"`
-	CrowdsecCapiMachineIDFile                  string   `json:"crowdsecCapiMachineIdFile,omitempty"`
-	CrowdsecCapiPassword                       string   `json:"crowdsecCapiPassword,omitempty"`
-	CrowdsecCapiPasswordFile                   string   `json:"crowdsecCapiPasswordFile,omitempty"`
-	CrowdsecCapiScenarios                      []string `json:"crowdsecCapiScenarios,omitempty"`
-	UpdateIntervalSeconds                      int64    `json:"updateIntervalSeconds,omitempty"`
-	MetricsUpdateIntervalSeconds               int64    `json:"metricsUpdateIntervalSeconds,omitempty"`
-	UpdateMaxFailure                           int64    `json:"updateMaxFailure,omitempty"`
-	StreamStartupBlock                         bool     `json:"streamStartupBlock,omitempty"`
-	DefaultDecisionSeconds                     int64    `json:"defaultDecisionSeconds,omitempty"`
-	RemediationStatusCode                      int      `json:"remediationStatusCode,omitempty"`
-	HTTPTimeoutSeconds                         int64    `json:"httpTimeoutSeconds,omitempty"`
-	TraceHeadersCustomName                     string   `json:"traceHeadersCustomName,omitempty"`
-	RemediationHeadersCustomName               string   `json:"remediationHeadersCustomName,omitempty"`
-	ForwardedHeadersCustomName                 string   `json:"forwardedHeadersCustomName,omitempty"`
-	CountryHeader                              string   `json:"countryHeader,omitempty"`
-	AsnHeader                                  string   `json:"asnHeader,omitempty"`
-	ForwardedHeadersTrustedIPs                 []string `json:"forwardedHeadersTrustedIps,omitempty"`
-	ClientTrustedIPs                           []string `json:"clientTrustedIps,omitempty"`
-	RedisCacheEnabled                          bool     `json:"redisCacheEnabled,omitempty"`
-	RedisCacheHost                             string   `json:"redisCacheHost,omitempty"`
-	RedisCacheReadHosts                        []string `json:"redisCacheReadHosts,omitempty"`
-	RedisCachePassword                         string   `json:"redisCachePassword,omitempty"`
-	RedisCachePasswordFile                     string   `json:"redisCachePasswordFile,omitempty"`
-	RedisCacheDatabase                         string   `json:"redisCacheDatabase,omitempty"`
-	RedisCacheUnreachableBlock                 bool     `json:"redisCacheUnreachableBlock,omitempty"`
-	BanHTMLFilePath                            string   `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
-	BanFilePath                                string   `json:"banFilePath,omitempty"`
-	CaptchaHTMLFilePath                        string   `json:"captchaHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
-	CaptchaFilePath                            string   `json:"captchaFilePath,omitempty"`
-	CaptchaProvider                            string   `json:"captchaProvider,omitempty"`
-	CaptchaCustomJsURL                         string   `json:"captchaCustomJsUrl,omitempty"`
-	CaptchaCustomValidateURL                   string   `json:"captchaCustomValidateUrl,omitempty"`
-	CaptchaCustomKey                           string   `json:"captchaCustomKey,omitempty"`
-	CaptchaCustomResponse                      string   `json:"captchaCustomResponse,omitempty"`
-	CaptchaSiteKey                             string   `json:"captchaSiteKey,omitempty"`
-	CaptchaSiteKeyFile                         string   `json:"captchaSiteKeyFile,omitempty"`
-	CaptchaSecretKey                           string   `json:"captchaSecretKey,omitempty"`
-	CaptchaSecretKeyFile                       string   `json:"captchaSecretKeyFile,omitempty"`
-	CaptchaGracePeriodSeconds                  int64    `json:"captchaGracePeriodSeconds,omitempty"`
+	Enabled                                    bool              `json:"enabled,omitempty"`
+	LogLevel                                   string            `json:"logLevel,omitempty"`
+	LogFormat                                  string            `json:"logFormat,omitempty"`
+	LogFilePath                                string            `json:"logFilePath,omitempty"`
+	CrowdsecMode                               string            `json:"crowdsecMode,omitempty"`
+	CrowdsecAppsecEnabled                      bool              `json:"crowdsecAppsecEnabled,omitempty"`
+	CrowdsecAppsecScheme                       string            `json:"crowdsecAppsecScheme,omitempty"`
+	CrowdsecAppsecHost                         string            `json:"crowdsecAppsecHost,omitempty"`
+	CrowdsecAppsecPath                         string            `json:"crowdsecAppsecPath,omitempty"`
+	CrowdsecAppsecKey                          string            `json:"crowdsecAppsecKey,omitempty"`
+	CrowdsecAppsecKeyFile                      string            `json:"crowdsecAppsecKeyFile,omitempty"`
+	CrowdsecAppsecTLSInsecureVerify            bool              `json:"crowdsecAppsecTlsInsecureVerify,omitempty"`
+	CrowdsecAppsecTLSCertificateAuthority      string            `json:"crowdsecAppsecTlsCertificateAuthority,omitempty"`
+	CrowdsecAppsecTLSCertificateAuthorityFile  string            `json:"crowdsecAppsecTlsCertificateAuthorityFile,omitempty"`
+	CrowdsecAppsecTLSCertificateBouncer        string            `json:"crowdsecAppsecTlsCertificateBouncer,omitempty"`
+	CrowdsecAppsecTLSCertificateBouncerFile    string            `json:"crowdsecAppsecTlsCertificateBouncerFile,omitempty"`
+	CrowdsecAppsecTLSCertificateBouncerKey     string            `json:"crowdsecAppsecTlsCertificateBouncerKey,omitempty"`
+	CrowdsecAppsecTLSCertificateBouncerKeyFile string            `json:"crowdsecAppsecTlsCertificateBouncerKeyFile,omitempty"`
+	CrowdsecAppsecFailureBlock                 bool              `json:"crowdsecAppsecFailureBlock,omitempty"`
+	CrowdsecAppsecUnreachableBlock             bool              `json:"crowdsecAppsecUnreachableBlock,omitempty"`
+	CrowdsecAppsecUnreadableBodyBlock          bool              `json:"crowdsecAppsecUnreadableBodyBlock,omitempty"`
+	CrowdsecAppsecBodyLimit                    int64             `json:"crowdsecAppsecBodyLimit,omitempty"`
+	CrowdsecLapiScheme                         string            `json:"crowdsecLapiScheme,omitempty"`
+	CrowdsecLapiHost                           string            `json:"crowdsecLapiHost,omitempty"`
+	CrowdsecLapiPath                           string            `json:"crowdsecLapiPath,omitempty"`
+	CrowdsecLapiKey                            string            `json:"crowdsecLapiKey,omitempty"`
+	CrowdsecLapiKeyFile                        string            `json:"crowdsecLapiKeyFile,omitempty"`
+	CrowdsecLapiTLSInsecureVerify              bool              `json:"crowdsecLapiTlsInsecureVerify,omitempty"`
+	CrowdsecLapiTLSCertificateAuthority        string            `json:"crowdsecLapiTlsCertificateAuthority,omitempty"`
+	CrowdsecLapiTLSCertificateAuthorityFile    string            `json:"crowdsecLapiTlsCertificateAuthorityFile,omitempty"`
+	CrowdsecLapiTLSCertificateBouncer          string            `json:"crowdsecLapiTlsCertificateBouncer,omitempty"`
+	CrowdsecLapiTLSCertificateBouncerFile      string            `json:"crowdsecLapiTlsCertificateBouncerFile,omitempty"`
+	CrowdsecLapiTLSCertificateBouncerKey       string            `json:"crowdsecLapiTlsCertificateBouncerKey,omitempty"`
+	CrowdsecLapiTLSCertificateBouncerKeyFile   string            `json:"crowdsecLapiTlsCertificateBouncerKeyFile,omitempty"`
+	CrowdsecCapiMachineID                      string            `json:"crowdsecCapiMachineId,omitempty"`
+	CrowdsecCapiMachineIDFile                  string            `json:"crowdsecCapiMachineIdFile,omitempty"`
+	CrowdsecCapiPassword                       string            `json:"crowdsecCapiPassword,omitempty"`
+	CrowdsecCapiPasswordFile                   string            `json:"crowdsecCapiPasswordFile,omitempty"`
+	CrowdsecCapiScenarios                      []string          `json:"crowdsecCapiScenarios,omitempty"`
+	UpdateIntervalSeconds                      int64             `json:"updateIntervalSeconds,omitempty"`
+	MetricsUpdateIntervalSeconds               int64             `json:"metricsUpdateIntervalSeconds,omitempty"`
+	UpdateMaxFailure                           int64             `json:"updateMaxFailure,omitempty"`
+	StreamStartupBlock                         bool              `json:"streamStartupBlock,omitempty"`
+	DefaultDecisionSeconds                     int64             `json:"defaultDecisionSeconds,omitempty"`
+	RemediationStatusCode                      int               `json:"remediationStatusCode,omitempty"`
+	HTTPTimeoutSeconds                         int64             `json:"httpTimeoutSeconds,omitempty"`
+	TraceHeadersCustomName                     string            `json:"traceHeadersCustomName,omitempty"`
+	RemediationHeadersCustomName               string            `json:"remediationHeadersCustomName,omitempty"`
+	ForwardedHeadersCustomName                 string            `json:"forwardedHeadersCustomName,omitempty"`
+	ScopeHeaders                               map[string]string `json:"scopeHeaders,omitempty"`
+	ForwardedHeadersTrustedIPs                 []string          `json:"forwardedHeadersTrustedIps,omitempty"`
+	ClientTrustedIPs                           []string          `json:"clientTrustedIps,omitempty"`
+	RedisCacheEnabled                          bool              `json:"redisCacheEnabled,omitempty"`
+	RedisCacheHost                             string            `json:"redisCacheHost,omitempty"`
+	RedisCacheReadHosts                        []string          `json:"redisCacheReadHosts,omitempty"`
+	RedisCachePassword                         string            `json:"redisCachePassword,omitempty"`
+	RedisCachePasswordFile                     string            `json:"redisCachePasswordFile,omitempty"`
+	RedisCacheDatabase                         string            `json:"redisCacheDatabase,omitempty"`
+	RedisCacheUnreachableBlock                 bool              `json:"redisCacheUnreachableBlock,omitempty"`
+	BanHTMLFilePath                            string            `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
+	BanFilePath                                string            `json:"banFilePath,omitempty"`
+	CaptchaHTMLFilePath                        string            `json:"captchaHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
+	CaptchaFilePath                            string            `json:"captchaFilePath,omitempty"`
+	CaptchaProvider                            string            `json:"captchaProvider,omitempty"`
+	CaptchaCustomJsURL                         string            `json:"captchaCustomJsUrl,omitempty"`
+	CaptchaCustomValidateURL                   string            `json:"captchaCustomValidateUrl,omitempty"`
+	CaptchaCustomKey                           string            `json:"captchaCustomKey,omitempty"`
+	CaptchaCustomResponse                      string            `json:"captchaCustomResponse,omitempty"`
+	CaptchaSiteKey                             string            `json:"captchaSiteKey,omitempty"`
+	CaptchaSiteKeyFile                         string            `json:"captchaSiteKeyFile,omitempty"`
+	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
+	CaptchaSecretKeyFile                       string            `json:"captchaSecretKeyFile,omitempty"`
+	CaptchaGracePeriodSeconds                  int64             `json:"captchaGracePeriodSeconds,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -171,8 +170,7 @@ func New() *Config {
 		TraceHeadersCustomName:            "",
 		RemediationHeadersCustomName:      "",
 		ForwardedHeadersCustomName:        "X-Forwarded-For",
-		CountryHeader:                     "",
-		AsnHeader:                         "",
+		ScopeHeaders:                      map[string]string{},
 		ForwardedHeadersTrustedIPs:        []string{},
 		ClientTrustedIPs:                  []string{},
 		RedisCacheEnabled:                 false,
@@ -406,6 +404,23 @@ func validateParamsTLS(config *Config) error {
 	return nil
 }
 
+func validateScopeHeaders(config *Config) error {
+	for rawScope, rawHeader := range config.ScopeHeaders {
+		scope := strings.TrimSpace(rawScope)
+		if scope == "" {
+			return errors.New("scopeHeaders: scope name cannot be empty")
+		}
+		switch strings.ToLower(scope) {
+		case "ip", "range":
+			return fmt.Errorf("scopeHeaders: %q cannot be mapped to a header", scope)
+		}
+		if strings.TrimSpace(rawHeader) == "" {
+			return fmt.Errorf("scopeHeaders: header for %q cannot be empty", scope)
+		}
+	}
+	return nil
+}
+
 func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 	if len(listIP) > 0 {
 		if _, err := ip.NewChecker(log, listIP); err != nil {
@@ -483,7 +498,7 @@ func validateParamsRequired(config *Config) error {
 	if !contains([]string{HTTP, HTTPS, ""}, config.CrowdsecAppsecScheme) {
 		return errors.New("CrowdsecAppsecScheme: must be one of 'http' or 'https'")
 	}
-	return nil
+	return validateScopeHeaders(config)
 }
 
 func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insecureVerify bool) (*tls.Config, error) {

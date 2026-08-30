@@ -107,8 +107,7 @@ type Bouncer struct {
 	remediationStatusCode     int
 	remediationCustomHeader   string
 	forwardedCustomHeader     string
-	countryHeader             string
-	asnHeader                 string
+	scopeHeaders              map[string]string
 	crowdsecStreamRoute       string
 	crowdsecHeader            string
 	redisUnreachableBlock     bool
@@ -228,8 +227,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		updateMaxFailure:          config.UpdateMaxFailure,
 		remediationCustomHeader:   config.RemediationHeadersCustomName,
 		forwardedCustomHeader:     config.ForwardedHeadersCustomName,
-		countryHeader:             config.CountryHeader,
-		asnHeader:                 config.AsnHeader,
+		scopeHeaders:              normalizeScopeHeaders(config.ScopeHeaders),
 		defaultDecisionTimeout:    config.DefaultDecisionSeconds,
 		remediationStatusCode:     config.RemediationStatusCode,
 		redisUnreachableBlock:     config.RedisCacheUnreachableBlock,
@@ -366,12 +364,11 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	country := requestCountry(bouncer, req)
-	asn := requestASN(bouncer, req)
+	scopes := requestScopeValues(bouncer, req)
 
-	// Cache lookup: Ip, then Range, then Country, then AS. Live still queries LAPI on miss.
+	// Cache lookup: Ip, Range, then configured header scopes. Live still queries LAPI on miss.
 	if bouncer.crowdsecMode != configuration.NoneMode {
-		value, cacheErr := lookupCachedRemediation(bouncer, remoteIP, country, asn)
+		value, cacheErr := lookupCachedRemediation(bouncer, remoteIP, scopes)
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
@@ -405,7 +402,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 		}
 	} else {
-		value, err := handleNoStreamCache(bouncer, remoteIP, country, asn)
+		value, err := handleNoStreamCache(bouncer, remoteIP, scopes)
 		if err != nil {
 			bouncer.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
 		}
@@ -540,37 +537,17 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	return stop
 }
 
-// We are now in none or live mode. country and asn are already normalized, or empty.
-func handleNoStreamCache(bouncer *Bouncer, remoteIP, country, asn string) (string, error) {
+// We are now in none or live mode. scopes holds normalized header values for configured scopes.
+func handleNoStreamCache(bouncer *Bouncer, remoteIP string, scopes map[string]string) (string, error) {
 	isLiveMode := bouncer.crowdsecMode == configuration.LiveMode
 	chosen, parsedDuration, err := queryLiveDecisions(bouncer, fmt.Sprintf("ip=%v", remoteIP))
 	if err != nil {
 		return cache.BannedValue, err
 	}
-	if country != "" {
-		headerChosen, headerDuration, headerErr := queryLiveDecisions(bouncer, "scope=Country&value="+url.QueryEscape(country))
-		if headerErr != nil {
-			bouncer.log.Debug("handleNoStreamCache:countryQuery " + headerErr.Error())
-		} else {
-			cacheLiveScope(bouncer, countryKey(country), headerChosen, headerDuration, isLiveMode)
-			chosen = preferRemediation(chosen, headerChosen)
-			if headerChosen == chosen {
-				parsedDuration = headerDuration
-			}
-		}
-	}
-	if asn != "" {
-		headerChosen, headerDuration, headerErr := queryLiveDecisions(bouncer, "scope=AS&value="+url.QueryEscape(asn))
-		if headerErr != nil {
-			bouncer.log.Debug("handleNoStreamCache:asnQuery " + headerErr.Error())
-		} else {
-			cacheLiveScope(bouncer, asKey(asn), headerChosen, headerDuration, isLiveMode)
-			next := preferRemediation(chosen, headerChosen)
-			if next != chosen {
-				parsedDuration = headerDuration
-			}
-			chosen = next
-		}
+	chosen, parsedDuration = mergeLiveScope(bouncer, chosen, parsedDuration, scopeCountry, scopes[scopeCountry], isLiveMode)
+	chosen, parsedDuration = mergeLiveScope(bouncer, chosen, parsedDuration, scopeAS, scopes[scopeAS], isLiveMode)
+	for _, scope := range extraHeaderScopes(bouncer) {
+		chosen, parsedDuration = mergeLiveScope(bouncer, chosen, parsedDuration, scope, scopes[scope], isLiveMode)
 	}
 	if !isActiveRemediation(chosen) {
 		if isLiveMode && bouncer.defaultDecisionTimeout > 0 {

@@ -166,6 +166,24 @@ lapi_delete_decision() {
   curl -sS -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}" >/dev/null
 }
 
+# Generic CrowdSec scope (Country, AS, Range, username, …).
+# Usage: lapi_add_scope_decision SCOPE VALUE [type] [duration]
+lapi_add_scope_decision() {
+  local scope="$1" value="$2" type="${3:-ban}" duration="${4:-4h}"
+  curl -sS -G -X POST "http://127.0.0.1:${LAPI_PORT}/admin/decisions" \
+    --data-urlencode "scope=${scope}" \
+    --data-urlencode "value=${value}" \
+    --data-urlencode "type=${type}" \
+    --data-urlencode "duration=${duration}" >/dev/null
+}
+
+lapi_delete_scope_decision() {
+  local scope="$1" value="$2"
+  curl -sS -G -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions" \
+    --data-urlencode "scope=${scope}" \
+    --data-urlencode "value=${value}" >/dev/null
+}
+
 # --- stack lifecycle ---------------------------------------------------------
 
 # start_stack SCENARIO_DIR

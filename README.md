@@ -33,9 +33,23 @@ Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) an
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
 
-Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), `Country`, and `AS`.  
-Country and AS matching use existing request headers named by `countryHeader` and `asnHeader` (for example a CDN `CF-IPCountry` / `CF-ASN`). The plugin does not resolve GeoIP itself. Other CrowdSec scopes (`username`, `session`, …) are ignored.  
-Those headers must be set by a trusted hop. If Traefik is the first hop, a client can send them and change Country or AS matching.
+Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), and any other CrowdSec scope listed in `scopeHeaders`.
+
+`scopeHeaders` maps a CrowdSec **scope name** (the map key) to a request **header name** (the map value). The key selects how the header is interpreted, not the header name:
+
+- `Country` (any case: `country`, `Country`): ISO 3166-1 alpha-2, case-insensitive. Cloudflare `XX` and `T1` do not match. Example header: `CF-IPCountry`.
+- `AS` (any case: `as`, `AS`): decimal ASN. A leading `AS` / `as` on the header or the decision is ignored. Example header: `CF-ASN`.
+- Any other key (`username`, `session`, …): trimmed header string, compared as-is to the decision value. The key must match the scope LAPI stored (`username` is not `user`).
+- `Ip` and `Range` cannot be mapped. IP comes from the client address; Range is CIDR containment.
+
+```yaml
+scopeHeaders:
+  Country: CF-IPCountry
+  AS: CF-ASN
+  username: X-User
+```
+
+The plugin does not resolve GeoIP itself. Those headers must be set by a trusted hop. If Traefik is the first hop, a client can send them and change matching.
 
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
@@ -437,14 +451,10 @@ make run
   - string
   - default: "X-Forwarded-For"
   - Name of the header where the real IP of the client should be retrieved
-- CountryHeader
-  - string
-  - default: ""
-  - Request header that already contains the client country as an ISO 3166-1 alpha-2 code (for example `CF-IPCountry`). Empty disables Country decisions.
-- AsnHeader
-  - string
-  - default: ""
-  - Request header that already contains the client ASN (decimal or `AS13335`). Empty disables AS decisions.
+- ScopeHeaders
+  - map[string]string
+  - default: {}
+  - Maps a CrowdSec **scope name** (key) to a request header (value). The key chooses the matcher: `Country` (any case) is ISO 3166-1 alpha-2 and ignores `XX`/`T1`; `AS` (any case) is decimal digits and strips a leading `AS`; any other key is a trimmed exact match. Do not map `Ip` or `Range`. Empty disables header scopes. See the `scopeHeaders` example above.
 - ForwardedHeadersTrustedIPs
   - []string
   - default: []
@@ -622,8 +632,10 @@ http:
           enabled: false
           logLevel: DEBUG
           logFormat: common
-          countryHeader: ""
-          asnHeader: ""
+          scopeHeaders: {}
+          # Country: CF-IPCountry  # key Country (any case) → ISO country matcher
+          # AS: CF-ASN             # key AS (any case) → ASN matcher
+          # username: X-User       # any other key → trimmed exact match
           LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0

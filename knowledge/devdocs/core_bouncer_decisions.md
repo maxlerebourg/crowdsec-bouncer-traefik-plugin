@@ -12,15 +12,16 @@ _Avoid_: remediation type, header
 
 ## Overview
 
-The bouncer stores stream decisions in the shared cache and looks them up on each request. Ip is the client address. Range is CIDR containment. Country and AS are existing request headers named in config.
+The bouncer stores stream decisions in the shared cache and looks them up on each request. Ip is the client address. Range is CIDR containment. Other scopes come from `scopeHeaders` (scope name → request header). Country and AS keep ad-hoc value normalization.
 
 ## How to use
 
-- Add `countryHeader` and/or `asnHeader` when you want Country or AS matching.
+- Add `scopeHeaders` when you want Country, AS, or another CrowdSec scope matched from a request header.
 - Those headers must be set by a trusted hop (CDN or Traefik). A client-supplied value is not trusted identity.
-- Empty header names leave Country/AS off. LAPI stream then asks only `ip,range`.
+- Empty `scopeHeaders` leaves header scopes off. LAPI stream then asks only `ip,range`.
 - Do not resolve GeoIP in this plugin. Read the header that already has the code or ASN.
-- Ignore custom scopes (`username`, `session`). There is no request identity for them.
+- Do not map `Ip` or `Range`. Those are not header scopes.
+- Unmapped custom scopes (`username`, `session`) are ignored.
 
 ## Pattern snippet
 
@@ -30,20 +31,23 @@ http:
     crowdsec:
       plugin:
         bouncer:
-          countryHeader: CF-IPCountry
-          asnHeader: CF-ASN
+          scopeHeaders:
+            Country: CF-IPCountry
+            AS: CF-ASN
+            username: X-User
 ```
 
 ## Key files
 
 - `decision_scope.go`, `decision_ranges.go` — scope normalize, cache keys, range index
 - `bouncer_decisions.go` — stream scopes, live extra queries, cache lookup
-- `pkg/configuration/configuration.go` — `CountryHeader`, `AsnHeader`
+- `pkg/configuration/configuration.go` — `ScopeHeaders`
 
 ## Gotchas
 
-- LAPI stream defaults to Ip+Range. Country and AS never arrive unless `scopes=` is sent (this plugin adds it when the header is configured).
+- LAPI stream defaults to Ip+Range. Country, AS, and custom scopes never arrive unless `scopes=` is sent (this plugin adds configured keys).
 - ASN values are decimal digits (`13335`). A header like `AS13335` is stripped before compare.
 - Cloudflare `XX` and `T1` do not match a Country decision.
+- Custom scopes compare the trimmed header string to the decision value. The scope name must match what LAPI stored (`username` is not `user`).
 - Range membership lives in the shared cache (`range-index`) so instances that do not ingest the stream can still match.
-- Country and ASN headers are not authenticated. If Traefik is the edge, the client can send them.
+- Scope headers are not authenticated. If Traefik is the edge, the client can send them.

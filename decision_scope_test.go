@@ -31,6 +31,7 @@ func TestNormalizeCountry(t *testing.T) {
 		{" XX ", ""},
 		{"T1", ""},
 		{"USA", ""},
+		{"12", ""},
 		{"", ""},
 		{"F", ""},
 	}
@@ -49,6 +50,7 @@ func TestNormalizeASN(t *testing.T) {
 		{"AS13335", "13335"},
 		{"as13335", "13335"},
 		{"AS 13335", "13335"},
+		{" 13335 ", "13335"},
 		{"", ""},
 		{"AS", ""},
 		{"AS-1", ""},
@@ -57,6 +59,45 @@ func TestNormalizeASN(t *testing.T) {
 		if got := normalizeASN(tt.in); got != tt.want {
 			t.Errorf("normalizeASN(%q) = %q, want %q", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestNormalizeScopeHeaders(t *testing.T) {
+	got := normalizeScopeHeaders(map[string]string{
+		"country":  "CF-IPCountry",
+		"AS":       "CF-ASN",
+		"username": "X-User",
+		"ip":       "X-Real-IP",
+		"range":    "X-Range",
+		"":         "X-Empty",
+		"session":  "  ",
+	})
+	if got[scopeCountry] != "CF-IPCountry" || got[scopeAS] != "CF-ASN" || got["username"] != "X-User" {
+		t.Fatalf("kept scopes: %+v", got)
+	}
+	if _, ok := got[scopeIP]; ok {
+		t.Fatal("ip must be dropped")
+	}
+	if _, ok := got[scopeRange]; ok {
+		t.Fatal("range must be dropped")
+	}
+	if _, ok := got[""]; ok {
+		t.Fatal("empty scope must be dropped")
+	}
+	if _, ok := got["session"]; ok {
+		t.Fatal("empty header must be dropped")
+	}
+}
+
+func TestHeaderScopeKey(t *testing.T) {
+	if got := headerScopeKey(scopeCountry, "FR"); got != countryKey("FR") {
+		t.Fatalf("country key %q", got)
+	}
+	if got := headerScopeKey(scopeAS, "13335"); got != asKey("13335") {
+		t.Fatalf("as key %q", got)
+	}
+	if got := headerScopeKey("username", "alice"); got != "username:alice" {
+		t.Fatalf("username key %q", got)
 	}
 }
 
@@ -69,5 +110,17 @@ func TestIPCacheKey(t *testing.T) {
 	}
 	if got := ipCacheKey("10.0.0.0/24"); got != "10.0.0.0/24" {
 		t.Errorf("non-host CIDR should stay: %s", got)
+	}
+	if got := ipCacheKey("2001:db8::1/128"); got != "2001:db8::1" {
+		t.Errorf("/128: %s", got)
+	}
+}
+
+func TestNormalizeScopeHeadersNil(t *testing.T) {
+	if got := normalizeScopeHeaders(nil); got != nil {
+		t.Fatalf("nil input: %+v", got)
+	}
+	if got := normalizeScopeHeaders(map[string]string{}); got != nil {
+		t.Fatalf("empty input: %+v", got)
 	}
 }

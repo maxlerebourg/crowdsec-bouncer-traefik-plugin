@@ -25,6 +25,7 @@ import (
 
 // Decision is the subset of a LAPI decision the plugin actually reads.
 type Decision struct {
+	Scope    string `json:"scope"`
 	Value    string `json:"value"`
 	Type     string `json:"type"`
 	Duration string `json:"duration"`
@@ -32,9 +33,25 @@ type Decision struct {
 
 var (
 	mu      sync.Mutex
-	active  = map[string]Decision{} // ip -> decision currently in force
-	deleted = map[string]Decision{} // ip -> decision to report in the stream "deleted" list
+	active  = map[string]Decision{} // scope:value -> decision currently in force
+	deleted = map[string]Decision{} // scope:value -> decision to report in the stream "deleted" list
 )
+
+func decisionKey(scope, value string) string {
+	if scope == "" {
+		scope = "Ip"
+	}
+	return strings.ToLower(scope) + ":" + value
+}
+
+func ipInRange(ipAddr, cidr string) bool {
+	_, network, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return false
+	}
+	parsed := net.ParseIP(ipAddr)
+	return parsed != nil && network.Contains(parsed)
+}
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -157,14 +174,31 @@ func main() {
 	// Readiness probe for the test harness (empty body, 200).
 	mux.HandleFunc("/health", func(http.ResponseWriter, *http.Request) {})
 
-	// live / none mode: the plugin asks about one IP and expects a decision
-	// array, or the literal `null` when there is none.
+	// live / none mode: ?ip= matches an Ip decision or a covering Range.
+	// ?scope=&value= is an exact match (Country, AS, username, …).
 	mux.HandleFunc("/v1/decisions", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
-		if d, ok := active[r.URL.Query().Get("ip")]; ok {
-			writeJSON(w, []Decision{d})
+		q := r.URL.Query()
+		if ipAddr := q.Get("ip"); ipAddr != "" {
+			if d, ok := active[decisionKey("Ip", ipAddr)]; ok {
+				writeJSON(w, []Decision{d})
+				return
+			}
+			for _, d := range active {
+				if strings.EqualFold(d.Scope, "Range") && ipInRange(ipAddr, d.Value) {
+					writeJSON(w, []Decision{d})
+					return
+				}
+			}
+			_, _ = w.Write([]byte("null"))
 			return
+		}
+		if scope := q.Get("scope"); scope != "" {
+			if d, ok := active[decisionKey(scope, q.Get("value"))]; ok {
+				writeJSON(w, []Decision{d})
+				return
+			}
 		}
 		_, _ = w.Write([]byte("null"))
 	})
@@ -184,9 +218,19 @@ func main() {
 	})
 
 	// Test control plane: add / remove decisions instead of cscli.
+	// ip= is shorthand for scope=Ip&value=<ip>. scope=&value= is the generic form.
 	mux.HandleFunc("/admin/decisions", func(_ http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		ip := q.Get("ip")
+		scope := q.Get("scope")
+		value := q.Get("value")
+		if ipAddr := q.Get("ip"); ipAddr != "" {
+			scope = "Ip"
+			value = ipAddr
+		}
+		if scope == "" {
+			scope = "Ip"
+		}
+		key := decisionKey(scope, value)
 		mu.Lock()
 		defer mu.Unlock()
 		switch r.Method {
@@ -199,12 +243,12 @@ func main() {
 			if duration == "" {
 				duration = "4h"
 			}
-			active[ip] = Decision{Value: ip, Type: dtype, Duration: duration}
-			delete(deleted, ip)
+			active[key] = Decision{Scope: scope, Value: value, Type: dtype, Duration: duration}
+			delete(deleted, key)
 		case http.MethodDelete:
-			if d, ok := active[ip]; ok {
-				deleted[ip] = d
-				delete(active, ip)
+			if d, ok := active[key]; ok {
+				deleted[key] = d
+				delete(active, key)
 			}
 		}
 	})

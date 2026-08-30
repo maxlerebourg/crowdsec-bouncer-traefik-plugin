@@ -6,25 +6,35 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
-// requestCountry reads and normalizes the configured country header.
-func requestCountry(bouncer *Bouncer, req *http.Request) string {
-	if bouncer.countryHeader == "" {
-		return ""
+// requestScopeValues reads configured scope headers and normalizes Country and AS ad-hoc.
+func requestScopeValues(bouncer *Bouncer, req *http.Request) map[string]string {
+	if len(bouncer.scopeHeaders) == 0 {
+		return nil
 	}
-	return normalizeCountry(req.Header.Get(bouncer.countryHeader))
-}
-
-// requestASN reads and normalizes the configured ASN header.
-func requestASN(bouncer *Bouncer, req *http.Request) string {
-	if bouncer.asnHeader == "" {
-		return ""
+	out := make(map[string]string, len(bouncer.scopeHeaders))
+	for scope, header := range bouncer.scopeHeaders {
+		raw := req.Header.Get(header)
+		var value string
+		switch scope {
+		case scopeCountry:
+			value = normalizeCountry(raw)
+		case scopeAS:
+			value = normalizeASN(raw)
+		default:
+			value = strings.TrimSpace(raw)
+		}
+		if value != "" {
+			out[scope] = value
+		}
 	}
-	return normalizeASN(req.Header.Get(bouncer.asnHeader))
+	return out
 }
 
 // isActiveRemediation reports whether value is ban or captcha.
@@ -55,8 +65,8 @@ func preferRemediation(current, incoming string) string {
 	return incoming
 }
 
-// lookupCachedRemediation checks Ip, Range, Country, then AS in the shared cache.
-func lookupCachedRemediation(bouncer *Bouncer, remoteIP, country, asn string) (string, error) {
+// lookupCachedRemediation checks Ip, Range, Country, AS, then other configured header scopes.
+func lookupCachedRemediation(bouncer *Bouncer, remoteIP string, scopes map[string]string) (string, error) {
 	value, err := bouncer.cacheClient.Get(remoteIP)
 	switch {
 	case err == nil && isActiveRemediation(value):
@@ -67,11 +77,17 @@ func lookupCachedRemediation(bouncer *Bouncer, remoteIP, country, asn string) (s
 	if rangeValue := matchRange(bouncer.cacheClient, remoteIP); isActiveRemediation(rangeValue) {
 		return rangeValue, nil
 	}
-	if countryValue, countryErr := lookupScopeKey(bouncer, countryKey(country), country); countryErr != nil || countryValue != "" {
+	if countryValue, countryErr := lookupScopeKey(bouncer, countryKey(scopes[scopeCountry]), scopes[scopeCountry]); countryErr != nil || countryValue != "" {
 		return countryValue, countryErr
 	}
-	if asnValue, asnErr := lookupScopeKey(bouncer, asKey(asn), asn); asnErr != nil || asnValue != "" {
+	if asnValue, asnErr := lookupScopeKey(bouncer, asKey(scopes[scopeAS]), scopes[scopeAS]); asnErr != nil || asnValue != "" {
 		return asnValue, asnErr
+	}
+	for _, scope := range extraHeaderScopes(bouncer) {
+		identifier := scopes[scope]
+		if headerValue, headerErr := lookupScopeKey(bouncer, headerScopeKey(scope, identifier), identifier); headerErr != nil || headerValue != "" {
+			return headerValue, headerErr
+		}
 	}
 	if err == nil {
 		return value, nil
@@ -79,7 +95,7 @@ func lookupCachedRemediation(bouncer *Bouncer, remoteIP, country, asn string) (s
 	return "", err
 }
 
-// lookupScopeKey returns an active remediation for a Country or AS cache key.
+// lookupScopeKey returns an active remediation for a header-scope cache key.
 func lookupScopeKey(bouncer *Bouncer, key, identifier string) (string, error) {
 	if identifier == "" {
 		return "", nil
@@ -105,14 +121,27 @@ func streamQuery(bouncer *Bouncer) string {
 
 // streamScopeList is the LAPI scopes query value for this bouncer config.
 func streamScopeList(bouncer *Bouncer) string {
-	scopes := "ip,range"
-	if bouncer.countryHeader != "" {
-		scopes += ",country"
+	parts := []string{"ip", "range"}
+	if _, ok := bouncer.scopeHeaders[scopeCountry]; ok {
+		parts = append(parts, "country")
 	}
-	if bouncer.asnHeader != "" {
-		scopes += ",AS"
+	if _, ok := bouncer.scopeHeaders[scopeAS]; ok {
+		parts = append(parts, "AS")
 	}
-	return scopes
+	return strings.Join(append(parts, extraHeaderScopes(bouncer)...), ",")
+}
+
+// extraHeaderScopes is configured header scopes other than Country and AS, sorted.
+func extraHeaderScopes(bouncer *Bouncer) []string {
+	extras := make([]string, 0)
+	for scope := range bouncer.scopeHeaders {
+		if scope == scopeCountry || scope == scopeAS {
+			continue
+		}
+		extras = append(extras, scope)
+	}
+	sort.Strings(extras)
+	return extras
 }
 
 // storeStreamDecision writes one stream New decision into the shared cache by scope.
@@ -140,7 +169,16 @@ func storeStreamDecision(bouncer *Bouncer, item Decision, duration int64) {
 		}
 		bouncer.cacheClient.Set(asKey(asn), value, duration)
 	default:
-		bouncer.log.Debug("handleStreamCache:ignoredScope " + item.Scope)
+		scope := normalizeScope(item.Scope)
+		if _, ok := bouncer.scopeHeaders[scope]; !ok {
+			bouncer.log.Debug("handleStreamCache:ignoredScope " + item.Scope)
+			return
+		}
+		trimmed := strings.TrimSpace(item.Value)
+		if trimmed == "" {
+			return
+		}
+		bouncer.cacheClient.Set(headerScopeKey(scope, trimmed), value, duration)
 	}
 }
 
@@ -163,7 +201,11 @@ func deleteStreamDecision(bouncer *Bouncer, item Decision) {
 			bouncer.cacheClient.Delete(asKey(asn))
 		}
 	default:
-		bouncer.cacheClient.Delete(item.Value)
+		scope := normalizeScope(item.Scope)
+		trimmed := strings.TrimSpace(item.Value)
+		if trimmed != "" {
+			bouncer.cacheClient.Delete(headerScopeKey(scope, trimmed))
+		}
 	}
 }
 
@@ -217,6 +259,23 @@ func pickDecision(items []Decision) *Decision {
 		}
 	}
 	return fallback
+}
+
+func mergeLiveScope(bouncer *Bouncer, chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool) (string, time.Duration) {
+	if identifier == "" {
+		return chosen, parsedDuration
+	}
+	headerChosen, headerDuration, headerErr := queryLiveDecisions(bouncer, "scope="+url.QueryEscape(scope)+"&value="+url.QueryEscape(identifier))
+	if headerErr != nil {
+		bouncer.log.Debug("handleNoStreamCache:scopeQuery " + scope + " " + headerErr.Error())
+		return chosen, parsedDuration
+	}
+	cacheLiveScope(bouncer, headerScopeKey(scope, identifier), headerChosen, headerDuration, isLiveMode)
+	next := preferRemediation(chosen, headerChosen)
+	if next != chosen {
+		return next, headerDuration
+	}
+	return chosen, parsedDuration
 }
 
 func cacheLiveScope(bouncer *Bouncer, key, value string, parsedDuration time.Duration, isLiveMode bool) {

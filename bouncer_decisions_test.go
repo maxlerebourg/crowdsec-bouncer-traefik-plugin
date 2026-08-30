@@ -1,9 +1,12 @@
 package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
@@ -28,8 +31,10 @@ func newTestMatchBouncer(t *testing.T) *Bouncer {
 		enabled:               true,
 		crowdsecMode:          configuration.StreamMode,
 		forwardedCustomHeader: "X-Forwarded-For",
-		countryHeader:         "CF-IPCountry",
-		asnHeader:             "CF-ASN",
+		scopeHeaders: map[string]string{
+			scopeCountry: "CF-IPCountry",
+			scopeAS:      "CF-ASN",
+		},
 		remediationStatusCode: http.StatusForbidden,
 		serverPoolStrategy:    &ip.PoolStrategy{Checker: checker},
 		clientPoolStrategy:    &ip.PoolStrategy{Checker: checker},
@@ -44,9 +49,12 @@ func TestStreamScopeList(t *testing.T) {
 	if got := streamScopeList(bouncer); got != "ip,range" {
 		t.Fatalf("default scopes %q", got)
 	}
-	bouncer.countryHeader = "CF-IPCountry"
-	bouncer.asnHeader = "CF-ASN"
-	if got := streamScopeList(bouncer); got != "ip,range,country,AS" {
+	bouncer.scopeHeaders = map[string]string{
+		scopeCountry: "CF-IPCountry",
+		scopeAS:      "CF-ASN",
+		"username":   "X-User",
+	}
+	if got := streamScopeList(bouncer); got != "ip,range,country,AS,username" {
 		t.Fatalf("configured scopes %q", got)
 	}
 }
@@ -54,7 +62,7 @@ func TestStreamScopeList(t *testing.T) {
 func TestStreamQueryLAPIIncludesScopes(t *testing.T) {
 	bouncer := &Bouncer{
 		crowdsecStreamRoute: crowdsecLapiStreamRoute,
-		countryHeader:       "CF-IPCountry",
+		scopeHeaders:        map[string]string{scopeCountry: "CF-IPCountry"},
 	}
 	query := streamQuery(bouncer)
 	if query != "startup=true&scopes=ip,range,country" && query != "startup=false&scopes=ip,range,country" {
@@ -130,5 +138,330 @@ func TestStoreStreamDecisionIgnoresUsername(t *testing.T) {
 	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "alice"}, 60)
 	if _, err := bouncer.cacheClient.Get("alice"); err == nil {
 		t.Fatal("username scope must not be cached as a key")
+	}
+	if _, err := bouncer.cacheClient.Get(headerScopeKey("username", "alice")); err == nil {
+		t.Fatal("unmapped username scope must not be cached")
+	}
+}
+
+func TestServeHTTPCustomScopeDecision(t *testing.T) {
+	isCrowdsecStreamHealthy = true
+	bouncer := newTestMatchBouncer(t)
+	bouncer.scopeHeaders["username"] = "X-User"
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "alice"}, 60)
+	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
+	req.RemoteAddr = "203.0.113.10:1234"
+	req.Header.Set("X-User", "alice")
+	recorder := httptest.NewRecorder()
+	bouncer.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("username match status %d", recorder.Code)
+	}
+}
+
+func TestServeHTTPCustomScopeMissingHeaderSkips(t *testing.T) {
+	isCrowdsecStreamHealthy = true
+	bouncer := newTestMatchBouncer(t)
+	bouncer.scopeHeaders["username"] = "X-User"
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "alice"}, 60)
+	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
+	req.RemoteAddr = "203.0.113.10:1234"
+	recorder := httptest.NewRecorder()
+	bouncer.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("missing custom header should skip, status %d", recorder.Code)
+	}
+}
+
+func TestRequestScopeValues(t *testing.T) {
+	bouncer := &Bouncer{scopeHeaders: map[string]string{
+		scopeCountry: "CF-IPCountry",
+		scopeAS:      "CF-ASN",
+		"username":   "X-User",
+	}}
+	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
+	req.Header.Set("Cf-Ipcountry", "fr")
+	req.Header.Set("Cf-Asn", "AS13335")
+	req.Header.Set("X-User", "  alice  ")
+	got := requestScopeValues(bouncer, req)
+	if got[scopeCountry] != "FR" || got[scopeAS] != "13335" || got["username"] != "alice" {
+		t.Fatalf("normalized values: %+v", got)
+	}
+
+	skip := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
+	skip.Header.Set("Cf-Ipcountry", "T1")
+	skip.Header.Set("Cf-Asn", "AS-1")
+	got = requestScopeValues(bouncer, skip)
+	if _, ok := got[scopeCountry]; ok {
+		t.Fatal("T1 must skip Country")
+	}
+	if _, ok := got[scopeAS]; ok {
+		t.Fatal("invalid ASN must skip AS")
+	}
+	if requestScopeValues(&Bouncer{}, req) != nil {
+		t.Fatal("empty scopeHeaders must return nil")
+	}
+}
+
+func TestStoreAndDeleteStreamDecisions(t *testing.T) {
+	bouncer := newTestMatchBouncer(t)
+	bouncer.scopeHeaders["username"] = "X-User"
+
+	storeStreamDecision(bouncer, Decision{Type: "throttle", Scope: "Ip", Value: "1.2.3.4"}, 60)
+	if _, err := bouncer.cacheClient.Get("1.2.3.4"); err == nil {
+		t.Fatal("unknown type must not be cached")
+	}
+
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "Ip", Value: "10.0.0.1/32"}, 60)
+	if _, err := bouncer.cacheClient.Get("10.0.0.1"); err != nil {
+		t.Fatal("/32 must be stored as host")
+	}
+
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "country", Value: "fr"}, 60)
+	if _, err := bouncer.cacheClient.Get(countryKey("FR")); err != nil {
+		t.Fatal("country fr must normalize to FR")
+	}
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "Country", Value: "XX"}, 60)
+	if _, err := bouncer.cacheClient.Get(countryKey("XX")); err == nil {
+		t.Fatal("Country XX must not be stored")
+	}
+
+	storeStreamDecision(bouncer, Decision{Type: "captcha", Scope: "AS", Value: "AS13335"}, 60)
+	if got, err := bouncer.cacheClient.Get(asKey("13335")); err != nil || got != cache.CaptchaValue {
+		t.Fatalf("AS prefix strip: %q %v", got, err)
+	}
+
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "Range", Value: "192.168.0.0/16"}, 60)
+	if matchRange(bouncer.cacheClient, "192.168.1.9") != cache.BannedValue {
+		t.Fatal("range must match")
+	}
+
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "  alice  "}, 60)
+	if _, err := bouncer.cacheClient.Get(headerScopeKey("username", "alice")); err != nil {
+		t.Fatal("mapped username must be cached trimmed")
+	}
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "session", Value: "abc"}, 60)
+	if _, err := bouncer.cacheClient.Get(headerScopeKey("session", "abc")); err == nil {
+		t.Fatal("unmapped session must be ignored")
+	}
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "   "}, 60)
+
+	deleteStreamDecision(bouncer, Decision{Scope: "Ip", Value: "10.0.0.1/32"})
+	if _, err := bouncer.cacheClient.Get("10.0.0.1"); err == nil {
+		t.Fatal("deleted /32 host")
+	}
+	deleteStreamDecision(bouncer, Decision{Scope: "Country", Value: "fr"})
+	if _, err := bouncer.cacheClient.Get(countryKey("FR")); err == nil {
+		t.Fatal("deleted country")
+	}
+	deleteStreamDecision(bouncer, Decision{Scope: "AS", Value: "AS13335"})
+	if _, err := bouncer.cacheClient.Get(asKey("13335")); err == nil {
+		t.Fatal("deleted AS")
+	}
+	deleteStreamDecision(bouncer, Decision{Scope: "Range", Value: "192.168.0.0/16"})
+	if matchRange(bouncer.cacheClient, "192.168.1.9") != "" {
+		t.Fatal("deleted range")
+	}
+	deleteStreamDecision(bouncer, Decision{Scope: "username", Value: "alice"})
+	if _, err := bouncer.cacheClient.Get(headerScopeKey("username", "alice")); err == nil {
+		t.Fatal("deleted username")
+	}
+}
+
+func TestLookupOrderIPBeatsCountry(t *testing.T) {
+	bouncer := newTestMatchBouncer(t)
+	bouncer.cacheClient.Set("198.51.100.10", cache.CaptchaValue, 60)
+	bouncer.cacheClient.Set(countryKey("FR"), cache.BannedValue, 60)
+	got, err := lookupCachedRemediation(bouncer, "198.51.100.10", map[string]string{scopeCountry: "FR"})
+	if err != nil || got != cache.CaptchaValue {
+		t.Fatalf("Ip is checked before Country: %q %v", got, err)
+	}
+}
+
+func TestServeHTTPCountryT1AndMissingHeader(t *testing.T) {
+	isCrowdsecStreamHealthy = true
+	bouncer := newTestMatchBouncer(t)
+	bouncer.cacheClient.Set(countryKey("FR"), cache.BannedValue, 60)
+	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
+	req.RemoteAddr = "203.0.113.10:1234"
+	req.Header.Set("Cf-Ipcountry", "T1")
+	recorder := httptest.NewRecorder()
+	bouncer.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("T1 should skip country, status %d", recorder.Code)
+	}
+	req2 := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
+	req2.RemoteAddr = "203.0.113.10:1234"
+	recorder2 := httptest.NewRecorder()
+	bouncer.ServeHTTP(recorder2, req2)
+	if recorder2.Code != http.StatusOK {
+		t.Fatalf("missing country header should skip, status %d", recorder2.Code)
+	}
+}
+
+func TestServeHTTPCustomScopeWhitespace(t *testing.T) {
+	isCrowdsecStreamHealthy = true
+	bouncer := newTestMatchBouncer(t)
+	bouncer.scopeHeaders["username"] = "X-User"
+	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "username", Value: "alice"}, 60)
+	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
+	req.RemoteAddr = "203.0.113.10:1234"
+	req.Header.Set("X-User", "  alice  ")
+	recorder := httptest.NewRecorder()
+	bouncer.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("trimmed custom header status %d", recorder.Code)
+	}
+}
+
+func TestPreferRemediationAndPickDecision(t *testing.T) {
+	if preferRemediation(cache.CaptchaValue, cache.BannedValue) != cache.BannedValue {
+		t.Fatal("ban wins")
+	}
+	if preferRemediation(cache.CaptchaValue, "") != cache.CaptchaValue {
+		t.Fatal("keep captcha")
+	}
+	if remediationValue("ban") != cache.BannedValue || remediationValue("captcha") != cache.CaptchaValue || remediationValue("throttle") != "" {
+		t.Fatal("remediationValue")
+	}
+	items := []Decision{{Type: "captcha"}, {Type: "ban"}, {Type: "captcha"}}
+	if pickDecision(items).Type != "ban" {
+		t.Fatal("first ban")
+	}
+	if pickDecision([]Decision{{Type: "captcha"}}).Type != "captcha" {
+		t.Fatal("captcha fallback")
+	}
+	if pickDecision([]Decision{{Type: "throttle"}}) != nil {
+		t.Fatal("unknown type")
+	}
+}
+
+func TestStreamScopeListCustomOnly(t *testing.T) {
+	bouncer := &Bouncer{scopeHeaders: map[string]string{"username": "X-User", "session": "X-Session"}}
+	if got := streamScopeList(bouncer); got != "ip,range,session,username" {
+		t.Fatalf("sorted extras %q", got)
+	}
+}
+
+func TestLiveHeaderScopes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		q := req.URL.Query()
+		switch {
+		case q.Get("ip") != "":
+			_, _ = rw.Write([]byte("null"))
+		case q.Get("scope") == scopeCountry && q.Get("value") == "FR":
+			_ = json.NewEncoder(rw).Encode([]Decision{{Type: "ban", Scope: scopeCountry, Value: "FR", Duration: "2m"}})
+		case q.Get("scope") == "username" && q.Get("value") == "alice":
+			_ = json.NewEncoder(rw).Encode([]Decision{{Type: "captcha", Scope: "username", Value: "alice", Duration: "1m"}})
+		default:
+			_, _ = rw.Write([]byte("null"))
+		}
+	}))
+	defer server.Close()
+	host := strings.TrimPrefix(server.URL, "http://")
+	bouncer := newTestMatchBouncer(t)
+	bouncer.crowdsecMode = configuration.LiveMode
+	bouncer.crowdsecScheme = "http"
+	bouncer.crowdsecHost = host
+	bouncer.crowdsecPath = "/"
+	bouncer.crowdsecHeader = crowdsecLapiHeader
+	bouncer.httpClient = server.Client()
+	bouncer.defaultDecisionTimeout = 60
+	bouncer.scopeHeaders["username"] = "X-User"
+
+	value, err := handleNoStreamCache(bouncer, "203.0.113.10", map[string]string{
+		scopeCountry: "FR",
+		"username":   "alice",
+	})
+	if err == nil || value != cache.BannedValue {
+		t.Fatalf("country ban should win over username captcha: %q %v", value, err)
+	}
+	if cached, cacheErr := bouncer.cacheClient.Get(countryKey("FR")); cacheErr != nil || cached != cache.BannedValue {
+		t.Fatalf("live country cache %q %v", cached, cacheErr)
+	}
+}
+
+func TestLiveHeaderScopeEmptySkipsQuery(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if req.URL.Query().Get("scope") != "" {
+			called = true
+		}
+		_, _ = rw.Write([]byte("null"))
+	}))
+	defer server.Close()
+	bouncer := newTestMatchBouncer(t)
+	bouncer.crowdsecMode = configuration.LiveMode
+	bouncer.crowdsecScheme = "http"
+	bouncer.crowdsecHost = strings.TrimPrefix(server.URL, "http://")
+	bouncer.crowdsecPath = "/"
+	bouncer.crowdsecHeader = crowdsecLapiHeader
+	bouncer.httpClient = server.Client()
+	value, err := handleNoStreamCache(bouncer, "203.0.113.10", nil)
+	if err != nil || value != cache.NoBannedValue {
+		t.Fatalf("no scopes: %q %v", value, err)
+	}
+	if called {
+		t.Fatal("empty identifier must not query scope")
+	}
+}
+
+func TestHandleStreamCacheStoresAndDeletes(t *testing.T) {
+	polls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		if polls == 0 {
+			_ = json.NewEncoder(rw).Encode(Stream{
+				New: []Decision{
+					{Type: "ban", Scope: "Country", Value: "FR", Duration: "2m"},
+					{Type: "ban", Scope: "username", Value: "alice", Duration: "2m"},
+				},
+			})
+		} else {
+			_ = json.NewEncoder(rw).Encode(Stream{
+				Deleted: []Decision{
+					{Type: "ban", Scope: "Country", Value: "FR", Duration: "2m"},
+				},
+			})
+		}
+		polls++
+	}))
+	defer server.Close()
+	bouncer := newTestMatchBouncer(t)
+	bouncer.scopeHeaders["username"] = "X-User"
+	bouncer.crowdsecScheme = "http"
+	bouncer.crowdsecHost = strings.TrimPrefix(server.URL, "http://")
+	bouncer.crowdsecPath = "/"
+	bouncer.crowdsecStreamRoute = crowdsecLapiStreamRoute
+	bouncer.crowdsecHeader = crowdsecLapiHeader
+	bouncer.httpClient = server.Client()
+	bouncer.updateInterval = 2
+	if err := handleStreamCache(bouncer); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bouncer.cacheClient.Get(countryKey("FR")); err != nil {
+		t.Fatal("stream must store Country")
+	}
+	if _, err := bouncer.cacheClient.Get(headerScopeKey("username", "alice")); err != nil {
+		t.Fatal("stream must store mapped username")
+	}
+	bouncer.cacheClient.Delete(cacheTimeoutKey)
+	if err := handleStreamCache(bouncer); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bouncer.cacheClient.Get(countryKey("FR")); err == nil {
+		t.Fatal("stream delete must drop Country")
+	}
+}
+
+func TestLiveCacheTTL(t *testing.T) {
+	bouncer := &Bouncer{defaultDecisionTimeout: 30}
+	if liveCacheTTL(bouncer, time.Minute) != 30 {
+		t.Fatal("cap at default")
+	}
+	if liveCacheTTL(bouncer, 10*time.Second) != 10 {
+		t.Fatal("use decision duration")
+	}
+	if liveCacheTTL(bouncer, 0) != 30 {
+		t.Fatal("zero duration uses default")
 	}
 }

@@ -63,6 +63,31 @@ func normalizeASN(value string) string {
 	return trimmed
 }
 
+// headerScopeKey is the shared-cache key for a header-matched scope (Country, AS, or custom).
+func headerScopeKey(scope, value string) string {
+	return strings.ToLower(scope) + ":" + value
+}
+
+// normalizeScopeHeaders keeps configured header scopes. Ip and Range are not header scopes.
+func normalizeScopeHeaders(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for rawScope, rawHeader := range in {
+		header := strings.TrimSpace(rawHeader)
+		if header == "" {
+			continue
+		}
+		scope := normalizeScope(rawScope)
+		if scope == "" || scope == scopeIP || scope == scopeRange {
+			continue
+		}
+		out[scope] = header
+	}
+	return out
+}
+
 // ipCacheKey is the cache key for an Ip-scoped decision value (bare IP or /32 / /128).
 func ipCacheKey(value string) string {
 	trimmed := strings.TrimSpace(value)
