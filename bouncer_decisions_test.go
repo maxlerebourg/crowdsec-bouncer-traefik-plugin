@@ -1,7 +1,7 @@
 package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
-	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -343,32 +343,47 @@ func TestStreamScopeListCustomOnly(t *testing.T) {
 	}
 }
 
-func TestLiveHeaderScopes(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		q := req.URL.Query()
-		switch {
-		case q.Get("ip") != "":
-			_, _ = rw.Write([]byte("null"))
-		case q.Get("scope") == scopeCountry && q.Get("value") == "FR":
-			_ = json.NewEncoder(rw).Encode([]Decision{{Type: "ban", Scope: scopeCountry, Value: "FR", Duration: "2m"}})
-		case q.Get("scope") == "username" && q.Get("value") == "alice":
-			_ = json.NewEncoder(rw).Encode([]Decision{{Type: "captcha", Scope: "username", Value: "alice", Duration: "1m"}})
-		default:
-			_, _ = rw.Write([]byte("null"))
-		}
-	}))
-	defer server.Close()
-	host := strings.TrimPrefix(server.URL, "http://")
+// lapiTransport is a Yaegi-safe LAPI fake. httptest.NewServer and methods on
+// function types both fail under the Traefik-bundled Yaegi.
+type lapiTransport struct {
+	fn func(*http.Request) string
+}
+
+func (tr lapiTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(tr.fn(req))),
+		Header:     make(http.Header),
+		Request:    req,
+	}, nil
+}
+
+func lapiBouncer(t *testing.T, fn func(*http.Request) string) *Bouncer {
+	t.Helper()
 	bouncer := newTestMatchBouncer(t)
-	bouncer.crowdsecMode = configuration.LiveMode
 	bouncer.crowdsecScheme = "http"
-	bouncer.crowdsecHost = host
+	bouncer.crowdsecHost = "lapi.test"
 	bouncer.crowdsecPath = "/"
 	bouncer.crowdsecHeader = crowdsecLapiHeader
-	bouncer.httpClient = server.Client()
+	bouncer.httpClient = &http.Client{Transport: lapiTransport{fn: fn}}
+	return bouncer
+}
+
+func TestLiveHeaderScopes(t *testing.T) {
+	bouncer := lapiBouncer(t, func(req *http.Request) string {
+		q := req.URL.Query()
+		switch {
+		case q.Get("scope") == scopeCountry && q.Get("value") == "FR":
+			return `[{"type":"ban","scope":"Country","value":"FR","duration":"2m"}]`
+		case q.Get("scope") == "username" && q.Get("value") == "alice":
+			return `[{"type":"captcha","scope":"username","value":"alice","duration":"1m"}]`
+		default:
+			return "null"
+		}
+	})
+	bouncer.crowdsecMode = configuration.LiveMode
 	bouncer.defaultDecisionTimeout = 60
 	bouncer.scopeHeaders["username"] = "X-User"
-
 	value, err := handleNoStreamCache(bouncer, "203.0.113.10", map[string]string{
 		scopeCountry: "FR",
 		"username":   "alice",
@@ -382,58 +397,34 @@ func TestLiveHeaderScopes(t *testing.T) {
 }
 
 func TestLiveHeaderScopeEmptySkipsQuery(t *testing.T) {
-	called := false
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	scopeQuery := false
+	bouncer := lapiBouncer(t, func(req *http.Request) string {
 		if req.URL.Query().Get("scope") != "" {
-			called = true
+			scopeQuery = true
 		}
-		_, _ = rw.Write([]byte("null"))
-	}))
-	defer server.Close()
-	bouncer := newTestMatchBouncer(t)
+		return "null"
+	})
 	bouncer.crowdsecMode = configuration.LiveMode
-	bouncer.crowdsecScheme = "http"
-	bouncer.crowdsecHost = strings.TrimPrefix(server.URL, "http://")
-	bouncer.crowdsecPath = "/"
-	bouncer.crowdsecHeader = crowdsecLapiHeader
-	bouncer.httpClient = server.Client()
 	value, err := handleNoStreamCache(bouncer, "203.0.113.10", nil)
 	if err != nil || value != cache.NoBannedValue {
 		t.Fatalf("no scopes: %q %v", value, err)
 	}
-	if called {
+	if scopeQuery {
 		t.Fatal("empty identifier must not query scope")
 	}
 }
 
 func TestHandleStreamCacheStoresAndDeletes(t *testing.T) {
 	polls := 0
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		if polls == 0 {
-			_ = json.NewEncoder(rw).Encode(Stream{
-				New: []Decision{
-					{Type: "ban", Scope: "Country", Value: "FR", Duration: "2m"},
-					{Type: "ban", Scope: "username", Value: "alice", Duration: "2m"},
-				},
-			})
-		} else {
-			_ = json.NewEncoder(rw).Encode(Stream{
-				Deleted: []Decision{
-					{Type: "ban", Scope: "Country", Value: "FR", Duration: "2m"},
-				},
-			})
-		}
+	bouncer := lapiBouncer(t, func(_ *http.Request) string {
 		polls++
-	}))
-	defer server.Close()
-	bouncer := newTestMatchBouncer(t)
+		if polls == 1 {
+			return `{"new":[{"type":"ban","scope":"Country","value":"FR","duration":"2m"},{"type":"ban","scope":"username","value":"alice","duration":"2m"}],"deleted":[]}`
+		}
+		return `{"new":[],"deleted":[{"type":"ban","scope":"Country","value":"FR","duration":"2m"}]}`
+	})
 	bouncer.scopeHeaders["username"] = "X-User"
-	bouncer.crowdsecScheme = "http"
-	bouncer.crowdsecHost = strings.TrimPrefix(server.URL, "http://")
-	bouncer.crowdsecPath = "/"
 	bouncer.crowdsecStreamRoute = crowdsecLapiStreamRoute
-	bouncer.crowdsecHeader = crowdsecLapiHeader
-	bouncer.httpClient = server.Client()
 	bouncer.updateInterval = 2
 	if err := handleStreamCache(bouncer); err != nil {
 		t.Fatal(err)
