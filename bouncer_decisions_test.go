@@ -15,6 +15,7 @@ import (
 
 func newTestMatchBouncer(t *testing.T) *Bouncer {
 	t.Helper()
+	cache.ResetLocalForTest()
 	log := logger.New("ERROR", "")
 	checker, err := ip.NewChecker(log, []string{})
 	if err != nil {

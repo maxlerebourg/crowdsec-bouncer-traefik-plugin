@@ -30,6 +30,12 @@ const (
 //nolint:gochecknoglobals
 var cache = ttl_map.New()
 
+// ResetLocalForTest replaces the in-process map. Tests share one map; Yaegi
+// does not run in file order, so leftovers from another test would look like hits.
+func ResetLocalForTest() {
+	cache = ttl_map.New()
+}
+
 type localCache struct{}
 
 func (localCache) get(key string) (string, error) {
