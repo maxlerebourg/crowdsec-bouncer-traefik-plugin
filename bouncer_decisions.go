@@ -59,37 +59,40 @@ func preferRemediation(current, incoming string) string {
 // lookupCachedRemediation checks Ip, Range, Country, then AS in the shared cache.
 func lookupCachedRemediation(bouncer *Bouncer, remoteIP, country, asn string) (string, error) {
 	value, err := bouncer.cacheClient.Get(remoteIP)
+	switch {
+	case err == nil && isActiveRemediation(value):
+		return value, nil
+	case err != nil && err.Error() != cache.CacheMiss:
+		return "", err
+	}
+	if rangeValue := decision.MatchRange(bouncer.cacheClient, remoteIP); isActiveRemediation(rangeValue) {
+		return rangeValue, nil
+	}
+	if countryValue, countryErr := lookupScopeKey(bouncer, decision.CountryKey(country), country); countryErr != nil || countryValue != "" {
+		return countryValue, countryErr
+	}
+	if asnValue, asnErr := lookupScopeKey(bouncer, decision.ASKey(asn), asn); asnErr != nil || asnValue != "" {
+		return asnValue, asnErr
+	}
+	if err == nil {
+		return value, nil
+	}
+	return "", err
+}
+
+// lookupScopeKey returns an active remediation for a Country or AS cache key.
+func lookupScopeKey(bouncer *Bouncer, key, identifier string) (string, error) {
+	if identifier == "" {
+		return "", nil
+	}
+	value, err := bouncer.cacheClient.Get(key)
 	if err == nil && isActiveRemediation(value) {
 		return value, nil
 	}
 	if err != nil && err.Error() != cache.CacheMiss {
 		return "", err
 	}
-	if rangeValue := decision.MatchRange(bouncer.cacheClient, remoteIP); isActiveRemediation(rangeValue) {
-		return rangeValue, nil
-	}
-	if country != "" {
-		countryValue, countryErr := bouncer.cacheClient.Get(decision.CountryKey(country))
-		if countryErr == nil && isActiveRemediation(countryValue) {
-			return countryValue, nil
-		}
-		if countryErr != nil && countryErr.Error() != cache.CacheMiss {
-			return "", countryErr
-		}
-	}
-	if asn != "" {
-		asnValue, asnErr := bouncer.cacheClient.Get(decision.ASKey(asn))
-		if asnErr == nil && isActiveRemediation(asnValue) {
-			return asnValue, nil
-		}
-		if asnErr != nil && asnErr.Error() != cache.CacheMiss {
-			return "", asnErr
-		}
-	}
-	if err == nil {
-		return value, nil
-	}
-	return "", err
+	return "", nil
 }
 
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.

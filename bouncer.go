@@ -373,7 +373,8 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Cache lookup: Ip, then Range, then Country, then AS. Live still queries LAPI on miss.
 	if bouncer.crowdsecMode != configuration.NoneMode {
 		value, cacheErr := lookupCachedRemediation(bouncer, remoteIP, country, asn)
-		if cacheErr != nil {
+		switch {
+		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
 			if !bouncer.redisUnreachableBlock && cacheErrString == cache.CacheUnreachable {
@@ -386,11 +387,11 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 				return
 			}
-		} else if isActiveRemediation(value) {
+		case isActiveRemediation(value):
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
 			bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value)
 			return
-		} else if value == cache.NoBannedValue {
+		case value == cache.NoBannedValue:
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}

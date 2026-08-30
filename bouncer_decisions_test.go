@@ -90,7 +90,7 @@ func TestServeHTTPCountryDecision(t *testing.T) {
 	bouncer.cacheClient.Set(decision.CountryKey("FR"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
-	req.Header.Set("CF-IPCountry", "fr")
+	req.Header.Set("Cf-Ipcountry", "fr")
 	recorder := httptest.NewRecorder()
 	bouncer.ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusForbidden {
@@ -104,7 +104,7 @@ func TestServeHTTPCountryPlaceholderDoesNotMatch(t *testing.T) {
 	bouncer.cacheClient.Set(decision.CountryKey("FR"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
-	req.Header.Set("CF-IPCountry", "XX")
+	req.Header.Set("Cf-Ipcountry", "XX")
 	recorder := httptest.NewRecorder()
 	bouncer.ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusOK {
@@ -118,7 +118,7 @@ func TestServeHTTPASNDecision(t *testing.T) {
 	bouncer.cacheClient.Set(decision.ASKey("13335"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
-	req.Header.Set("CF-ASN", "AS13335")
+	req.Header.Set("Cf-Asn", "AS13335")
 	recorder := httptest.NewRecorder()
 	bouncer.ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusForbidden {
