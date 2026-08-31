@@ -68,6 +68,30 @@ func headerScopeKey(scope, value string) string {
 	return strings.ToLower(scope) + ":" + value
 }
 
+// normalizeHeaderScopeValue applies Country/AS rules, else a trim. Empty means skip that scope.
+func normalizeHeaderScopeValue(scope, raw string) string {
+	switch scope {
+	case scopeCountry:
+		return normalizeCountry(raw)
+	case scopeAS:
+		return normalizeASN(raw)
+	default:
+		return strings.TrimSpace(raw)
+	}
+}
+
+// streamScopeToken is the LAPI stream `scopes=` spelling for a configured header scope.
+func streamScopeToken(scope string) string {
+	switch scope {
+	case scopeCountry:
+		return "country"
+	case scopeAS:
+		return "AS"
+	default:
+		return scope
+	}
+}
+
 // normalizeDecisionScopeHeaders keeps configured header scopes. Ip and Range are not header scopes.
 func normalizeDecisionScopeHeaders(in map[string]string) map[string]string {
 	if len(in) == 0 {

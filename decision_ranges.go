@@ -8,19 +8,9 @@ import (
 )
 
 const (
-	countryKeyPrefix = "country:"
-	asKeyPrefix      = "as:"
-	rangeIndexKey    = "range-index"
-	rangeIndexTTL    = 365 * 24 * 3600
+	rangeIndexKey = "range-index"
+	rangeIndexTTL = 365 * 24 * 3600
 )
-
-func countryKey(country string) string {
-	return countryKeyPrefix + country
-}
-
-func asKey(asn string) string {
-	return asKeyPrefix + asn
-}
 
 // addRange upserts a Range decision on the shared index as cidr=remediation.
 func addRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {

@@ -15,23 +15,14 @@ import (
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
-// requestScopeValues reads configured scope headers and normalizes Country and AS ad-hoc.
+// requestScopeValues reads configured scope headers. Country and AS are normalized; others are trimmed.
 func requestScopeValues(bouncer *Bouncer, req *http.Request) map[string]string {
 	if len(bouncer.decisionScopeHeaders) == 0 {
 		return nil
 	}
 	out := make(map[string]string, len(bouncer.decisionScopeHeaders))
 	for scope, header := range bouncer.decisionScopeHeaders {
-		raw := req.Header.Get(header)
-		var value string
-		switch scope {
-		case scopeCountry:
-			value = normalizeCountry(raw)
-		case scopeAS:
-			value = normalizeASN(raw)
-		default:
-			value = strings.TrimSpace(raw)
-		}
+		value := normalizeHeaderScopeValue(scope, req.Header.Get(header))
 		if value != "" {
 			out[scope] = value
 		}
@@ -67,7 +58,7 @@ func preferRemediation(current, incoming string) string {
 	return incoming
 }
 
-// lookupCachedRemediation checks Ip, Range, Country, AS, then other configured header scopes.
+// lookupCachedRemediation checks Ip, then Range, then every present header scope (ban over captcha).
 // One GetMany loads the IP, present header-scope keys, and range-index (stream/alone).
 // Redis GetMany is one GET per key until simpleredis grows MGET.
 // Range verdicts live on range-index (cidr=remediation). Live/none expand Range via LAPI ?ip=.
@@ -85,17 +76,15 @@ func lookupCachedRemediation(bouncer *Bouncer, remoteIP string, scopes map[strin
 			return rangeValue, nil
 		}
 	}
-	if value := lookupFoundScope(found, countryKey(scopes[scopeCountry]), scopes[scopeCountry]); value != "" {
-		return value, nil
-	}
-	if value := lookupFoundScope(found, asKey(scopes[scopeAS]), scopes[scopeAS]); value != "" {
-		return value, nil
-	}
-	for _, scope := range extraHeaderScopes(bouncer) {
-		identifier := scopes[scope]
-		if value := lookupFoundScope(found, headerScopeKey(scope, identifier), identifier); value != "" {
-			return value, nil
+	chosen := ""
+	for scope, identifier := range scopes {
+		if identifier == "" {
+			continue
 		}
+		chosen = preferRemediation(chosen, found[headerScopeKey(scope, identifier)])
+	}
+	if isActiveRemediation(chosen) {
+		return chosen, nil
 	}
 	if value, ok := found[remoteIP]; ok {
 		return value, nil
@@ -110,31 +99,11 @@ func lookupCacheKeys(remoteIP string, scopes map[string]string, useRangeIndex bo
 		keys = append(keys, rangeIndexKey)
 	}
 	for scope, identifier := range scopes {
-		if identifier == "" {
-			continue
-		}
-		switch scope {
-		case scopeCountry:
-			keys = append(keys, countryKey(identifier))
-		case scopeAS:
-			keys = append(keys, asKey(identifier))
-		default:
+		if identifier != "" {
 			keys = append(keys, headerScopeKey(scope, identifier))
 		}
 	}
 	return keys
-}
-
-// lookupFoundScope returns an active remediation already loaded by GetMany.
-func lookupFoundScope(found map[string]string, key, identifier string) string {
-	if identifier == "" {
-		return ""
-	}
-	value := found[key]
-	if isActiveRemediation(value) {
-		return value
-	}
-	return ""
 }
 
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.
@@ -149,26 +118,12 @@ func streamQuery(bouncer *Bouncer) string {
 // streamScopeList is the LAPI scopes query value for this bouncer config.
 func streamScopeList(bouncer *Bouncer) string {
 	parts := []string{"ip", "range"}
-	if _, ok := bouncer.decisionScopeHeaders[scopeCountry]; ok {
-		parts = append(parts, "country")
-	}
-	if _, ok := bouncer.decisionScopeHeaders[scopeAS]; ok {
-		parts = append(parts, "AS")
-	}
-	return strings.Join(append(parts, extraHeaderScopes(bouncer)...), ",")
-}
-
-// extraHeaderScopes is configured header scopes other than Country and AS, sorted.
-func extraHeaderScopes(bouncer *Bouncer) []string {
-	extras := make([]string, 0)
+	mapped := make([]string, 0, len(bouncer.decisionScopeHeaders))
 	for scope := range bouncer.decisionScopeHeaders {
-		if scope == scopeCountry || scope == scopeAS {
-			continue
-		}
-		extras = append(extras, scope)
+		mapped = append(mapped, streamScopeToken(scope))
 	}
-	sort.Strings(extras)
-	return extras
+	sort.Strings(mapped)
+	return strings.Join(append(parts, mapped...), ",")
 }
 
 // storeStreamDecision writes one stream New decision into the shared cache by scope.
@@ -178,60 +133,38 @@ func storeStreamDecision(bouncer *Bouncer, item Decision, duration int64) {
 		bouncer.log.Debug("handleStreamCache:unknownType " + item.Type)
 		return
 	}
-	switch normalizeScope(item.Scope) {
+	scope := normalizeScope(item.Scope)
+	switch scope {
 	case scopeIP, "":
 		bouncer.cacheClient.Set(ipCacheKey(item.Value), value, duration)
 	case scopeRange:
 		addRange(bouncer.cacheClient, item.Value, value, duration)
-	case scopeCountry:
-		code := normalizeCountry(item.Value)
-		if code == "" {
-			return
-		}
-		bouncer.cacheClient.Set(countryKey(code), value, duration)
-	case scopeAS:
-		asn := normalizeASN(item.Value)
-		if asn == "" {
-			return
-		}
-		bouncer.cacheClient.Set(asKey(asn), value, duration)
 	default:
-		scope := normalizeScope(item.Scope)
 		if _, ok := bouncer.decisionScopeHeaders[scope]; !ok {
 			bouncer.log.Debug("handleStreamCache:ignoredScope " + item.Scope)
 			return
 		}
-		trimmed := strings.TrimSpace(item.Value)
-		if trimmed == "" {
+		identifier := normalizeHeaderScopeValue(scope, item.Value)
+		if identifier == "" {
 			return
 		}
-		bouncer.cacheClient.Set(headerScopeKey(scope, trimmed), value, duration)
+		bouncer.cacheClient.Set(headerScopeKey(scope, identifier), value, duration)
 	}
 }
 
 // deleteStreamDecision removes one stream Deleted decision from the shared cache.
 func deleteStreamDecision(bouncer *Bouncer, item Decision) {
-	switch normalizeScope(item.Scope) {
+	scope := normalizeScope(item.Scope)
+	switch scope {
 	case scopeIP, "":
 		bouncer.cacheClient.Delete(ipCacheKey(item.Value))
 		bouncer.cacheClient.Delete(item.Value)
 	case scopeRange:
 		removeRange(bouncer.cacheClient, item.Value)
-	case scopeCountry:
-		code := normalizeCountry(item.Value)
-		if code != "" {
-			bouncer.cacheClient.Delete(countryKey(code))
-		}
-	case scopeAS:
-		asn := normalizeASN(item.Value)
-		if asn != "" {
-			bouncer.cacheClient.Delete(asKey(asn))
-		}
 	default:
-		scope := normalizeScope(item.Scope)
-		trimmed := strings.TrimSpace(item.Value)
-		if trimmed != "" {
-			bouncer.cacheClient.Delete(headerScopeKey(scope, trimmed))
+		identifier := normalizeHeaderScopeValue(scope, item.Value)
+		if identifier != "" {
+			bouncer.cacheClient.Delete(headerScopeKey(scope, identifier))
 		}
 	}
 }

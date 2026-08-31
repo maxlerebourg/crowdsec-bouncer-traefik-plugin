@@ -53,7 +53,7 @@ func TestStreamScopeList(t *testing.T) {
 		scopeAS:      "CF-ASN",
 		"username":   "X-User",
 	}
-	if got := streamScopeList(bouncer); got != "ip,range,country,AS,username" {
+	if got := streamScopeList(bouncer); got != "ip,range,AS,country,username" {
 		t.Fatalf("configured scopes %q", got)
 	}
 }
@@ -93,7 +93,7 @@ func TestServeHTTPRangeDecision(t *testing.T) {
 func TestServeHTTPCountryDecision(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.cacheClient.Set(countryKey("FR"), cache.BannedValue, 60)
+	bouncer.cacheClient.Set(headerScopeKey(scopeCountry, "FR"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
 	req.Header.Set("Cf-Ipcountry", "fr")
@@ -107,7 +107,7 @@ func TestServeHTTPCountryDecision(t *testing.T) {
 func TestServeHTTPCountryPlaceholderDoesNotMatch(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.cacheClient.Set(countryKey("FR"), cache.BannedValue, 60)
+	bouncer.cacheClient.Set(headerScopeKey(scopeCountry, "FR"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
 	req.Header.Set("Cf-Ipcountry", "XX")
@@ -121,7 +121,7 @@ func TestServeHTTPCountryPlaceholderDoesNotMatch(t *testing.T) {
 func TestServeHTTPASNDecision(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.cacheClient.Set(asKey("13335"), cache.BannedValue, 60)
+	bouncer.cacheClient.Set(headerScopeKey(scopeAS, "13335"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
 	req.Header.Set("Cf-Asn", "AS13335")
@@ -217,16 +217,16 @@ func TestStoreAndDeleteStreamDecisions(t *testing.T) {
 	}
 
 	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "country", Value: "fr"}, 60)
-	if _, err := bouncer.cacheClient.Get(countryKey("FR")); err != nil {
+	if _, err := bouncer.cacheClient.Get(headerScopeKey(scopeCountry, "FR")); err != nil {
 		t.Fatal("country fr must normalize to FR")
 	}
 	storeStreamDecision(bouncer, Decision{Type: "ban", Scope: "Country", Value: "XX"}, 60)
-	if _, err := bouncer.cacheClient.Get(countryKey("XX")); err == nil {
+	if _, err := bouncer.cacheClient.Get(headerScopeKey(scopeCountry, "XX")); err == nil {
 		t.Fatal("Country XX must not be stored")
 	}
 
 	storeStreamDecision(bouncer, Decision{Type: "captcha", Scope: "AS", Value: "AS13335"}, 60)
-	if got, err := bouncer.cacheClient.Get(asKey("13335")); err != nil || got != cache.CaptchaValue {
+	if got, err := bouncer.cacheClient.Get(headerScopeKey(scopeAS, "13335")); err != nil || got != cache.CaptchaValue {
 		t.Fatalf("AS prefix strip: %q %v", got, err)
 	}
 
@@ -250,11 +250,11 @@ func TestStoreAndDeleteStreamDecisions(t *testing.T) {
 		t.Fatal("deleted /32 host")
 	}
 	deleteStreamDecision(bouncer, Decision{Scope: "Country", Value: "fr"})
-	if _, err := bouncer.cacheClient.Get(countryKey("FR")); err == nil {
+	if _, err := bouncer.cacheClient.Get(headerScopeKey(scopeCountry, "FR")); err == nil {
 		t.Fatal("deleted country")
 	}
 	deleteStreamDecision(bouncer, Decision{Scope: "AS", Value: "AS13335"})
-	if _, err := bouncer.cacheClient.Get(asKey("13335")); err == nil {
+	if _, err := bouncer.cacheClient.Get(headerScopeKey(scopeAS, "13335")); err == nil {
 		t.Fatal("deleted AS")
 	}
 	deleteStreamDecision(bouncer, Decision{Scope: "Range", Value: "192.168.0.0/16"})
@@ -278,17 +278,30 @@ func TestLookupCacheMissWhenEmpty(t *testing.T) {
 func TestLookupOrderIPBeatsCountry(t *testing.T) {
 	bouncer := newTestMatchBouncer(t)
 	bouncer.cacheClient.Set("198.51.100.10", cache.CaptchaValue, 60)
-	bouncer.cacheClient.Set(countryKey("FR"), cache.BannedValue, 60)
+	bouncer.cacheClient.Set(headerScopeKey(scopeCountry, "FR"), cache.BannedValue, 60)
 	got, err := lookupCachedRemediation(bouncer, "198.51.100.10", map[string]string{scopeCountry: "FR"})
 	if err != nil || got != cache.CaptchaValue {
 		t.Fatalf("Ip is checked before Country: %q %v", got, err)
 	}
 }
 
+func TestLookupHeaderScopesBanWins(t *testing.T) {
+	bouncer := newTestMatchBouncer(t)
+	bouncer.cacheClient.Set(headerScopeKey(scopeCountry, "FR"), cache.CaptchaValue, 60)
+	bouncer.cacheClient.Set(headerScopeKey("username", "alice"), cache.BannedValue, 60)
+	got, err := lookupCachedRemediation(bouncer, "198.51.100.20", map[string]string{
+		scopeCountry: "FR",
+		"username":   "alice",
+	})
+	if err != nil || got != cache.BannedValue {
+		t.Fatalf("ban on any header scope wins: %q %v", got, err)
+	}
+}
+
 func TestServeHTTPCountryT1AndMissingHeader(t *testing.T) {
 	isCrowdsecStreamHealthy = true
 	bouncer := newTestMatchBouncer(t)
-	bouncer.cacheClient.Set(countryKey("FR"), cache.BannedValue, 60)
+	bouncer.cacheClient.Set(headerScopeKey(scopeCountry, "FR"), cache.BannedValue, 60)
 	req := httptest.NewRequest(http.MethodGet, "http://app.localhost/", nil)
 	req.RemoteAddr = "203.0.113.10:1234"
 	req.Header.Set("Cf-Ipcountry", "T1")

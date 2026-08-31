@@ -544,10 +544,8 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string, scopes map[string]st
 	if err != nil {
 		return cache.BannedValue, err
 	}
-	chosen, parsedDuration = mergeLiveScope(bouncer, chosen, parsedDuration, scopeCountry, scopes[scopeCountry], isLiveMode)
-	chosen, parsedDuration = mergeLiveScope(bouncer, chosen, parsedDuration, scopeAS, scopes[scopeAS], isLiveMode)
-	for _, scope := range extraHeaderScopes(bouncer) {
-		chosen, parsedDuration = mergeLiveScope(bouncer, chosen, parsedDuration, scope, scopes[scope], isLiveMode)
+	for scope, identifier := range scopes {
+		chosen, parsedDuration = mergeLiveScope(bouncer, chosen, parsedDuration, scope, identifier, isLiveMode)
 	}
 	if !isActiveRemediation(chosen) {
 		if isLiveMode && bouncer.defaultDecisionTimeout > 0 {

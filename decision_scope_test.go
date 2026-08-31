@@ -90,10 +90,10 @@ func TestNormalizeDecisionScopeHeaders(t *testing.T) {
 }
 
 func TestHeaderScopeKey(t *testing.T) {
-	if got := headerScopeKey(scopeCountry, "FR"); got != countryKey("FR") {
+	if got := headerScopeKey(scopeCountry, "FR"); got != "country:FR" {
 		t.Fatalf("country key %q", got)
 	}
-	if got := headerScopeKey(scopeAS, "13335"); got != asKey("13335") {
+	if got := headerScopeKey(scopeAS, "13335"); got != "as:13335" {
 		t.Fatalf("as key %q", got)
 	}
 	if got := headerScopeKey("username", "alice"); got != "username:alice" {
