@@ -364,6 +364,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// TODO This should be simplified
 	scopes := requestScopeValues(bouncer, req)
 
 	// Cache lookup: Ip, Range, then configured header scopes. Live still queries LAPI on miss.
