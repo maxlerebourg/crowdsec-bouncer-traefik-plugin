@@ -1,0 +1,53 @@
+name: Release (2/2) Publish
+
+# Step 2 of the release process: tag and publish the commit prepared by
+# Release (1/2) Prepare.
+#
+# Triggered by the release PR landing on main. The tag is created on that
+# commit, so version.go inside the released source always matches the tag —
+# no post-release patching, no force-moved tags.
+
+on:
+  push:
+    branches: [main]
+    paths: ["version.go"]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Tag and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: resolve
+        run: |
+          version="$(git log -1 --format='%B' | grep -oP '🔖 release \Kv[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' || true)"
+          [ -z "$version" ] && { echo "version.go changed outside a release commit, nothing to do"; echo "release=false" >> "$GITHUB_OUTPUT"; exit 0; }
+
+          in_source="$(sed -n 's/.*pluginVersion = "\([^"]*\)".*/\1/p' version.go)"
+          [ "$in_source" != "$version" ] && { echo "::error::commit says $version but version.go reads $in_source"; exit 1; }
+          git rev-parse -q --verify "refs/tags/$version" >/dev/null && { echo "::error::tag $version already exists"; exit 1; }
+
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$([[ "$version" == *-* ]] && echo '--prerelease')" >> "$GITHUB_OUTPUT"
+
+      - name: Tag and create the GitHub release
+        if: steps.resolve.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+          PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
+          gh release create "$VERSION" --title "$VERSION" --generate-notes $PRERELEASE
