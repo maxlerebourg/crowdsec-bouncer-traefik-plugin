@@ -529,6 +529,11 @@ func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, re
 	if status == 0 {
 		status = bouncer.remediationStatusCode
 	}
+
+	if status < 100 || status > 999 {
+		status = bouncer.remediationStatusCode
+	}
+
 	rw.WriteHeader(status)
 
 	if req.Method == http.MethodHead || decision.UserBodyContent == "" {
