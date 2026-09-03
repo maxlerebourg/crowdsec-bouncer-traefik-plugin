@@ -593,7 +593,10 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 			}
 
 			const calls = 10
-			for range calls {
+			// Not a range-over-int loop: yaegi v0.16.1, which is what Traefik
+			// bundles and what `make yaegi_test` pins, cannot parse that form
+			// and panics with "nil type".
+			for i := 0; i < calls; i++ { //nolint:intrange
 				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
 				_ = appsecQuery(bouncer, "1.2.3.4", req)
 			}
