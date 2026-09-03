@@ -252,17 +252,19 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		},
 		httpClient: &http.Client{
 			Transport: &http.Transport{
-				MaxIdleConns:    10,
-				IdleConnTimeout: 30 * time.Second,
-				TLSClientConfig: tlsConfig,
+				MaxIdleConns:        10,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     30 * time.Second,
+				TLSClientConfig:     tlsConfig,
 			},
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
 		httpAppsecClient: &http.Client{
 			Transport: &http.Transport{
-				MaxIdleConns:    10,
-				IdleConnTimeout: 30 * time.Second,
-				TLSClientConfig: tlsAppsecConfig,
+				MaxIdleConns:        10,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     30 * time.Second,
+				TLSClientConfig:     tlsAppsecConfig,
 			},
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
@@ -287,7 +289,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		log,
 		bouncer.cacheClient,
 		&http.Client{
-			Transport: &http.Transport{MaxIdleConns: 10, IdleConnTimeout: 30 * time.Second},
+			Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
 			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
 		config.CaptchaProvider,
@@ -849,6 +851,11 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		return nil, nil
 	}
 	defer func() {
+		// net/http returns a conn to the idle pool once its body has been read to EOF, closing early discards it.
+		// Drain the body from the non-200 paths, which return earlier, keep their connections too.
+		if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
+			bouncer.log.Debug("appsecQuery:drainBody " + errDrain.Error())
+		}
 		if err = res.Body.Close(); err != nil {
 			bouncer.log.Error("appsecQuery:closeBody " + err.Error())
 		}
