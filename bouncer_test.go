@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -553,5 +554,49 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("appsecQuery() blocked on an HTTP/3 GET request body (issue #351 regression)")
+	}
+}
+
+// Test_appsecQuery_reusesConnection is a regression test for issue #384: the appsec response
+// body must be drained for non-200 status response so net/http can return the conn to the idle pool.
+func Test_appsecQuery_reusesConnection(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var mu sync.Mutex
+			conns := map[string]bool{}
+			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				conns[r.RemoteAddr] = true
+				mu.Unlock()
+				rw.WriteHeader(status)
+				if _, errWrite := rw.Write([]byte(`{"action":"allow"}`)); errWrite != nil {
+					t.Errorf("appsec stub write: %v", errWrite)
+				}
+			}))
+			defer appsecServer.Close()
+
+			appsecURL, _ := url.Parse(appsecServer.URL)
+			bouncer := &Bouncer{
+				appsecScheme:       appsecURL.Scheme,
+				appsecHost:         appsecURL.Host,
+				appsecPath:         "/",
+				appsecBodyLimit:    10485760,
+				appsecFailureBlock: false,
+				httpAppsecClient:   appsecServer.Client(),
+				log:                logger.New("INFO", ""),
+			}
+
+			const calls = 10
+			for i := 0; i < calls; i++ { //nolint:intrange
+				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+				_ = appsecQuery(bouncer, "1.2.3.4", req)
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			if len(conns) != 1 {
+				t.Errorf("appsecQuery() opened %d connections for %d calls, want 1 (response body not drained?)", len(conns), calls)
+			}
+		})
 	}
 }
