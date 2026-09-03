@@ -462,7 +462,8 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		finished <- err
 	}()
 
 	select {
@@ -500,7 +501,8 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		finished <- err
 	}()
 
 	select {
@@ -543,7 +545,8 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newUnreadableGetRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newUnreadableGetRequest(done))
+		finished <- err
 	}()
 
 	select {

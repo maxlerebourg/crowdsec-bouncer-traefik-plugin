@@ -804,7 +804,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	switch {
 	case isBodyUnreadable(httpReq):
 		if bouncer.appsecUnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
-			return errors.New("appsecQuery:unreadableBody dropped")
+			return nil, errors.New("appsecQuery:unreadableBody dropped")
 		}
 		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
 	case bouncer.appsecBodyLimit > 0 && httpReq.Body != nil:
