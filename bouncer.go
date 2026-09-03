@@ -43,6 +43,7 @@ const (
 	crowdsecCapiStreamRoute  = "v2/decisions/stream"
 	cacheTimeoutKey          = "updated"
 	appsecAllowAction        = "allow"
+	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
 )
 
 // ##############################################################
@@ -868,9 +869,16 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		return nil, nil
 	}
 
-	body, err := io.ReadAll(res.Body)
+	body, err := io.ReadAll(io.LimitReader(res.Body, appsecResponseBodyLimit+1))
 	if err != nil {
 		return nil, fmt.Errorf("appsecQuery:readBody %w", err)
+	}
+	if len(body) > appsecResponseBodyLimit {
+		bouncer.log.Debug("appsecQuery:responseBodyTooLarge")
+		if res.StatusCode == http.StatusOK {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("appsecQuery:responseBodyTooLarge statusCode:%d", res.StatusCode)
 	}
 
 	decision, parseErr := parseAppsecResponse(body)

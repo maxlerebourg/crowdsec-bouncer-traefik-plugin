@@ -560,6 +560,56 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	}
 }
 
+func Test_appsecQuery_oversizedOKResponsePasses(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	bouncer := &Bouncer{
+		appsecScheme:     appsecURL.Scheme,
+		appsecHost:       appsecURL.Host,
+		appsecPath:       "/",
+		httpAppsecClient: appsecServer.Client(),
+		log:              logger.New("INFO", ""),
+	}
+
+	decision, err := appsecQuery(bouncer, "1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
+	if err != nil {
+		t.Fatalf("appsecQuery() returned error: %v", err)
+	}
+	if decision != nil {
+		t.Fatalf("appsecQuery() returned decision: %v", decision)
+	}
+}
+
+func Test_appsecQuery_oversizedForbiddenResponseBlocks(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	bouncer := &Bouncer{
+		appsecScheme:     appsecURL.Scheme,
+		appsecHost:       appsecURL.Host,
+		appsecPath:       "/",
+		httpAppsecClient: appsecServer.Client(),
+		log:              logger.New("INFO", ""),
+	}
+
+	decision, err := appsecQuery(bouncer, "1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
+	if err == nil {
+		t.Fatal("appsecQuery() expected error, got nil")
+	}
+	if decision != nil {
+		t.Fatalf("appsecQuery() returned decision: %v", decision)
+	}
+}
+
 func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
