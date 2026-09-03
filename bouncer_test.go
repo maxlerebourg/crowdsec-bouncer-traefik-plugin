@@ -557,12 +557,8 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	}
 }
 
-// Test_appsecQuery_reusesConnection is a regression test for issue #384: the
-// appsec response body must be drained so net/http can return the connection to
-// the idle pool. Without it every request opened a fresh TCP connection and left
-// it in TIME_WAIT. The 403 and 500 cases matter as much as 200: they return
-// before the end of the function, and they are what a site under attack or a
-// wedged appsec produce in volume.
+// Test_appsecQuery_reusesConnection is a regression test for issue #384: the appsec response
+// body must be drained for non-200 status response so net/http can return the conn to the idle pool.
 func Test_appsecQuery_reusesConnection(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
@@ -573,8 +569,6 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 				conns[r.RemoteAddr] = true
 				mu.Unlock()
 				rw.WriteHeader(status)
-				// a non-empty body is what makes the connection unusable when it
-				// is not drained; an empty one is already at EOF
 				if _, errWrite := rw.Write([]byte(`{"action":"allow"}`)); errWrite != nil {
 					t.Errorf("appsec stub write: %v", errWrite)
 				}
@@ -593,9 +587,6 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 			}
 
 			const calls = 10
-			// Not a range-over-int loop: yaegi v0.16.1, which is what Traefik
-			// bundles and what `make yaegi_test` pins, cannot parse that form
-			// and panics with "nil type".
 			for i := 0; i < calls; i++ { //nolint:intrange
 				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
 				_ = appsecQuery(bouncer, "1.2.3.4", req)
