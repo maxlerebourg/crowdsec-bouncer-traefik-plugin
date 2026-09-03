@@ -2,12 +2,14 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -553,5 +555,53 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("appsecQuery() blocked on an HTTP/3 GET request body (issue #351 regression)")
+	}
+}
+
+// Test_appsecQuery_reusesConnection is a regression test for issue #384: the
+// appsec response body must be drained so net/http can return the connection to
+// the idle pool. Without it every request opened a fresh TCP connection and left
+// it in TIME_WAIT. The 403 and 500 cases matter as much as 200: they return
+// before the end of the function, and they are what a site under attack or a
+// wedged appsec produce in volume.
+func Test_appsecQuery_reusesConnection(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var mu sync.Mutex
+			conns := map[string]bool{}
+			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				conns[r.RemoteAddr] = true
+				mu.Unlock()
+				rw.WriteHeader(status)
+				// a non-empty body is what makes the connection unusable when it
+				// is not drained; an empty one is already at EOF
+				fmt.Fprint(rw, `{"action":"allow"}`)
+			}))
+			defer appsecServer.Close()
+
+			appsecURL, _ := url.Parse(appsecServer.URL)
+			bouncer := &Bouncer{
+				appsecScheme:       appsecURL.Scheme,
+				appsecHost:         appsecURL.Host,
+				appsecPath:         "/",
+				appsecBodyLimit:    10485760,
+				appsecFailureBlock: false,
+				httpAppsecClient:   appsecServer.Client(),
+				log:                logger.New("INFO", ""),
+			}
+
+			const calls = 10
+			for range calls {
+				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+				_ = appsecQuery(bouncer, "1.2.3.4", req)
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			if len(conns) != 1 {
+				t.Errorf("appsecQuery() opened %d connections for %d calls, want 1 (response body not drained?)", len(conns), calls)
+			}
+		})
 	}
 }
