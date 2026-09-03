@@ -2,7 +2,6 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -576,7 +575,9 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 				rw.WriteHeader(status)
 				// a non-empty body is what makes the connection unusable when it
 				// is not drained; an empty one is already at EOF
-				fmt.Fprint(rw, `{"action":"allow"}`)
+				if _, errWrite := rw.Write([]byte(`{"action":"allow"}`)); errWrite != nil {
+					t.Errorf("appsec stub write: %v", errWrite)
+				}
 			}))
 			defer appsecServer.Close()
 
