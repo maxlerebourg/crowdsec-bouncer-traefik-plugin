@@ -692,7 +692,7 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 			const calls = 10
 			for i := 0; i < calls; i++ { //nolint:intrange
 				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
-				_ = appsecQuery(bouncer, "1.2.3.4", req)
+				_, _ = appsecQuery(bouncer, "1.2.3.4", req)
 			}
 
 			mu.Lock()
