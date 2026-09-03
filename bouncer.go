@@ -803,10 +803,8 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 		return nil
 	}
 	defer func() {
-		// net/http only returns a connection to the idle pool once its body has
-		// been read to EOF; closing early discards it. Drain here rather than at
-		// the end of the function so the 500 and non-200 paths, which return
-		// earlier, keep their connections too.
+		// net/http returns a conn to the idle pool once its body has been read to EOF, closing early discards it.
+		// Drain the body from the non-200 paths, which return earlier, keep their connections too.
 		if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
 			bouncer.log.Debug("appsecQuery:drainBody " + errDrain.Error())
 		}
