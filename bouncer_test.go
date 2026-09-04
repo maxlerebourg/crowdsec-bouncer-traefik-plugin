@@ -708,8 +708,9 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	}
 	if got := recorder.Header().Get("X-Remediation"); got != "ban" {
 		t.Fatalf("expected fallback remediation header ban, got %q", got)
-  }
+	}
 }
+
 // Test_appsecQuery_reusesConnection is a regression test for issue #384: the appsec response
 // body must be drained for non-200 status response so net/http can return the conn to the idle pool.
 func Test_appsecQuery_reusesConnection(t *testing.T) {

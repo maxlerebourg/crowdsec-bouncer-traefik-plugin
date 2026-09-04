@@ -124,12 +124,13 @@ type Bouncer struct {
 	log                       *slog.Logger
 }
 
+// AppSecResponse is the structured remediation Appsec returns for a request.
 type AppSecResponse struct {
 	Action          string              `json:"action"`
-	HTTPStatus      int                 `json:"http_status"`
-	UserBodyContent string              `json:"user_body_content,omitempty"`
-	UserCookies     []string            `json:"user_cookies,omitempty"`
-	UserHeaders     map[string][]string `json:"user_headers,omitempty"`
+	HTTPStatus      int                 `json:"http_status"`                 //nolint:tagliatelle
+	UserBodyContent string              `json:"user_body_content,omitempty"` //nolint:tagliatelle
+	UserCookies     []string            `json:"user_cookies,omitempty"`      //nolint:tagliatelle
+	UserHeaders     map[string][]string `json:"user_headers,omitempty"`      //nolint:tagliatelle
 }
 
 // New creates the crowdsec bouncer plugin.
@@ -802,6 +803,7 @@ func isMethodWithBody(method string) bool {
 	}
 }
 
+//nolint:nilnil,gocognit,gocyclo,funlen
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecResponse, error) {
 	routeURL := url.URL{
 		Scheme: bouncer.appsecScheme,
