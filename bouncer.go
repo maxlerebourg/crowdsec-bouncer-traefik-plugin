@@ -43,6 +43,7 @@ const (
 	crowdsecCapiStreamRoute  = "v2/decisions/stream"
 	cacheTimeoutKey          = "updated"
 	appsecAllowAction        = "allow"
+	appsecBanAction          = "ban"
 	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
 )
 
@@ -507,6 +508,10 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 			return
 		}
 		if decision != nil && decision.Action != "" && decision.Action != appsecAllowAction {
+			if decision.Action == appsecBanAction {
+				bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+				return
+			}
 			bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
 			return
 		}
@@ -527,6 +532,9 @@ func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, re
 	}
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, decision.Action)
+	}
+	if rw.Header().Get("Content-Type") == "" && bouncer.banTemplateContentType != "" {
+		rw.Header().Set("Content-Type", bouncer.banTemplateContentType)
 	}
 
 	status := decision.HTTPStatus

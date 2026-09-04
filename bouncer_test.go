@@ -754,3 +754,95 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
+	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"ban","http_status":403,"user_body_content":"appsec default page"}`))
+	}))
+	defer appsec.Close()
+
+	appsecURL, err := url.Parse(appsec.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	banTemplate, err := template.New("ban").Parse("<html>custom ban for {{.ClientIP}} reason={{.RemediationReason}}</html>")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nextCalled := false
+	bouncer := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+		appsecEnabled:           true,
+		appsecScheme:            appsecURL.Scheme,
+		appsecHost:              appsecURL.Host,
+		appsecPath:              "/",
+		httpAppsecClient:        appsec.Client(),
+		remediationStatusCode:   http.StatusForbidden,
+		remediationCustomHeader: "X-Remediation",
+		banTemplate:             banTemplate,
+		banTemplateContentType:  "text/html; charset=utf-8",
+		log:                     logger.New("ERROR", ""),
+	}
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+	if nextCalled {
+		t.Fatal("next handler should not be called for an appsec ban")
+	}
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", recorder.Code)
+	}
+	want := "<html>custom ban for 192.0.2.10 reason=APPSEC</html>"
+	if got := recorder.Body.String(); got != want {
+		t.Fatalf("appsec ban must keep the configured ban template, got %q want %q", got, want)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
+		t.Fatalf("expected banTemplateContentType, got %q", got)
+	}
+	if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+		t.Fatalf("expected remediation header ban, got %q", got)
+	}
+}
+
+func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
+	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`))
+	}))
+	defer appsec.Close()
+
+	appsecURL, err := url.Parse(appsec.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bouncer := &Bouncer{
+		next:                   http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+		appsecEnabled:          true,
+		appsecScheme:           appsecURL.Scheme,
+		appsecHost:             appsecURL.Host,
+		appsecPath:             "/",
+		httpAppsecClient:       appsec.Client(),
+		remediationStatusCode:  http.StatusForbidden,
+		banTemplateContentType: "text/html; charset=utf-8",
+		log:                    logger.New("ERROR", ""),
+	}
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected challenge status 200, got %d", recorder.Code)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
+		t.Fatalf("challenge without a Content-Type from appsec should fall back, got %q", got)
+	}
+}
