@@ -514,13 +514,6 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	}
 }
 
-func newUnreadableGetRequest(done <-chan struct{}) *http.Request {
-	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", blockingBody{done: done})
-	req.ProtoMajor = 3
-	req.ContentLength = -1
-	return req
-}
-
 // Test_appsecQuery_unreadableBodyGetNotDropped is a regression test for issue #351
 func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
@@ -544,7 +537,7 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newUnreadableGetRequest(done))
+		finished <- appsecQuery(bouncer, "1.2.3.4", newUnreadableRequest(http.MethodGet, done))
 	}()
 
 	select {
