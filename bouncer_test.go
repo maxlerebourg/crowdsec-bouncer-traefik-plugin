@@ -600,3 +600,66 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 		})
 	}
 }
+
+func newUnreadableRequest(method string, done <-chan struct{}) *http.Request {
+	req, _ := http.NewRequest(method, "http://localhost/api/admin/reservations/8fff14a2", blockingBody{done: done})
+	req.ProtoMajor = 3
+	req.ContentLength = -1
+	return req
+}
+
+func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, _ := url.Parse(appsecServer.URL)
+
+	tests := []struct {
+		method      string
+		wantDropped bool
+	}{
+		{method: http.MethodGet, wantDropped: false},
+		{method: http.MethodHead, wantDropped: false},
+		{method: http.MethodOptions, wantDropped: false},
+		{method: http.MethodDelete, wantDropped: false},
+		{method: http.MethodPost, wantDropped: true},
+		{method: http.MethodPut, wantDropped: true},
+		{method: http.MethodPatch, wantDropped: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			bouncer := &Bouncer{
+				appsecScheme:              appsecURL.Scheme,
+				appsecHost:                appsecURL.Host,
+				appsecPath:                "/",
+				appsecBodyLimit:           10485760,
+				appsecUnreadableBodyBlock: true,
+				httpAppsecClient:          appsecServer.Client(),
+				log:                       logger.New("INFO", ""),
+			}
+
+			done := make(chan struct{})
+			defer close(done)
+
+			finished := make(chan error, 1)
+			go func() {
+				finished <- appsecQuery(bouncer, "1.2.3.4", newUnreadableRequest(tt.method, done))
+			}()
+
+			select {
+			case err := <-finished:
+				if tt.wantDropped && err == nil {
+					t.Errorf("appsecQuery() on an unreadable-body %s: expected the request to be dropped, got nil", tt.method)
+				}
+				if !tt.wantDropped && err != nil {
+					t.Errorf("appsecQuery() on a bodyless HTTP/3 %s returned error: %v", tt.method, err)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatalf("appsecQuery() blocked on an unreadable %s body", tt.method)
+			}
+		})
+	}
+}
