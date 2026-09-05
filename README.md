@@ -526,6 +526,10 @@ make run
   - string
   - default: /captcha.html
   - Path where the captcha template is stored. The Content-Type header is automatically inferred from the file extension.
+- CaptchaBanOrigins
+  - []string
+  - default: [] (disabled)
+  - Decision origins whose `ban` decisions are served the captcha remediation instead. Useful for decisions whose type cannot be chosen at the source, such as the CAPI community blocklist and console-subscribed blocklists (origins `CAPI` and `lists`), which always arrive as `ban`. Local scenario decisions keep the type set by your `profiles.yaml`, and origins that are not listed are unaffected — e.g. `["CAPI", "lists"]` still bans everything you or your scenarios decided to ban. Requires a captcha provider to be configured; without one the captcha remediation falls back to the ban page.
 - BanFilePath
   - string
   - default: ""
