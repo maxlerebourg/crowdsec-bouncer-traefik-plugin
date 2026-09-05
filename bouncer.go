@@ -746,7 +746,7 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 // isMethodWithBody used only when isBodyUnreadable returns true but the request method can't have body.
 func isMethodWithBody(method string) bool {
 	switch method {
-	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
 		return true
 	default:
 		return false
