@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.7.11"
+    image: "traefik:v3.7.13"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -71,7 +71,7 @@ services:
       # Define AppSec host and port informations
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.7.8
+    image: crowdsecurity/crowdsec:v1.8.1
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
