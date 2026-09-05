@@ -60,6 +60,17 @@ func (localCache) set(key, value string, duration int64) {
 	cache.Set(key, value, duration)
 }
 
+func (lc localCache) mget(keys []string) ([]string, error) {
+	values := make([]string, len(keys))
+	for i, key := range keys {
+		value, err := lc.get(key)
+		if err == nil {
+			values[i] = value
+		}
+	}
+	return values, nil
+}
+
 func (localCache) delete(key string) {
 	cache.Del(key)
 }
@@ -67,7 +78,7 @@ func (localCache) delete(key string) {
 type redisCache struct {
 	log     *slog.Logger
 	writer  simpleredis.SimpleRedis
-	readers []simpleredis.SimpleRedis
+	readers []*simpleredis.SimpleRedis
 	counter atomic.Uint64
 }
 
@@ -77,7 +88,7 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 		return &rc.writer
 	}
 	idx := rc.counter.Add(1) % uint64(n)
-	return &rc.readers[idx]
+	return rc.readers[idx]
 }
 
 func (rc *redisCache) get(key string) (string, error) {
@@ -99,6 +110,27 @@ func (rc *redisCache) get(key string) (string, error) {
 	return "", errors.New(CacheMiss)
 }
 
+func (rc *redisCache) mget(keys []string) ([]string, error) {
+	raw, err := rc.nextReader().MGet(keys)
+	if err != nil {
+		switch err.Error() {
+		case simpleredis.RedisMiss:
+			return make([]string, len(keys)), nil
+		case simpleredis.RedisUnreachable:
+			return nil, errors.New(CacheUnreachable)
+		default:
+			return nil, err
+		}
+	}
+	values := make([]string, len(keys))
+	for i := range raw {
+		if i < len(values) {
+			values[i] = string(raw[i])
+		}
+	}
+	return values, nil
+}
+
 func (rc *redisCache) set(key, value string, duration int64) {
 	if err := rc.writer.Set(key, []byte(value), duration); err != nil {
 		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
@@ -114,6 +146,7 @@ func (rc *redisCache) delete(key string) {
 type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
+	mget(keys []string) ([]string, error)
 	delete(key string)
 }
 
@@ -130,7 +163,7 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 		rc := &redisCache{log: log}
 		rc.writer.Init(writeHost, pass, database)
 		for _, h := range readHosts {
-			var r simpleredis.SimpleRedis
+			r := &simpleredis.SimpleRedis{}
 			r.Init(h, pass, database)
 			rc.readers = append(rc.readers, r)
 		}
@@ -179,9 +212,23 @@ func (c *Client) GetCIDR(ipStr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, key := range ip.CIDRLookupKeys(ipStr, parsePrefixLens(prefixLens)) {
-		value, getErr := c.cache.get(cidrPrefix + key)
-		if getErr == nil {
+	lookupKeys := ip.CIDRLookupKeys(ipStr, parsePrefixLens(prefixLens))
+	if len(lookupKeys) == 0 {
+		return "", errors.New(CacheMiss)
+	}
+	keys := make([]string, len(lookupKeys))
+	for i, key := range lookupKeys {
+		keys[i] = cidrPrefix + key
+	}
+	// One read for every candidate rather than one per prefix length: a miss,
+	// which is the common case on the request path, used to cost them all.
+	values, err := c.cache.mget(keys)
+	if err != nil {
+		return "", err
+	}
+	// CIDRLookupKeys is most specific first, so the first hit is the match.
+	for _, value := range values {
+		if value != "" {
 			return value, nil
 		}
 	}
