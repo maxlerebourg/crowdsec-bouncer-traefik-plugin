@@ -86,6 +86,7 @@ mock/
    template).
 2. In `run.sh`, define a `body` function with the assertions and call
    `run_scenario "<name>" "$HERE" body`.
-3. Drive decisions with `lapi_add_decision <ip> [type] [duration]` and
-   `lapi_delete_decision <ip>`.
-4. Add `<name>` to `E2E_MOCK_SCENARIOS` in the `Makefile`.
+3. Drive IP decisions with `lapi_add_decision <ip> [type] [duration]` and
+   `lapi_delete_decision <ip>`. For Country, AS, Range, or a custom scope use
+   `lapi_add_scope_decision <scope> <value> [type] [duration]`.
+4. New folders under `scenarios/` are picked up by `make e2e_mock` automatically.

@@ -74,6 +74,14 @@ jobs:
       - name: Lint and Tests
         run: make
 
+      # Yaegi GOPATH lookup uses the Go module path, which on this fork is not
+      # the same as github.repository. Link the checkout so pkg/* imports resolve.
+      - name: Expose module path for Yaegi
+        run: |
+          mkdir -p "${{ github.workspace }}/go/src/github.com/maxlerebourg"
+          ln -sfn "${{ github.workspace }}/go/src/github.com/${{ github.repository }}" \
+            "${{ github.workspace }}/go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+
       - name: Run tests with Yaegi
         run: make yaegi_test
         env:

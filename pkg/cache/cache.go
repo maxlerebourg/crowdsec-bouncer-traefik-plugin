@@ -30,6 +30,12 @@ const (
 //nolint:gochecknoglobals
 var cache = ttl_map.New()
 
+// ResetLocalForTest replaces the in-process map. Tests share one map; Yaegi
+// does not run in file order, so leftovers from another test would look like hits.
+func ResetLocalForTest() {
+	cache = ttl_map.New()
+}
+
 type localCache struct{}
 
 func (localCache) get(key string) (string, error) {
@@ -47,6 +53,24 @@ func (localCache) set(key, value string, duration int64) {
 
 func (localCache) delete(key string) {
 	cache.Del(key)
+}
+
+func (lc localCache) getMany(keys []string) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		value, err := lc.get(key)
+		if err == nil {
+			out[key] = value
+			continue
+		}
+		if err.Error() == CacheUnreachable {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 type redisCache struct {
@@ -96,9 +120,40 @@ func (rc *redisCache) delete(key string) {
 	}
 }
 
+func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
+	// Upstream github.com/maxlerebourg/simpleredis v1.0.12 exposes GET only.
+	// CI runs `go mod vendor` and restores that module, so a vendored MGET
+	// does not survive. One nextReader() keeps redis e2e rotation; loop Get
+	// until maxlerebourg/simpleredis#9 adds MGET.
+	reader := rc.nextReader()
+	out := make(map[string]string)
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		value, err := reader.Get(key)
+		if err != nil {
+			switch err.Error() {
+			case simpleredis.RedisMiss:
+				continue
+			case simpleredis.RedisUnreachable:
+				return nil, errors.New(CacheUnreachable)
+			default:
+				return nil, err
+			}
+		}
+		valueString := string(value)
+		if len(valueString) > 0 {
+			out[key] = valueString
+		}
+	}
+	return out, nil
+}
+
 type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
+	getMany(keys []string) (map[string]string, error)
 	delete(key string)
 }
 
@@ -137,6 +192,13 @@ func (c *Client) Delete(key string) {
 func (c *Client) Get(key string) (string, error) {
 	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
 	return c.cache.get(key)
+}
+
+// GetMany returns the values for the given keys. Missing keys are omitted.
+// Redis issues one GET per key (simpleredis v1.0.12 has no MGET). Unreachable returns CacheUnreachable.
+func (c *Client) GetMany(keys []string) (map[string]string, error) {
+	c.log.Debug(fmt.Sprintf("cache:GetMany keys:%v", keys))
+	return c.cache.getMany(keys)
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.

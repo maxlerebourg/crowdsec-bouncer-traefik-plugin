@@ -33,6 +33,26 @@ Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) an
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
 
+Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), and any other CrowdSec scope listed in `decisionScopeHeaders`.
+
+`decisionScopeHeaders` maps a CrowdSec **scope name** (the map key) to a request **header name** (the map value). The key selects how the header is interpreted, not the header name:
+
+- `Country` (any case: `country`, `Country`): ISO 3166-1 alpha-2, case-insensitive. Cloudflare `XX` and `T1` do not match. Example header: `CF-IPCountry`.
+- `AS` (any case: `as`, `AS`): decimal ASN. A leading `AS` / `as` on the header or the decision is ignored. Example header: `CF-ASN`.
+- Any other key (`username`, `session`, …): trimmed header string, compared as-is to the decision value. The key must match the scope LAPI stored (`username` is not `user`).
+- `Ip` and `Range` cannot be mapped. IP comes from the client address; Range is CIDR containment.
+
+Range uses one shared cache key (`range-index`) of `cidr=remediation` lines. A request that misses an exact IP walks that list (`O(number of Range decisions)`). Community blocklists are almost all IPs; Range counts stay small, so this is the compromise instead of a radix tree: replicas that only `Get` the Redis cache still match (stream ingest is single-writer), exact IPs stay an `O(1)` lookup, and any containing CIDR that is `ban` wins even if a tighter range is `captcha` (longest-prefix match would invert that). Lookup is one `GetMany` for the IP, header-scope keys, and `range-index` (Redis still one `GET` per key; `simpleredis` v1.0.12 has no `MGET`). Live/none skip `range-index` and expand Range via LAPI `?ip=`. Stream `Deleted` removes a CIDR from the index; a missed delete stays until the next full stream refresh.
+
+```yaml
+decisionScopeHeaders:
+  Country: CF-IPCountry
+  AS: CF-ASN
+  username: X-User
+```
+
+The plugin does not resolve GeoIP or invent header values. Every `decisionScopeHeaders` scope is taken from the request as-is (CDN, reverse proxy, or a Traefik middleware). If the client can set that header, they can change matching — use only values you trust when the header is not client-controlled.
+
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
 
@@ -433,6 +453,10 @@ make run
   - string
   - default: "X-Forwarded-For"
   - Name of the header where the real IP of the client should be retrieved
+- DecisionScopeHeaders
+  - map[string]string
+  - default: {}
+  - Maps a CrowdSec **scope name** (key) to a request header (value). The key chooses the matcher: `Country` (any case) is ISO 3166-1 alpha-2 and ignores `XX`/`T1`; `AS` (any case) is decimal digits and strips a leading `AS`; any other key is a trimmed exact match. Do not map `Ip` or `Range`. Empty disables header scopes. See the `decisionScopeHeaders` example above.
 - ForwardedHeadersTrustedIPs
   - []string
   - default: []
@@ -610,6 +634,10 @@ http:
           enabled: false
           logLevel: DEBUG
           logFormat: common
+          decisionScopeHeaders: {}
+          # Country: CF-IPCountry  # key Country (any case) → ISO country matcher
+          # AS: CF-ASN             # key AS (any case) → ASN matcher
+          # username: X-User       # any other key → trimmed exact match
           LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0

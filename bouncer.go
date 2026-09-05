@@ -107,6 +107,7 @@ type Bouncer struct {
 	remediationStatusCode     int
 	remediationCustomHeader   string
 	forwardedCustomHeader     string
+	decisionScopeHeaders      map[string]string
 	crowdsecStreamRoute       string
 	crowdsecHeader            string
 	redisUnreachableBlock     bool
@@ -226,6 +227,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		updateMaxFailure:          config.UpdateMaxFailure,
 		remediationCustomHeader:   config.RemediationHeadersCustomName,
 		forwardedCustomHeader:     config.ForwardedHeadersCustomName,
+		decisionScopeHeaders:      normalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		defaultDecisionTimeout:    config.DefaultDecisionSeconds,
 		remediationStatusCode:     config.RemediationStatusCode,
 		redisUnreachableBlock:     config.RedisCacheUnreachableBlock,
@@ -365,9 +367,13 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// TODO This should be simplified
+	scopes := requestScopeValues(bouncer, req)
+
+	// Cache lookup: Ip, Range, then configured header scopes. Live still queries LAPI on miss.
 	if bouncer.crowdsecMode != configuration.NoneMode {
-		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
-		if cacheErr != nil {
+		value, cacheErr := lookupCachedRemediation(bouncer, remoteIP, scopes)
+		switch {
+		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
 			if !bouncer.redisUnreachableBlock && cacheErrString == cache.CacheUnreachable {
@@ -380,18 +386,17 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 				return
 			}
-		} else {
+		case isActiveRemediation(value):
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
-			if value == cache.NoBannedValue {
-				bouncer.handleNextServeHTTP(rw, req, remoteIP)
-			} else {
-				bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value)
-			}
+			bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value)
+			return
+		case value == cache.NoBannedValue:
+			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}
 	}
 
-	// Right here if we cannot join the stream we forbid the request to go on.
+	// Stream/alone: miss means not on the ban list. Live/none: ask LAPI.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
@@ -400,7 +405,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 		}
 	} else {
-		value, err := handleNoStreamCache(bouncer, remoteIP)
+		value, err := handleNoStreamCache(bouncer, remoteIP, scopes)
 		if err != nil {
 			bouncer.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
 		}
@@ -535,66 +540,26 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	return stop
 }
 
-// We are now in none or live mode.
-func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
+// We are now in none or live mode. scopes holds normalized header values for configured scopes.
+func handleNoStreamCache(bouncer *Bouncer, remoteIP string, scopes map[string]string) (string, error) {
 	isLiveMode := bouncer.crowdsecMode == configuration.LiveMode
-	routeURL := url.URL{
-		Scheme:   bouncer.crowdsecScheme,
-		Host:     bouncer.crowdsecHost,
-		Path:     bouncer.crowdsecPath + crowdsecLapiRoute,
-		RawQuery: fmt.Sprintf("ip=%v", remoteIP),
-	}
-	body, err := crowdsecQuery(bouncer, routeURL.String(), nil)
+	chosen, parsedDuration, err := queryLiveDecisions(bouncer, fmt.Sprintf("ip=%v", remoteIP))
 	if err != nil {
 		return cache.BannedValue, err
 	}
-
-	if bytes.Equal(body, []byte("null")) {
-		if isLiveMode {
+	for scope, identifier := range scopes {
+		chosen, parsedDuration = mergeLiveScope(bouncer, chosen, parsedDuration, scope, identifier, isLiveMode)
+	}
+	if !isActiveRemediation(chosen) {
+		if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
 			bouncer.cacheClient.Set(remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
 		}
 		return cache.NoBannedValue, nil
-	}
-
-	var decisions []Decision
-	err = json.Unmarshal(body, &decisions)
-	if err != nil {
-		return cache.BannedValue, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
-	}
-	if len(decisions) == 0 {
-		if isLiveMode {
-			bouncer.cacheClient.Set(remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
-		}
-		return cache.NoBannedValue, nil
-	}
-	var decision Decision
-	for _, d := range decisions {
-		decision = d
-		if decision.Type == "ban" {
-			break
-		}
-	}
-	duration, err := time.ParseDuration(decision.Duration)
-	if err != nil {
-		return cache.BannedValue, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
-	}
-	var value string
-	switch decision.Type {
-	case "ban":
-		value = cache.BannedValue
-	case "captcha":
-		value = cache.CaptchaValue
-	default:
-		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 	}
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
-		durationSecond := int64(duration.Seconds())
-		if bouncer.defaultDecisionTimeout < durationSecond {
-			durationSecond = bouncer.defaultDecisionTimeout
-		}
-		bouncer.cacheClient.Set(remoteIP, value, durationSecond)
+		bouncer.cacheClient.Set(remoteIP, chosen, liveCacheTTL(bouncer, parsedDuration))
 	}
-	return value, errors.New("handleNoStreamCache:banned")
+	return chosen, errors.New("handleNoStreamCache:banned")
 }
 
 func getToken(bouncer *Bouncer) error {
@@ -653,7 +618,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup),
+		RawQuery: streamQuery(bouncer),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
@@ -664,23 +629,15 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
-	for _, decision := range stream.New {
-		duration, err := time.ParseDuration(decision.Duration)
-		if err == nil {
-			var value string
-			switch decision.Type {
-			case "ban":
-				value = cache.BannedValue
-			case "captcha":
-				value = cache.CaptchaValue
-			default:
-				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
-			}
-			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+	for _, item := range stream.New {
+		parsedDuration, parseErr := time.ParseDuration(item.Duration)
+		if parseErr != nil {
+			continue
 		}
+		storeStreamDecision(bouncer, item, int64(parsedDuration.Seconds()))
 	}
-	for _, decision := range stream.Deleted {
-		bouncer.cacheClient.Delete(decision.Value)
+	for _, item := range stream.Deleted {
+		deleteStreamDecision(bouncer, item)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
 	isCrowdsecStreamStartup = false

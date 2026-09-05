@@ -1,0 +1,3 @@
+# CI runs these on Linux. CRLF breaks `set -euo pipefail` and gofmt.
+*.sh text eol=lf
+*.go text eol=lf

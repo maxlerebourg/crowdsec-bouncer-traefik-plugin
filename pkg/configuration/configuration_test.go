@@ -222,6 +222,34 @@ func Test_validateParamsRequired(t *testing.T) {
 	}
 }
 
+func Test_validateDecisionScopeHeaders(t *testing.T) {
+	ok := getMinimalConfig()
+	ok.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry", "username": "X-User"}
+	if err := ValidateParams(ok, logger.New("INFO", "")); err != nil {
+		t.Fatalf("valid decisionScopeHeaders: %v", err)
+	}
+	badIP := getMinimalConfig()
+	badIP.DecisionScopeHeaders = map[string]string{"Ip": "X-Real-IP"}
+	if err := ValidateParams(badIP, logger.New("INFO", "")); err == nil {
+		t.Fatal("Ip decisionScopeHeaders must be rejected")
+	}
+	badRange := getMinimalConfig()
+	badRange.DecisionScopeHeaders = map[string]string{"range": "X-Range"}
+	if err := ValidateParams(badRange, logger.New("INFO", "")); err == nil {
+		t.Fatal("Range decisionScopeHeaders must be rejected")
+	}
+	emptyHeader := getMinimalConfig()
+	emptyHeader.DecisionScopeHeaders = map[string]string{"Country": ""}
+	if err := ValidateParams(emptyHeader, logger.New("INFO", "")); err == nil {
+		t.Fatal("empty header must be rejected")
+	}
+	emptyScope := getMinimalConfig()
+	emptyScope.DecisionScopeHeaders = map[string]string{" ": "X-User"}
+	if err := ValidateParams(emptyScope, logger.New("INFO", "")); err == nil {
+		t.Fatal("empty scope name must be rejected")
+	}
+}
+
 func Test_validateParamsAPIKey(t *testing.T) {
 	type args struct {
 		lapiKey   string
