@@ -15,10 +15,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -53,10 +55,10 @@ func list(m map[string]Decision) []Decision {
 	return out
 }
 
-// --- Redis mock (inline-command wire format, as spoken by simpleredis) ---
+// --- Redis mock (RESP arrays, as spoken by simpleredis; inline still accepted) ---
 
 // serveRedis is a hardcoded stand-in. When verdicts is true it plays a replica
-// that holds decisions: every line is scanned for known IPs, 1.2.3.4 → "f"
+// that holds decisions: keys are scanned for known IPs, 1.2.3.4 → "f"
 // (clean), 1.2.3.5 → "t" (banned); any other GET is a miss ($-1). When verdicts
 // is false it plays the primary and answers every GET with a miss, so a
 // scenario can prove reads are served from the replica and not the primary.
@@ -77,24 +79,76 @@ func serveRedis(addr string, verdicts bool) {
 			defer conn.Close()
 			rd := bufio.NewReader(conn)
 			for {
-				line, _, err := rd.ReadLine()
+				args, err := readRedisCommand(rd)
 				if err != nil {
 					return
 				}
-				s := string(line)
-				switch {
-				case verdicts && strings.Contains(s, "1.2.3.4"):
-					conn.Write([]byte("$1\r\nf\r\n"))
-				case verdicts && strings.Contains(s, "1.2.3.5"):
-					conn.Write([]byte("$1\r\nt\r\n"))
-				case strings.HasPrefix(strings.ToUpper(s), "GET "):
-					conn.Write([]byte("$-1\r\n"))
+				if len(args) == 0 {
+					continue
+				}
+				switch strings.ToUpper(args[0]) {
+				case "GET":
+					if len(args) < 2 {
+						conn.Write([]byte("$-1\r\n"))
+						continue
+					}
+					conn.Write([]byte(redisValue(verdicts, args[1])))
+				case "MGET":
+					fmt.Fprintf(conn, "*%d\r\n", len(args)-1)
+					for _, key := range args[1:] {
+						conn.Write([]byte(redisValue(verdicts, key)))
+					}
 				default:
 					conn.Write([]byte("+OK\r\n"))
 				}
 			}
 		}(conn)
 	}
+}
+
+func redisValue(verdicts bool, key string) string {
+	switch {
+	case verdicts && strings.Contains(key, "1.2.3.4"):
+		return "$1\r\nf\r\n"
+	case verdicts && strings.Contains(key, "1.2.3.5"):
+		return "$1\r\nt\r\n"
+	default:
+		return "$-1\r\n"
+	}
+}
+
+// readRedisCommand reads one RESP array, falling back to a whitespace split for
+// the inline commands older simpleredis releases sent.
+func readRedisCommand(rd *bufio.Reader) ([]string, error) {
+	header, err := rd.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	header = strings.TrimRight(header, "\r\n")
+	if !strings.HasPrefix(header, "*") {
+		return strings.Fields(header), nil
+	}
+	count, err := strconv.Atoi(header[1:])
+	if err != nil {
+		return nil, err
+	}
+	args := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		sizeLine, err := rd.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		size, err := strconv.Atoi(strings.TrimRight(sizeLine, "\r\n")[1:])
+		if err != nil {
+			return nil, err
+		}
+		buf := make([]byte, size+2)
+		if _, err := io.ReadFull(rd, buf); err != nil {
+			return nil, err
+		}
+		args = append(args, string(buf[:size]))
+	}
+	return args, nil
 }
 
 func main() {
