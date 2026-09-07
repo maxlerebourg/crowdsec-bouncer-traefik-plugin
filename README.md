@@ -473,7 +473,8 @@ make run
 - UpdateMaxFailure
   - int64
   - default: 0
-  - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
+  - In `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
+  - In `live` and `none` mode, only `-1` has an effect: a request is let through instead of blocked when Crowdsec cannot be reached. Any other value blocks on the first failure, there is no failure counter on that path.
 - StreamStartupBlock
   - bool
   - default: true

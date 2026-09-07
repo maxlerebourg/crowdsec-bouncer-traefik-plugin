@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.7.11"
+    image: "traefik:v3.7.13"
     container_name: "traefik"
     restart: unless-stopped
     command:
@@ -71,7 +71,7 @@ services:
 
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.7.8
+    image: crowdsecurity/crowdsec:v1.8.1
     container_name: "crowdsec"
     restart: unless-stopped
     environment:
@@ -87,7 +87,7 @@ services:
       - "traefik.enable=false"
 
   redis-secure:
-    image: "redis:8.10.0-alpine"
+    image: "redis:8.10.1-alpine"
     container_name: "redis-secure"
     hostname: redis-secure
     restart: unless-stopped

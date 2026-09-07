@@ -123,21 +123,67 @@ func TestBouncer_ServeHTTP(t *testing.T) {
 }
 
 func Test_handleNoStreamCache(t *testing.T) {
-	type args struct {
-		bouncer  *Bouncer
-		remoteIP string
+	newBouncer := func(mode string, updateMaxFailure int64) *Bouncer {
+		log := logger.New("ERROR", "")
+		cacheClient := &cache.Client{}
+		cacheClient.New(log, false, "", nil, "", "")
+		return &Bouncer{
+			crowdsecScheme:         "http",
+			crowdsecHost:           "127.0.0.1:1",
+			crowdsecPath:           "/",
+			crowdsecMode:           mode,
+			updateMaxFailure:       updateMaxFailure,
+			defaultDecisionTimeout: 60,
+			httpClient:             &http.Client{Timeout: time.Second},
+			cacheClient:            cacheClient,
+			log:                    log,
+		}
 	}
+
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name             string
+		mode             string
+		updateMaxFailure int64
+		want             string
+		wantErr          bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:             "live mode blocks by default when crowdsec is unreachable",
+			mode:             configuration.LiveMode,
+			updateMaxFailure: 0,
+			want:             cache.BannedValue,
+			wantErr:          true,
+		},
+		{
+			name:             "live mode blocks for any positive updateMaxFailure",
+			mode:             configuration.LiveMode,
+			updateMaxFailure: 3,
+			want:             cache.BannedValue,
+			wantErr:          true,
+		},
+		{
+			name:             "live mode lets the request through when updateMaxFailure is -1",
+			mode:             configuration.LiveMode,
+			updateMaxFailure: -1,
+			want:             cache.NoBannedValue,
+			wantErr:          true,
+		},
+		{
+			name:             "none mode lets the request through when updateMaxFailure is -1",
+			mode:             configuration.NoneMode,
+			updateMaxFailure: -1,
+			want:             cache.NoBannedValue,
+			wantErr:          true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := handleNoStreamCache(tt.args.bouncer, tt.args.remoteIP); (err != nil) != tt.wantErr {
+			got, err := handleNoStreamCache(newBouncer(tt.mode, tt.updateMaxFailure), "1.2.3.4")
+			if (err != nil) != tt.wantErr {
 				t.Errorf("handleNoStreamCache() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("handleNoStreamCache() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -516,13 +562,6 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	}
 }
 
-func newUnreadableGetRequest(done <-chan struct{}) *http.Request {
-	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", blockingBody{done: done})
-	req.ProtoMajor = 3
-	req.ContentLength = -1
-	return req
-}
-
 // Test_appsecQuery_unreadableBodyGetNotDropped is a regression test for issue #351
 func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
@@ -546,7 +585,7 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		_, err := appsecQuery(bouncer, "1.2.3.4", newUnreadableGetRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newUnreadableRequest(http.MethodGet, done))
 		finished <- err
 	}()
 
@@ -844,5 +883,69 @@ func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
 	}
 	if got := recorder.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Fatalf("challenge without a Content-Type from appsec should fall back, got %q", got)
+	}
+}
+
+func newUnreadableRequest(method string, done <-chan struct{}) *http.Request {
+	req, _ := http.NewRequest(method, "http://localhost/api/admin/reservations/8fff14a2", blockingBody{done: done})
+	req.ProtoMajor = 3
+	req.ContentLength = -1
+	return req
+}
+
+func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, _ := url.Parse(appsecServer.URL)
+
+	tests := []struct {
+		method      string
+		wantDropped bool
+	}{
+		{method: http.MethodGet, wantDropped: false},
+		{method: http.MethodHead, wantDropped: false},
+		{method: http.MethodOptions, wantDropped: false},
+		{method: http.MethodDelete, wantDropped: false},
+		{method: http.MethodPost, wantDropped: true},
+		{method: http.MethodPut, wantDropped: true},
+		{method: http.MethodPatch, wantDropped: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			bouncer := &Bouncer{
+				appsecScheme:              appsecURL.Scheme,
+				appsecHost:                appsecURL.Host,
+				appsecPath:                "/",
+				appsecBodyLimit:           10485760,
+				appsecUnreadableBodyBlock: true,
+				httpAppsecClient:          appsecServer.Client(),
+				log:                       logger.New("INFO", ""),
+			}
+
+			done := make(chan struct{})
+			defer close(done)
+
+			finished := make(chan error, 1)
+			go func() {
+				_, err := appsecQuery(bouncer, "1.2.3.4", newUnreadableRequest(tt.method, done))
+				finished <- err
+			}()
+
+			select {
+			case err := <-finished:
+				if tt.wantDropped && err == nil {
+					t.Errorf("appsecQuery() on an unreadable-body %s: expected the request to be dropped, got nil", tt.method)
+				}
+				if !tt.wantDropped && err != nil {
+					t.Errorf("appsecQuery() on a bodyless HTTP/3 %s returned error: %v", tt.method, err)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatalf("appsecQuery() blocked on an unreadable %s body", tt.method)
+			}
+		})
 	}
 }

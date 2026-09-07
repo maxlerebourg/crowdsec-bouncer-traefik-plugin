@@ -604,6 +604,9 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String(), nil)
 	if err != nil {
+		if bouncer.updateMaxFailure == -1 {
+			return cache.NoBannedValue, err
+		}
 		return cache.BannedValue, err
 	}
 
@@ -804,7 +807,7 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 // isMethodWithBody used only when isBodyUnreadable returns true but the request method can't have body.
 func isMethodWithBody(method string) bool {
 	switch method {
-	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
 		return true
 	default:
 		return false
