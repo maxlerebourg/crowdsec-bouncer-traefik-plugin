@@ -534,7 +534,9 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 		for {
 			select {
 			case <-ticker.C:
+				log.Debug(name + "_ticker:recv")
 				go work()
+				log.Debug(name + "_ticker:spawned")
 			case <-stop:
 				return
 			}
