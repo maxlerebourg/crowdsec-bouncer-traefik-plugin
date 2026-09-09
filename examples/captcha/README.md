@@ -7,10 +7,11 @@ This plugins support the `ban` and `captcha` remediation.
 ### Traefik configuration
 
 The minimal configuration is defined below.  
-For now 3 captcha providers are supported:  
+For now 4 captcha providers are supported:
  - [hcaptcha](https://www.hcaptcha.com/)
  - [recaptcha](https://www.google.com/recaptcha/about/)
  - [turnstile](https://www.cloudflare.com/fr-fr/products/turnstile/)
+ - [eucaptcha](https://eu-captcha.eu/) — GDPR-compliant, EU-hosted
 
 ```yaml
   labels:
@@ -156,6 +157,23 @@ Choose v2 (challenge) and configure the domain to protect:
 
 TODO
 
-- Hcatpcha
+- Hcaptcha
 
 TODO
+
+- EU CAPTCHA
+
+Sign up at [app.eu-captcha.eu](https://app.eu-captcha.eu), create a sitekey for your domain, and use `eucaptcha` as the provider:
+
+```yaml
+captchaProvider: eucaptcha
+captchaSiteKey: <your-sitekey>      # public key shown in the widget
+captchaSecretKey: <your-secret>     # private key used for server-side verification
+captchaGracePeriodSeconds: 1800
+captchaHTMLFilePath: /captcha.html
+```
+
+EU CAPTCHA is a GDPR-compliant, privacy-first anti-bot service hosted entirely within the EU.
+Unlike other providers it sends additional context (client IP and user agent) to the verification endpoint,
+and returns a `train` flag alongside `success`; a `train: true` response is treated as a failure and
+the challenge is shown again.
