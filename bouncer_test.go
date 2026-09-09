@@ -472,6 +472,13 @@ func Test_isBodyUnreadable(t *testing.T) {
 	}
 }
 
+func newUnreadableRequest(method string, done <-chan struct{}) *http.Request {
+	req, _ := http.NewRequest(method, "http://localhost/api/admin/reservations/8fff14a2", blockingBody{done: done})
+	req.ProtoMajor = 3
+	req.ContentLength = -1
+	return req
+}
+
 // newStreamingRequest builds an HTTP/2 request whose body never reaches EOF,
 // like a bidirectional gRPC stream (issue #323).
 func newStreamingRequest(done <-chan struct{}) *http.Request {
@@ -543,109 +550,80 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 		log:                       logger.New("INFO", ""),
 	}
 
-	done := make(chan struct{})
-	defer close(done)
+	type bodyReq func(done <-chan struct{}) *http.Request
+	tests := []struct {
+		name    string
+		req     bodyReq
+		wantErr bool
+	}{
+		// a streaming body that never reaches EOF is unreadable: the request is dropped.
+		{name: "streaming request is dropped", req: newStreamingRequest, wantErr: true},
+		// issue #351 regression: an HTTP/3 GET without content-length has no body to read, so it must not be dropped.
+		{name: "bodyless HTTP/3 GET is not dropped", req: func(done <-chan struct{}) *http.Request { return newUnreadableRequest(http.MethodGet, done) }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			done := make(chan struct{})
+			defer close(done)
 
-	finished := make(chan error, 1)
-	go func() {
-		_, err := appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
-		finished <- err
-	}()
+			finished := make(chan error, 1)
+			go func() {
+				_, err := appsecQuery(bouncer, "1.2.3.4", tc.req(done))
+				finished <- err
+			}()
 
-	select {
-	case err := <-finished:
-		if err == nil {
-			t.Error("appsecQuery() expected an error to block the request, got nil")
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("appsecQuery() blocked on a streaming request body (issue #323 regression)")
+			select {
+			case err := <-finished:
+				if tc.wantErr && err == nil {
+					t.Error("appsecQuery() expected the request to be dropped, got nil")
+				}
+				if !tc.wantErr && err != nil {
+					t.Errorf("appsecQuery() returned error: %v", err)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("appsecQuery() blocked while handling the request body")
+			}
+		})
 	}
 }
 
-// Test_appsecQuery_unreadableBodyGetNotDropped is a regression test for issue #351
-func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-	}))
-	defer appsecServer.Close()
-
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	bouncer := &Bouncer{
-		appsecScheme:              appsecURL.Scheme,
-		appsecHost:                appsecURL.Host,
-		appsecPath:                "/",
-		appsecBodyLimit:           10485760,
-		appsecUnreadableBodyBlock: true,
-		httpAppsecClient:          appsecServer.Client(),
-		log:                       logger.New("INFO", ""),
+func Test_appsecQuery_oversizedResponse(t *testing.T) {
+	testCases := []struct {
+		name       string
+		statusCode int
+		wantErr    bool
+	}{
+		{name: "OK passes", statusCode: http.StatusOK, wantErr: false},
+		{name: "Forbidden blocks", statusCode: http.StatusForbidden, wantErr: true},
 	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+				rw.WriteHeader(tc.statusCode)
+				_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
+			}))
+			defer appsecServer.Close()
 
-	done := make(chan struct{})
-	defer close(done)
+			appsecURL, _ := url.Parse(appsecServer.URL)
+			bouncer := &Bouncer{
+				appsecScheme:     appsecURL.Scheme,
+				appsecHost:       appsecURL.Host,
+				appsecPath:       "/",
+				httpAppsecClient: appsecServer.Client(),
+				log:              logger.New("INFO", ""),
+			}
 
-	finished := make(chan error, 1)
-	go func() {
-		_, err := appsecQuery(bouncer, "1.2.3.4", newUnreadableRequest(http.MethodGet, done))
-		finished <- err
-	}()
-
-	select {
-	case err := <-finished:
-		if err != nil {
-			t.Errorf("appsecQuery() on an HTTP/3 GET without content-length returned error: %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("appsecQuery() blocked on an HTTP/3 GET request body (issue #351 regression)")
-	}
-}
-
-func Test_appsecQuery_oversizedOKResponsePasses(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-		_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
-	}))
-	defer appsecServer.Close()
-
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	bouncer := &Bouncer{
-		appsecScheme:     appsecURL.Scheme,
-		appsecHost:       appsecURL.Host,
-		appsecPath:       "/",
-		httpAppsecClient: appsecServer.Client(),
-		log:              logger.New("INFO", ""),
-	}
-
-	decision, err := appsecQuery(bouncer, "1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
-	if err != nil {
-		t.Fatalf("appsecQuery() returned error: %v", err)
-	}
-	if decision != nil {
-		t.Fatalf("appsecQuery() returned decision: %v", decision)
-	}
-}
-
-func Test_appsecQuery_oversizedForbiddenResponseBlocks(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusForbidden)
-		_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
-	}))
-	defer appsecServer.Close()
-
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	bouncer := &Bouncer{
-		appsecScheme:     appsecURL.Scheme,
-		appsecHost:       appsecURL.Host,
-		appsecPath:       "/",
-		httpAppsecClient: appsecServer.Client(),
-		log:              logger.New("INFO", ""),
-	}
-
-	decision, err := appsecQuery(bouncer, "1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
-	if err == nil {
-		t.Fatal("appsecQuery() expected error, got nil")
-	}
-	if decision != nil {
-		t.Fatalf("appsecQuery() returned decision: %v", decision)
+			decision, err := appsecQuery(bouncer, "1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
+			if tc.wantErr && err == nil {
+				t.Fatal("appsecQuery() expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("appsecQuery() returned error: %v", err)
+			}
+			if decision != nil {
+				t.Fatalf("appsecQuery() returned decision: %v", decision)
+			}
+		})
 	}
 }
 
@@ -806,7 +784,7 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	banTemplate, err := template.New("ban").Parse("<html>custom ban for {{.ClientIP}} reason={{.RemediationReason}}</html>")
+	banTemplate, err := template.New("ban").Parse("<html>BAN ip={{.ClientIP}} reason={{.RemediationReason}}</html>")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -838,7 +816,7 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", recorder.Code)
 	}
-	want := "<html>custom ban for 192.0.2.10 reason=APPSEC</html>"
+	want := "<html>BAN ip=192.0.2.10 reason=APPSEC</html>"
 	if got := recorder.Body.String(); got != want {
 		t.Fatalf("appsec ban must keep the configured ban template, got %q want %q", got, want)
 	}
@@ -884,13 +862,6 @@ func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
 	if got := recorder.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Fatalf("challenge without a Content-Type from appsec should fall back, got %q", got)
 	}
-}
-
-func newUnreadableRequest(method string, done <-chan struct{}) *http.Request {
-	req, _ := http.NewRequest(method, "http://localhost/api/admin/reservations/8fff14a2", blockingBody{done: done})
-	req.ProtoMajor = 3
-	req.ContentLength = -1
-	return req
 }
 
 func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {

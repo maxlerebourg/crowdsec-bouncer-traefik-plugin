@@ -870,14 +870,14 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
 			bouncer.log.Debug("appsecQuery:drainBody " + errDrain.Error())
 		}
-		if err = res.Body.Close(); err != nil {
-			bouncer.log.Error("appsecQuery:closeBody " + err.Error())
+		if errClose := res.Body.Close(); errClose != nil {
+			bouncer.log.Error("appsecQuery:closeBody " + errClose.Error())
 		}
 	}()
 	if res.StatusCode == http.StatusInternalServerError {
 		bouncer.log.Info("appsecQuery:failure")
 		if bouncer.appsecFailureBlock {
-			return nil, errors.New("appsecQuery statusCode:500")
+			return nil, errors.New("appsecQuery:failure statusCode:500")
 		}
 		return nil, nil
 	}
@@ -895,26 +895,22 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	}
 
 	decision, parseErr := parseAppsecResponse(body)
-	if parseErr == nil && decision.Action != "" {
+	if parseErr == nil && decision != nil && decision.Action != "" {
 		return decision, nil
 	}
-
-	if res.StatusCode == http.StatusOK {
-		if parseErr != nil && len(bytes.TrimSpace(body)) > 0 {
-			bouncer.log.Debug("appsecQuery:parseBody " + parseErr.Error())
-		}
-		return nil, nil
-	}
-	if parseErr != nil && len(bytes.TrimSpace(body)) > 0 {
+	if parseErr != nil {
 		bouncer.log.Debug("appsecQuery:parseBody " + parseErr.Error())
 	}
-	return nil, fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
+	if res.StatusCode == http.StatusOK {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
 }
 
 func parseAppsecResponse(body []byte) (*AppSecResponse, error) {
 	body = bytes.TrimSpace(body)
 	if len(body) == 0 {
-		return nil, errors.New("empty appsec response body")
+		return nil, nil
 	}
 
 	var decision AppSecResponse
