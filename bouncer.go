@@ -44,7 +44,6 @@ const (
 	cacheTimeoutKey          = "updated"
 	appsecAllowAction        = "allow"
 	appsecBanAction          = "ban"
-	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
 )
 
 // ##############################################################
@@ -814,7 +813,7 @@ func isMethodWithBody(method string) bool {
 	}
 }
 
-//nolint:nilnil,gocognit,gocyclo,funlen
+//nolint:nilnil,gocyclo,funlen
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecResponse, error) {
 	routeURL := url.URL{
 		Scheme: bouncer.appsecScheme,
@@ -882,11 +881,11 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		return nil, nil
 	}
 
-	body, err := io.ReadAll(io.LimitReader(res.Body, appsecResponseBodyLimit+1))
+	body, err := io.ReadAll(io.LimitReader(res.Body, bouncer.appsecBodyLimit+1))
 	if err != nil {
 		return nil, fmt.Errorf("appsecQuery:readBody %w", err)
 	}
-	if len(body) > appsecResponseBodyLimit {
+	if int64(len(body)) > bouncer.appsecBodyLimit {
 		bouncer.log.Debug("appsecQuery:responseBodyTooLarge")
 		if res.StatusCode == http.StatusOK {
 			return nil, nil
@@ -907,6 +906,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
 }
 
+//nolint:nilnil
 func parseAppsecResponse(body []byte) (*AppSecResponse, error) {
 	body = bytes.TrimSpace(body)
 	if len(body) == 0 {

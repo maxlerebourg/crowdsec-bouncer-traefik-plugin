@@ -600,7 +600,7 @@ func Test_appsecQuery_oversizedResponse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 				rw.WriteHeader(tc.statusCode)
-				_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
+				_, _ = io.WriteString(rw, strings.Repeat("x", 1001))
 			}))
 			defer appsecServer.Close()
 
@@ -609,6 +609,7 @@ func Test_appsecQuery_oversizedResponse(t *testing.T) {
 				appsecScheme:     appsecURL.Scheme,
 				appsecHost:       appsecURL.Host,
 				appsecPath:       "/",
+				appsecBodyLimit:  1000,
 				httpAppsecClient: appsecServer.Client(),
 				log:              logger.New("INFO", ""),
 			}
