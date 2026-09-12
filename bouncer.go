@@ -43,7 +43,7 @@ const (
 	crowdsecCapiStreamRoute  = "v2/decisions/stream"
 	cacheTimeoutKey          = "updated"
 	appsecAllowAction        = "allow"
-	appsecBanAction          = "ban"
+	appsecChallengeAction    = "challenge"
 	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
 )
 
@@ -507,12 +507,12 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 			return
 		}
-		if decision != nil && decision.Action != "" && decision.Action != appsecAllowAction {
-			if decision.Action == appsecBanAction {
-				bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+		if decision != nil && decision.Action != appsecAllowAction {
+			if decision.Action == appsecChallengeAction {
+				bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
 				return
 			}
-			bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
+			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 			return
 		}
 	}
@@ -533,12 +533,7 @@ func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, re
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "challenge")
 	}
-
-	status := decision.HTTPStatus
-	if status == 0 || status < 100 || status > 999 {
-		status = bouncer.remediationStatusCode
-	}
-	rw.WriteHeader(status)
+	rw.WriteHeader(decision.HTTPStatus)
 
 	if req.Method == http.MethodHead || decision.UserBodyContent == "" {
 		return
@@ -892,6 +887,9 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		var decision AppSecResponse
 		if err := json.Unmarshal(body, &decision); err != nil {
 			return nil, fmt.Errorf("appsecQuery:parseBody %w", err)
+		}
+		if decision.Action == "" || decision.HTTPStatus == 0 {
+			return nil, errors.New("appsecQuery:responseAppsecKeysMissing")
 		}
 		return &decision, nil
 	default:
