@@ -629,7 +629,7 @@ func Test_appsecQuery_oversizedResponse(t *testing.T) {
 }
 
 func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
-	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{
 			"action":"challenge",
@@ -642,9 +642,9 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 			}
 		}`))
 	}))
-	defer appsec.Close()
+	defer appsecServer.Close()
 
-	appsecURL, err := url.Parse(appsec.URL)
+	appsecURL, err := url.Parse(appsecServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -658,7 +658,7 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 		appsecScheme:            appsecURL.Scheme,
 		appsecHost:              appsecURL.Host,
 		appsecPath:              "/",
-		httpAppsecClient:        appsec.Client(),
+		httpAppsecClient:        appsecServer.Client(),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		log:                     logger.New("DEBUG", ""),
@@ -689,12 +689,12 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 }
 
 func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
-	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
-	defer appsec.Close()
+	defer appsecServer.Close()
 
-	appsecURL, err := url.Parse(appsec.URL)
+	appsecURL, err := url.Parse(appsecServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -708,7 +708,7 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 		appsecScheme:            appsecURL.Scheme,
 		appsecHost:              appsecURL.Host,
 		appsecPath:              "/",
-		httpAppsecClient:        appsec.Client(),
+		httpAppsecClient:        appsecServer.Client(),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		log:                     logger.New("DEBUG", ""),
@@ -774,13 +774,13 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 }
 
 func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
-	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"action":"ban","http_status":403,"user_body_content":"appsec default page"}`))
 	}))
-	defer appsec.Close()
+	defer appsecServer.Close()
 
-	appsecURL, err := url.Parse(appsec.URL)
+	appsecURL, err := url.Parse(appsecServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -799,7 +799,7 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 		appsecScheme:            appsecURL.Scheme,
 		appsecHost:              appsecURL.Host,
 		appsecPath:              "/",
-		httpAppsecClient:        appsec.Client(),
+		httpAppsecClient:        appsecServer.Client(),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplate:             banTemplate,
