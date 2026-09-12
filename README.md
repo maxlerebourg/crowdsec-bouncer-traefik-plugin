@@ -428,7 +428,7 @@ make run
 - RemediationHeadersCustomName
   - string
   - default: ""
-  - Name of the header you want in response when request are handled by plugin (possible value of the header `ban`, `captcha` or `solved-captcha`)
+  - Name of the header you want in response when request are handled by plugin (possible value of the header `ban`, `challenge`, `captcha` or `solved-captcha`)
 - ForwardedHeadersCustomName
   - string
   - default: "X-Forwarded-For"

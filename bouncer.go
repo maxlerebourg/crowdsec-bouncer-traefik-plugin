@@ -531,21 +531,13 @@ func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, re
 		rw.Header().Add("Set-Cookie", cookie)
 	}
 	if bouncer.remediationCustomHeader != "" {
-		rw.Header().Set(bouncer.remediationCustomHeader, decision.Action)
-	}
-	if rw.Header().Get("Content-Type") == "" && bouncer.banTemplateContentType != "" {
-		rw.Header().Set("Content-Type", bouncer.banTemplateContentType)
+		rw.Header().Set(bouncer.remediationCustomHeader, "challenge")
 	}
 
 	status := decision.HTTPStatus
-	if status == 0 {
+	if status == 0 || status < 100 || status > 999 {
 		status = bouncer.remediationStatusCode
 	}
-
-	if status < 100 || status > 999 {
-		status = bouncer.remediationStatusCode
-	}
-
 	rw.WriteHeader(status)
 
 	if req.Method == http.MethodHead || decision.UserBodyContent == "" {
