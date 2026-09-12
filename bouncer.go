@@ -806,7 +806,7 @@ func isMethodWithBody(method string) bool {
 	}
 }
 
-//nolint:nilnil,gocyclo
+//nolint:nilnil,gocyclo,funlen
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecResponse, error) {
 	routeURL := url.URL{
 		Scheme: bouncer.appsecScheme,
