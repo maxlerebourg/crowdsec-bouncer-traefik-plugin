@@ -26,6 +26,18 @@ func getMinimalConfig() *Config {
 	return cfg
 }
 
+func getCustomCaptchaConfig() *Config {
+	cfg := getMinimalConfig()
+	cfg.CaptchaProvider = CustomProvider
+	cfg.CaptchaCustomJsURL = "http://captcha.localhost:8000/fast.js"
+	cfg.CaptchaCustomChallengeURL = "http://captcha.localhost:8000/v0/challenge"
+	cfg.CaptchaCustomValidateURL = "http://captcha.localhost:8000/v0/siteverify"
+	cfg.CaptchaCustomKey = "wicketkeeper"
+	cfg.CaptchaCustomResponse = "wicketkeeper_solution"
+	cfg.CaptchaFilePath = ""
+	return cfg
+}
+
 func Test_contains(t *testing.T) {
 	type args struct {
 		source []string
@@ -132,6 +144,70 @@ func Test_ValidateParams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := ValidateParams(tt.args.config, log); (err != nil) != tt.wantErr {
 				t.Errorf("validateParams() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_ValidateCaptcha(t *testing.T) {
+	log := logger.New("INFO", "")
+
+	// JS URL variants
+	schemelessJs := getCustomCaptchaConfig()
+	schemelessJs.CaptchaCustomJsURL = "captcha.localhost:8000/fast.js"
+
+	noPathJs := getCustomCaptchaConfig()
+	noPathJs.CaptchaCustomJsURL = "http://captcha.localhost:8000"
+
+	rootPathJs := getCustomCaptchaConfig()
+	rootPathJs.CaptchaCustomJsURL = "http://captcha.localhost:8000/"
+
+	badSchemeJs := getCustomCaptchaConfig()
+	badSchemeJs.CaptchaCustomJsURL = "ftp://captcha.localhost:8000/fast.js"
+
+	// Challenge URL variants (optional field)
+	schemelessChallenge := getCustomCaptchaConfig()
+	schemelessChallenge.CaptchaCustomChallengeURL = "captcha.localhost:8000/v0/challenge"
+
+	noPathChallenge := getCustomCaptchaConfig()
+	noPathChallenge.CaptchaCustomChallengeURL = "http://captcha.localhost:8000"
+
+	rootPathChallenge := getCustomCaptchaConfig()
+	rootPathChallenge.CaptchaCustomChallengeURL = "http://captcha.localhost:8000/"
+
+	badSchemeChallenge := getCustomCaptchaConfig()
+	badSchemeChallenge.CaptchaCustomChallengeURL = "ftp://captcha.localhost:8000/v0/challenge"
+
+	noChallengeURL := getCustomCaptchaConfig()
+	noChallengeURL.CaptchaCustomChallengeURL = "" // optional: absence is valid
+
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+	}{
+		// happy paths
+		{name: "valid custom captcha config with both URLs", config: getCustomCaptchaConfig(), wantErr: false},
+		{name: "valid config without challenge URL (optional)", config: noChallengeURL, wantErr: false},
+		{name: "non-custom provider ignores captcha URL fields", config: getMinimalConfig(), wantErr: false},
+
+		// CaptchaCustomJsURL must be a valid full URL
+		{name: "scheme-less JsURL is rejected", config: schemelessJs, wantErr: true},
+		{name: "JsURL with no path is rejected", config: noPathJs, wantErr: true},
+		{name: "JsURL with root path only is rejected", config: rootPathJs, wantErr: true},
+		{name: "JsURL with non-http scheme is rejected", config: badSchemeJs, wantErr: true},
+
+		// CaptchaCustomChallengeURL validated when non-empty
+		{name: "scheme-less ChallengeURL is rejected", config: schemelessChallenge, wantErr: true},
+		{name: "ChallengeURL with no path is rejected", config: noPathChallenge, wantErr: true},
+		{name: "ChallengeURL with root path only is rejected", config: rootPathChallenge, wantErr: true},
+		{name: "ChallengeURL with non-http scheme is rejected", config: badSchemeChallenge, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateParams(tt.config, log); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateParams() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
