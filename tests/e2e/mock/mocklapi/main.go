@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Decision is the subset of a LAPI decision the plugin actually reads.
@@ -34,6 +35,9 @@ var (
 	mu      sync.Mutex
 	active  = map[string]Decision{} // ip -> decision currently in force
 	deleted = map[string]Decision{} // ip -> decision to report in the stream "deleted" list
+	// streamFail makes /v1/decisions/stream return 500 when set, to exercise the
+	// bouncer's fail-closed behaviour on consecutive stream poll failures.
+	streamFail atomic.Bool
 )
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -173,6 +177,10 @@ func main() {
 	// "deleted". Re-sending the same on every poll is harmless — the plugin just
 	// re-adds to / re-deletes from its cache.
 	mux.HandleFunc("/v1/decisions/stream", func(w http.ResponseWriter, _ *http.Request) {
+		if streamFail.Load() {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		mu.Lock()
 		defer mu.Unlock()
 		writeJSON(w, map[string][]Decision{"new": list(active), "deleted": list(deleted)})
@@ -181,6 +189,17 @@ func main() {
 	// usage-metrics push: accept and ignore.
 	mux.HandleFunc("/v1/usage-metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
+	})
+
+	// Test control plane: make the stream endpoint fail (POST) or recover (DELETE).
+	mux.HandleFunc("/admin/stream-fail", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			streamFail.Store(true)
+		case http.MethodDelete:
+			streamFail.Store(false)
+		}
+		w.WriteHeader(http.StatusOK)
 	})
 
 	// Test control plane: add / remove decisions instead of cscli.
