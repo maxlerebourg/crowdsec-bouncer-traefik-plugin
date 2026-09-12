@@ -21,6 +21,8 @@ When used with Crowdsec it will leverage the local API which will analyze Traefi
 
 Appsec feature is supported from plugin version 1.2.0 and Crowdsec 1.6.0.
 
+Appsec bot detection is supported from plugin version 1.8.0 and Crowdsec 1.8.0.
+
 The AppSec Component offers:
 
 - Low-effort virtual patching capabilities.
