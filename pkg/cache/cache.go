@@ -52,7 +52,7 @@ func (localCache) delete(key string) {
 type redisCache struct {
 	log     *slog.Logger
 	writer  simpleredis.SimpleRedis
-	readers []simpleredis.SimpleRedis
+	readers []*simpleredis.SimpleRedis
 	counter atomic.Uint64
 }
 
@@ -62,7 +62,7 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 		return &rc.writer
 	}
 	idx := rc.counter.Add(1) % uint64(n)
-	return &rc.readers[idx]
+	return rc.readers[idx]
 }
 
 func (rc *redisCache) get(key string) (string, error) {
@@ -115,7 +115,7 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 		rc := &redisCache{log: log}
 		rc.writer.Init(writeHost, pass, database)
 		for _, h := range readHosts {
-			var r simpleredis.SimpleRedis
+			r := &simpleredis.SimpleRedis{}
 			r.Init(h, pass, database)
 			rc.readers = append(rc.readers, r)
 		}
