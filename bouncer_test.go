@@ -600,7 +600,7 @@ func Test_appsecQuery_oversizedResponse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 				rw.WriteHeader(tc.statusCode)
-				_, _ = io.WriteString(rw, strings.Repeat("x", 1001))
+				_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
 			}))
 			defer appsecServer.Close()
 
@@ -658,7 +658,6 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 		appsecScheme:            appsecURL.Scheme,
 		appsecHost:              appsecURL.Host,
 		appsecPath:              "/",
-		appsecBodyLimit:         10485760,
 		httpAppsecClient:        appsec.Client(),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
@@ -709,7 +708,6 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 		appsecScheme:            appsecURL.Scheme,
 		appsecHost:              appsecURL.Host,
 		appsecPath:              "/",
-		appsecBodyLimit:         10485760,
 		httpAppsecClient:        appsec.Client(),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
@@ -849,7 +847,6 @@ func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
 		appsecScheme:           appsecURL.Scheme,
 		appsecHost:             appsecURL.Host,
 		appsecPath:             "/",
-		appsecBodyLimit:        10485760,
 		httpAppsecClient:       appsec.Client(),
 		remediationStatusCode:  http.StatusForbidden,
 		banTemplateContentType: "text/html; charset=utf-8",

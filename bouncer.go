@@ -44,6 +44,7 @@ const (
 	cacheTimeoutKey          = "updated"
 	appsecAllowAction        = "allow"
 	appsecBanAction          = "ban"
+	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
 )
 
 // ##############################################################
@@ -881,11 +882,11 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		return nil, nil
 	}
 
-	body, err := io.ReadAll(io.LimitReader(res.Body, bouncer.appsecBodyLimit+1))
+	body, err := io.ReadAll(io.LimitReader(res.Body, appsecResponseBodyLimit+1))
 	if err != nil {
 		return nil, fmt.Errorf("appsecQuery:readBody %w", err)
 	}
-	if int64(len(body)) > bouncer.appsecBodyLimit {
+	if int64(len(body)) > appsecResponseBodyLimit {
 		bouncer.log.Debug("appsecQuery:responseBodyTooLarge")
 		if res.StatusCode == http.StatusOK {
 			return nil, nil
