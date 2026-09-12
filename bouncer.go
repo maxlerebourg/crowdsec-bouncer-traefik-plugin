@@ -672,7 +672,7 @@ func getToken(bouncer *Bouncer) error {
 	var login Login
 	err = json.Unmarshal(body, &login)
 	if err != nil {
-		return fmt.Errorf("getToken:parsingBody %w", err)
+		return fmt.Errorf("getToken:parseBody %w", err)
 	}
 	if login.Code == http.StatusOK && len(login.Token) > 0 {
 		bouncer.crowdsecKey = login.Token
@@ -715,7 +715,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
-		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
+		return fmt.Errorf("handleStreamCache:parseBody %w", err)
 	}
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
@@ -866,51 +866,37 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 			bouncer.log.Error("appsecQuery:closeBody " + errClose.Error())
 		}
 	}()
-	if res.StatusCode == http.StatusInternalServerError {
+	switch res.StatusCode {
+	case http.StatusInternalServerError:
 		bouncer.log.Info("appsecQuery:failure")
 		if bouncer.appsecFailureBlock {
 			return nil, errors.New("appsecQuery:failure statusCode:500")
 		}
 		return nil, nil
-	}
-
-	body, err := io.ReadAll(io.LimitReader(res.Body, appsecResponseBodyLimit+1))
-	if err != nil {
-		return nil, fmt.Errorf("appsecQuery:readBody %w", err)
-	}
-	if int64(len(body)) > appsecResponseBodyLimit {
-		bouncer.log.Debug("appsecQuery:responseBodyTooLarge")
-		if res.StatusCode == http.StatusOK {
-			return nil, nil
+	case http.StatusOK:
+		return nil, nil
+	case http.StatusForbidden:
+		body, err := io.ReadAll(io.LimitReader(res.Body, appsecResponseBodyLimit+1))
+		if err != nil {
+			return nil, fmt.Errorf("appsecQuery:readBody %w", err)
 		}
-		return nil, fmt.Errorf("appsecQuery:responseBodyTooLarge statusCode:%d", res.StatusCode)
-	}
+		if int64(len(body)) > appsecResponseBodyLimit {
+			bouncer.log.Debug("appsecQuery:responseBodyTooLarge")
+			return nil, errors.New("appsecQuery:responseBodyTooLarge statusCode:401")
+		}
+		body = bytes.TrimSpace(body)
+		if len(body) == 0 {
+			return nil, errors.New("appsecQuery:responseBodyMissing statusCode:401")
+		}
 
-	decision, parseErr := parseAppsecResponse(body)
-	if parseErr == nil && decision != nil && decision.Action != "" {
-		return decision, nil
+		var decision AppSecResponse
+		if err := json.Unmarshal(body, &decision); err != nil {
+			return nil, fmt.Errorf("appsecQuery:parseBody %w", err)
+		}
+		return &decision, nil
+	default:
+		return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
 	}
-	if parseErr != nil {
-		bouncer.log.Debug("appsecQuery:parseBody " + parseErr.Error())
-	}
-	if res.StatusCode == http.StatusOK {
-		return nil, nil
-	}
-	return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
-}
-
-//nolint:nilnil
-func parseAppsecResponse(body []byte) (*AppSecResponse, error) {
-	body = bytes.TrimSpace(body)
-	if len(body) == 0 {
-		return nil, nil
-	}
-
-	var decision AppSecResponse
-	if err := json.Unmarshal(body, &decision); err != nil {
-		return nil, err
-	}
-	return &decision, nil
 }
 
 func reportMetrics(bouncer *Bouncer) error {
