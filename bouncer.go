@@ -882,11 +882,11 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		}
 		if int64(len(body)) > appsecResponseBodyLimit {
 			bouncer.log.Debug("appsecQuery:responseBodyTooLarge")
-			return nil, errors.New("appsecQuery:responseBodyTooLarge statusCode:401")
+			return nil, errors.New("appsecQuery:responseBodyTooLarge statusCode:403")
 		}
 		body = bytes.TrimSpace(body)
 		if len(body) == 0 {
-			return nil, errors.New("appsecQuery:responseBodyMissing statusCode:401")
+			return nil, errors.New("appsecQuery:responseBodyMissing statusCode:403")
 		}
 
 		var decision AppSecResponse
