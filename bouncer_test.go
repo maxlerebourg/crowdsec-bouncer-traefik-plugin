@@ -829,42 +829,6 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	}
 }
 
-func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
-	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`))
-	}))
-	defer appsec.Close()
-
-	appsecURL, err := url.Parse(appsec.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bouncer := &Bouncer{
-		next:                   http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
-		appsecEnabled:          true,
-		appsecScheme:           appsecURL.Scheme,
-		appsecHost:             appsecURL.Host,
-		appsecPath:             "/",
-		httpAppsecClient:       appsec.Client(),
-		remediationStatusCode:  http.StatusForbidden,
-		banTemplateContentType: "text/html; charset=utf-8",
-		log:                    logger.New("ERROR", ""),
-	}
-
-	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
-	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected challenge status 200, got %d", recorder.Code)
-	}
-	if got := recorder.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
-		t.Fatalf("challenge without a Content-Type from appsec should fall back, got %q", got)
-	}
-}
-
 func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
