@@ -1,0 +1,16 @@
+filenames:
+ - /var/log/traefik/access.log
+labels:
+  type: traefik
+
+---
+listen_addr: 0.0.0.0:7422
+# The wildcard matches installed appsec-configs only, so it picks up exactly what the
+# collection provides: the scoring engine, its threshold, and every exclusion config.
+appsec_configs:
+  - crowdsecurity/appsec-default
+  - crowdsecurity/appsec-bot-*
+name: myBotDetectionComponent
+source: appsec
+labels:
+  type: appsec

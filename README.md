@@ -756,6 +756,29 @@ Set `crowdsecAppsecScheme` to `https`. Same three options as for the LAPI, prefi
 
 Currently AppSec does not support mTLS authentication for the AppSec Component.
 
+#### AppSec bot detection: route `/crowdsec-internal`
+
+When AppSec bot detection is enabled, the challenge page it returns loads its fingerprint
+script from `/crowdsec-internal/challenge/fpscanner.js`, an absolute path. Any router
+protected by this middleware therefore has to match that prefix as well, otherwise the
+script 404s, the proof-of-work never runs, and the client is stuck on the challenge page
+with no error anywhere:
+
+```yaml
+  - "traefik.http.routers.my-router.rule=PathPrefix(`/my-app`) || PathPrefix(`/crowdsec-internal`)"
+```
+
+The backend service never sees these requests: the plugin forwards them to the AppSec
+component and returns its response directly, so the prefix only needs to reach a router
+carrying the middleware.
+
+CrowdSec documents the same requirement, that the bouncer must forward
+`/crowdsec-internal/challenge/*` unchanged: see
+[enabling bot detection](https://docs.crowdsec.net/docs/appsec/bot_detection/enable) and the
+[challenge protocol](https://docs.crowdsec.net/docs/appsec/bot_detection/challenge_protocol).
+
+See [examples/bot-detection/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/bot-detection/README.md).
+
 #### Manually add an IP to the blocklist (for testing purposes)
 
 ```bash
@@ -789,6 +812,8 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 #### 10. Using Traefik with Custom Ban HTML Page [examples/custom-ban-page/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-ban-page/README.md)
 
 #### 11. Using Traefik with Custom Captcha Whiketkeeper[examples/custom-captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-captcha/README.md)
+
+#### 12. Using Traefik with AppSec bot detection enabled [examples/bot-detection/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/bot-detection/README.md)
 
 ### Local Mode
 
