@@ -665,10 +665,12 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup),
 	}
+	bouncer.log.Debug("handleStreamCache:fetching " + streamRouteURL.RawQuery)
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
 		return err
 	}
+	bouncer.log.Debug(fmt.Sprintf("handleStreamCache:fetched bytes:%d", len(body)))
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
