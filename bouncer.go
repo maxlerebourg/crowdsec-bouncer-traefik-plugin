@@ -571,6 +571,7 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 		for {
 			select {
 			case <-ticker.C:
+				log.Debug(name + "_ticker:tick")
 				go work()
 			case <-stop:
 				return
@@ -703,6 +704,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup),
 	}
+	bouncer.log.Debug("handleStreamCache:fetching " + streamRouteURL.RawQuery)
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
 		return err
