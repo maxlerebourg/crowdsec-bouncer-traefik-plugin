@@ -523,6 +523,7 @@ func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, re
 	atomic.AddInt64(&blockedRequests, 1)
 
 	for name, values := range decision.UserHeaders {
+		rw.Header().Del(name)
 		for _, value := range values {
 			rw.Header().Add(name, value)
 		}
@@ -535,7 +536,7 @@ func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, re
 	}
 	rw.WriteHeader(decision.HTTPStatus)
 
-	if req.Method == http.MethodHead || decision.UserBodyContent == "" {
+	if req.Method == http.MethodHead {
 		return
 	}
 	if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
@@ -890,6 +891,9 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		}
 		if decision.Action == "" || decision.HTTPStatus == 0 {
 			return nil, errors.New("appsecQuery:responseAppsecKeysMissing")
+		}
+		if decision.Action == appsecChallengeAction && decision.UserBodyContent == "" {
+			return nil, errors.New("appsecQuery:challengeBodyMissing")
 		}
 		return &decision, nil
 	default:

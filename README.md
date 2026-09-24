@@ -779,6 +779,19 @@ CrowdSec documents the same requirement, that the bouncer must forward
 [enabling bot detection](https://docs.crowdsec.net/docs/appsec/bot_detection/enable) and the
 [challenge protocol](https://docs.crowdsec.net/docs/appsec/bot_detection/challenge_protocol).
 
+#### AppSec bot detection: Content-Security-Policy
+
+The challenge page only runs under the Content-Security-Policy that AppSec sends with it,
+and the plugin replaces any policy already set on the response with that one. Traefik's
+`headers` middleware sets `contentSecurityPolicy` and `customResponseHeaders` as the
+response is written, so if it is listed before this middleware on the router, it replaces
+the challenge policy with your site's, and the challenge script cannot run. List this
+middleware first:
+
+```yaml
+  - "traefik.http.routers.my-router.middlewares=crowdsec@docker,security-headers@docker"
+```
+
 See [examples/bot-detection/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/bot-detection/README.md).
 
 #### Manually add an IP to the blocklist (for testing purposes)
