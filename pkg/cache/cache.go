@@ -91,17 +91,21 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 	return rc.readers[idx]
 }
 
+func redisError(err error) error {
+	switch err.Error() {
+	case simpleredis.RedisMiss:
+		return errors.New(CacheMiss)
+	case simpleredis.RedisUnreachable:
+		return errors.New(CacheUnreachable)
+	default:
+		return err
+	}
+}
+
 func (rc *redisCache) get(key string) (string, error) {
 	value, err := rc.nextReader().Get(key)
 	if err != nil {
-		switch err.Error() {
-		case simpleredis.RedisMiss:
-			return "", errors.New(CacheMiss)
-		case simpleredis.RedisUnreachable:
-			return "", errors.New(CacheUnreachable)
-		default:
-			return "", err
-		}
+		return "", redisError(err)
 	}
 	valueString := string(value)
 	if len(valueString) > 0 {
@@ -113,20 +117,11 @@ func (rc *redisCache) get(key string) (string, error) {
 func (rc *redisCache) mget(keys []string) ([]string, error) {
 	raw, err := rc.nextReader().MGet(keys)
 	if err != nil {
-		switch err.Error() {
-		case simpleredis.RedisMiss:
-			return make([]string, len(keys)), nil
-		case simpleredis.RedisUnreachable:
-			return nil, errors.New(CacheUnreachable)
-		default:
-			return nil, err
-		}
+		return nil, redisError(err)
 	}
-	values := make([]string, len(keys))
-	for i := range raw {
-		if i < len(values) {
-			values[i] = string(raw[i])
-		}
+	values := make([]string, len(raw))
+	for i, value := range raw {
+		values[i] = string(value)
 	}
 	return values, nil
 }
@@ -212,21 +207,14 @@ func (c *Client) GetCIDR(ipStr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	lookupKeys := ip.CIDRLookupKeys(ipStr, parsePrefixLens(prefixLens))
-	if len(lookupKeys) == 0 {
-		return "", errors.New(CacheMiss)
+	keys := ip.CIDRLookupKeys(ipStr, parsePrefixLens(prefixLens))
+	for i := range keys {
+		keys[i] = cidrPrefix + keys[i]
 	}
-	keys := make([]string, len(lookupKeys))
-	for i, key := range lookupKeys {
-		keys[i] = cidrPrefix + key
-	}
-	// One read for every candidate rather than one per prefix length: a miss,
-	// which is the common case on the request path, used to cost them all.
 	values, err := c.cache.mget(keys)
 	if err != nil {
 		return "", err
 	}
-	// CIDRLookupKeys is most specific first, so the first hit is the match.
 	for _, value := range values {
 		if value != "" {
 			return value, nil

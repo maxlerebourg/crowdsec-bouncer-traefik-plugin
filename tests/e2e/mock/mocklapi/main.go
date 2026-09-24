@@ -117,8 +117,6 @@ func redisValue(verdicts bool, key string) string {
 	}
 }
 
-// readRedisCommand reads one RESP array, falling back to a whitespace split for
-// the inline commands older simpleredis releases sent.
 func readRedisCommand(rd *bufio.Reader) ([]string, error) {
 	header, err := rd.ReadString('\n')
 	if err != nil {
