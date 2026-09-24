@@ -40,6 +40,8 @@ const (
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
 	CustomProvider    = "custom"
+	CaptchaAction     = "captcha"
+	ContinueAction    = "continue"
 )
 
 // Config the plugin configuration.
@@ -93,6 +95,7 @@ type Config struct {
 	HTTPTimeoutSeconds                         int64    `json:"httpTimeoutSeconds,omitempty"`
 	TraceHeadersCustomName                     string   `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string   `json:"remediationHeadersCustomName,omitempty"`
+	RemediationCaptchaAction                   string   `json:"remediationCaptchaAction,omitempty"`
 	ForwardedHeadersCustomName                 string   `json:"forwardedHeadersCustomName,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                           []string `json:"clientTrustedIps,omitempty"`
@@ -425,6 +428,9 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 }
 
 func validateCaptcha(config *Config) error {
+	if !contains([]string{"", CaptchaAction, ContinueAction}, config.RemediationCaptchaAction) {
+		return fmt.Errorf("RemediationCaptchaAction: must be one of '%s' or '%s'", CaptchaAction, ContinueAction)
+	}
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
 		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
 	}

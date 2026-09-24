@@ -117,6 +117,7 @@ type Bouncer struct {
 	defaultDecisionTimeout    int64
 	remediationStatusCode     int
 	remediationCustomHeader   string
+	remediationCaptchaAction  string
 	forwardedCustomHeader     string
 	crowdsecStreamRoute       string
 	crowdsecHeader            string
@@ -247,6 +248,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		updateInterval:            config.UpdateIntervalSeconds,
 		updateMaxFailure:          config.UpdateMaxFailure,
 		remediationCustomHeader:   config.RemediationHeadersCustomName,
+		remediationCaptchaAction:  config.RemediationCaptchaAction,
 		forwardedCustomHeader:     config.ForwardedHeadersCustomName,
 		defaultDecisionTimeout:    config.DefaultDecisionSeconds,
 		remediationStatusCode:     config.RemediationStatusCode,
@@ -501,6 +503,10 @@ func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *ht
 
 func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
+	if remediation == cache.CaptchaValue && bouncer.remediationCaptchaAction == configuration.ContinueAction {
+		bouncer.handleNextServeHTTP(rw, req, remoteIP)
+		return
+	}
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
