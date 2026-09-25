@@ -69,8 +69,8 @@ var (
 	isCrowdsecStreamStartup = true
 	isCrowdsecStreamHealthy = true
 	updateFailure           int64
-	streamTicker            chan bool
-	metricsTicker           chan bool
+	streamTicker            *time.Ticker
+	metricsTicker           *time.Ticker
 	lastMetricsPush         time.Time
 	blockedRequests         int64
 )
@@ -323,7 +323,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		} else {
 			go handleStreamTicker(bouncer)
 		}
-		streamTicker = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
+		streamTicker = startTicker(config.UpdateIntervalSeconds, func() {
 			handleStreamTicker(bouncer)
 		})
 	}
@@ -332,7 +332,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	if metricsTicker == nil && config.MetricsUpdateIntervalSeconds > 0 {
 		lastMetricsPush = time.Now() // Initialize lastMetricsPush when starting the metrics ticker
 		go handleMetricsTicker(bouncer)
-		metricsTicker = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
+		metricsTicker = startTicker(config.MetricsUpdateIntervalSeconds, func() {
 			handleMetricsTicker(bouncer)
 		})
 	}
@@ -563,21 +563,16 @@ func handleMetricsTicker(bouncer *Bouncer) {
 	}
 }
 
-func startTicker(name string, updateInterval int64, log *slog.Logger, work func()) chan bool {
+func startTicker(updateInterval int64, work func()) *time.Ticker {
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
-	stop := make(chan bool, 1)
-	go func() {
-		defer log.Debug(name + "_ticker:stopped")
-		for {
-			select {
-			case <-ticker.C:
-				go work()
-			case <-stop:
-				return
-			}
-		}
-	}()
-	return stop
+	go runTicker(ticker.C, work)
+	return ticker
+}
+
+func runTicker(ticks <-chan time.Time, work func()) {
+	for range ticks {
+		go work()
+	}
 }
 
 // We are now in none or live mode.
