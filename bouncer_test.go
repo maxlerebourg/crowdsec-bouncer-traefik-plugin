@@ -885,3 +885,71 @@ func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
 		})
 	}
 }
+
+// Test_appsecQuery_forwardsHTTPVersion verifies that the client HTTP version
+// is forwarded to CrowdSec AppSec via X-Crowdsec-Appsec-Http-Version.
+func Test_appsecQuery_forwardsHTTPVersion(t *testing.T) {
+	tests := []struct {
+		name        string
+		protoMajor  int
+		protoMinor  int
+		expectedHdr string
+	}{
+		{
+			name:        "HTTP/1.0",
+			protoMajor:  1,
+			protoMinor:  0,
+			expectedHdr: "10",
+		},
+		{
+			name:        "HTTP/1.1",
+			protoMajor:  1,
+			protoMinor:  1,
+			expectedHdr: "11",
+		},
+		{
+			name:        "HTTP/2.0",
+			protoMajor:  2,
+			protoMinor:  0,
+			expectedHdr: "20",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var capturedVersion string
+			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				capturedVersion = r.Header.Get(crowdsecAppsecHTTPVersionHeader)
+				rw.WriteHeader(http.StatusOK)
+				if _, err := rw.Write([]byte(`{"action":"allow"}`)); err != nil {
+					t.Errorf("write response: %v", err)
+				}
+			}))
+			defer appsecServer.Close()
+
+			appsecURL, _ := url.Parse(appsecServer.URL)
+			bouncer := &Bouncer{
+				appsecScheme:       appsecURL.Scheme,
+				appsecHost:         appsecURL.Host,
+				appsecPath:         "/",
+				appsecBodyLimit:    10485760,
+				appsecFailureBlock: false,
+				httpAppsecClient:   appsecServer.Client(),
+				log:                logger.New("INFO", ""),
+			}
+
+			req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+			req.ProtoMajor = tt.protoMajor
+			req.ProtoMinor = tt.protoMinor
+
+			_, err := appsecQuery(bouncer, "1.2.3.4", req)
+			if err != nil {
+				t.Fatalf("appsecQuery() unexpected error: %v", err)
+			}
+
+			if capturedVersion != tt.expectedHdr {
+				t.Errorf("expected %s header %q, got %q", crowdsecAppsecHTTPVersionHeader, tt.expectedHdr, capturedVersion)
+			}
+		})
+	}
+}
