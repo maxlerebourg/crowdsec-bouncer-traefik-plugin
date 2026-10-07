@@ -15,6 +15,8 @@ We configure the middleware to trust as well the IP:
     - "traefik.http.middlewares.crowdsec1.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
 ```
 
+The middleware only reads the forwarded header from requests coming from these IPs, so a client reaching Traefik directly cannot spoof its IP.
+
 To play the demo environment run:
 ```bash
 make run_behindproxy
