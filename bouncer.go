@@ -27,24 +27,25 @@ import (
 )
 
 const (
-	crowdsecAppsecIPHeader   = "X-Crowdsec-Appsec-Ip"
-	crowdsecAppsecURIHeader  = "X-Crowdsec-Appsec-Uri"
-	crowdsecAppsecHostHeader = "X-Crowdsec-Appsec-Host"
-	crowdsecAppsecVerbHeader = "X-Crowdsec-Appsec-Verb"
-	crowdsecAppsecHeader     = "X-Crowdsec-Appsec-Api-Key"
-	crowdsecAppsecUserAgent  = "X-Crowdsec-Appsec-User-Agent"
-	crowdsecLapiHeader       = "X-Api-Key"
-	crowdsecLapiRoute        = "v1/decisions"
-	crowdsecLapiStreamRoute  = "v1/decisions/stream"
-	crowdsecLapiMetricsRoute = "v1/usage-metrics"
-	crowdsecCapiHost         = "api.crowdsec.net"
-	crowdsecCapiHeader       = "Authorization"
-	crowdsecCapiLoginRoute   = "v2/watchers/login"
-	crowdsecCapiStreamRoute  = "v2/decisions/stream"
-	cacheTimeoutKey          = "updated"
-	appsecAllowAction        = "allow"
-	appsecChallengeAction    = "challenge"
-	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
+	crowdsecAppsecIPHeader          = "X-Crowdsec-Appsec-Ip"
+	crowdsecAppsecURIHeader         = "X-Crowdsec-Appsec-Uri"
+	crowdsecAppsecHostHeader        = "X-Crowdsec-Appsec-Host"
+	crowdsecAppsecVerbHeader        = "X-Crowdsec-Appsec-Verb"
+	crowdsecAppsecHeader            = "X-Crowdsec-Appsec-Api-Key"
+	crowdsecAppsecUserAgent         = "X-Crowdsec-Appsec-User-Agent"
+	crowdsecAppsecHTTPVersionHeader = "X-Crowdsec-Appsec-Http-Version"
+	crowdsecLapiHeader              = "X-Api-Key"
+	crowdsecLapiRoute               = "v1/decisions"
+	crowdsecLapiStreamRoute         = "v1/decisions/stream"
+	crowdsecLapiMetricsRoute        = "v1/usage-metrics"
+	crowdsecCapiHost                = "api.crowdsec.net"
+	crowdsecCapiHeader              = "Authorization"
+	crowdsecCapiLoginRoute          = "v2/watchers/login"
+	crowdsecCapiStreamRoute         = "v2/decisions/stream"
+	cacheTimeoutKey                 = "updated"
+	appsecAllowAction               = "allow"
+	appsecChallengeAction           = "challenge"
+	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 )
 
 // ##############################################################
@@ -841,6 +842,9 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
 	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
 	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
+	if httpReq.ProtoMajor > 0 {
+		req.Header.Set(crowdsecAppsecHTTPVersionHeader, fmt.Sprintf("%d%d", httpReq.ProtoMajor, httpReq.ProtoMinor))
+	}
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpAppsecClient.Do(req)
