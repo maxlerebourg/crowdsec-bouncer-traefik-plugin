@@ -779,6 +779,12 @@ them (for example when it is unreachable), so the prefix only needs to reach a r
 carrying the middleware. Requests from `clientTrustedIps` bypass the plugin, so they are
 the only exception.
 
+The proof-of-work result is posted to `/crowdsec-internal/challenge/submit`, and AppSec
+has to receive that form in full. Keep `crowdsecAppsecBodyLimit` above `0` and large enough
+for it, which the default of 10MB is. With `0` the plugin sends no body to AppSec, and with
+a smaller limit the proof is cut short: either way it is rejected and the visitor is
+challenged again forever.
+
 CrowdSec documents the same requirement, that the bouncer must forward
 `/crowdsec-internal/challenge/*` unchanged: see
 [enabling bot detection](https://docs.crowdsec.net/docs/appsec/bot_detection/enable) and the
