@@ -774,8 +774,10 @@ with no error anywhere:
 ```
 
 The backend service never sees these requests: the plugin forwards them to the AppSec
-component and returns its response directly, so the prefix only needs to reach a router
-carrying the middleware.
+component and returns its response directly, and answers `404` when AppSec does not serve
+them (for example when it is unreachable), so the prefix only needs to reach a router
+carrying the middleware. Requests from `clientTrustedIps` bypass the plugin, so they are
+the only exception.
 
 CrowdSec documents the same requirement, that the bouncer must forward
 `/crowdsec-internal/challenge/*` unchanged: see

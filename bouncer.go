@@ -46,6 +46,7 @@ const (
 	appsecAllowAction               = "allow"
 	appsecChallengeAction           = "challenge"
 	appsecCaptchaAction             = "captcha"
+	appsecChallengePathPrefix       = "/crowdsec-internal/challenge/"
 	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 )
 
@@ -510,6 +511,10 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 			return
 		}
 		if bouncer.handleAppsecDecisionServeHTTP(rw, req, remoteIP, decision) {
+			return
+		}
+		if strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) {
+			http.NotFound(rw, req)
 			return
 		}
 	}
