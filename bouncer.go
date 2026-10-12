@@ -540,7 +540,9 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 }
 
 func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *AppSecResponse) {
-	atomic.AddInt64(&blockedRequests, 1)
+	if !strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) {
+		atomic.AddInt64(&blockedRequests, 1)
+	}
 
 	for name, values := range decision.UserHeaders {
 		for _, value := range values {
