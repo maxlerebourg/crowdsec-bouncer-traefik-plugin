@@ -376,10 +376,12 @@ make run
   - bool
   - default: true
   - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
+  - A status 401 (API key rejected) or any other unexpected status always blocks the request, whatever this option says, and is logged at INFO.
 - CrowdsecAppsecUnreachableBlock
   - bool
   - default: true
   - Block request when Crowdsec Appsec Server is unreachable.
+  - A status 502, 503 or 504 counts as unreachable.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)

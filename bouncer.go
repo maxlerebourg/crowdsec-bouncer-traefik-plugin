@@ -894,6 +894,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		}
 		return &decision, nil
 	default:
+		bouncer.log.Info(fmt.Sprintf("appsecQuery:unexpectedStatus statusCode:%d", res.StatusCode))
 		return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
 	}
 }
