@@ -630,6 +630,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		value = cache.CaptchaValue
 	default:
 		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
+		value = cache.BannedValue
 	}
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
 		durationSecond := int64(duration.Seconds())
@@ -719,6 +720,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 				value = cache.CaptchaValue
 			default:
 				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
+				value = cache.BannedValue
 			}
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
 		}
