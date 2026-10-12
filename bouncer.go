@@ -45,6 +45,7 @@ const (
 	cacheTimeoutKey                 = "updated"
 	appsecAllowAction               = "allow"
 	appsecChallengeAction           = "challenge"
+	appsecCaptchaAction             = "captcha"
 	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 )
 
@@ -275,9 +276,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		cacheClient:   &cache.Client{},
 		captchaClient: &captcha.Client{},
 	}
-	if config.CrowdsecMode == configuration.AppsecMode {
-		return bouncer, nil
-	}
 	config.RedisCachePassword, _ = configuration.GetVariable(config, "RedisCachePassword")
 	bouncer.cacheClient.New(
 		log,
@@ -310,6 +308,9 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 	if err != nil {
 		log.Error("CaptchaClient not valid " + err.Error())
 		return nil, err
+	}
+	if config.CrowdsecMode == configuration.AppsecMode {
+		return bouncer, nil
 	}
 
 	if (config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode) && streamTicker == nil {
@@ -508,16 +509,29 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 			return
 		}
-		if decision != nil && decision.Action != appsecAllowAction {
-			if decision.Action == appsecChallengeAction {
-				bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
-				return
-			}
-			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+		if bouncer.handleAppsecDecisionServeHTTP(rw, req, remoteIP, decision) {
 			return
 		}
 	}
 	bouncer.next.ServeHTTP(rw, req)
+}
+
+func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, decision *AppSecResponse) bool {
+	switch {
+	case decision == nil || decision.Action == appsecAllowAction:
+		return false
+	case decision.Action == appsecChallengeAction:
+		bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
+	case decision.Action == appsecCaptchaAction && bouncer.captchaClient.Valid && req.Method != http.MethodHead:
+		if bouncer.captchaClient.Check(remoteIP) {
+			return false
+		}
+		atomic.AddInt64(&blockedRequests, 1)
+		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
+	default:
+		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+	}
+	return true
 }
 
 func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *AppSecResponse) {
