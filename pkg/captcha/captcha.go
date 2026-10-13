@@ -2,6 +2,8 @@
 package captcha
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -27,6 +29,8 @@ type Client struct {
 	httpClient              *http.Client
 	log                     *slog.Logger
 	infoProvider            *infoProvider
+	VisitorCookieName       string
+	RemediationTraceIDCustomName string
 }
 
 // Information for self-hosted provider.
@@ -95,7 +99,10 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+
+		captchaKey := c.GetCaptchaCacheKey(r, remoteIP)
+
+		c.cacheClient.Set(captchaKey+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
 		if c.remediationCustomHeader != "" {
 			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
 		}
@@ -107,11 +114,22 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		rw.Header().Set(c.remediationCustomHeader, "captcha")
 	}
 	rw.WriteHeader(http.StatusOK)
-	err = c.template.Execute(rw, map[string]string{
+
+	templateData := map[string]string{
 		"SiteKey":     c.siteKey,
 		"FrontendJS":  c.infoProvider.js,
 		"FrontendKey": c.infoProvider.key,
-	})
+	}
+
+	// Add TraceID header, if set RemediationTraceIDCustomName
+	if c.RemediationTraceIDCustomName != "" {
+		traceid := rw.Header().Get(c.RemediationTraceIDCustomName)
+		c.log.Debug("captcha:traceid: " + traceid)
+		templateData["TraceID"] = traceid
+	}
+
+	err = c.template.Execute(rw, templateData)
+
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
 	}
@@ -163,4 +181,33 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	}
 	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
 	return captchaResponse.Success, nil
+}
+
+// Generates an MD5 hash based on a string ip+useragent+protocol+cookie
+func (c *Client) GetCaptchaCacheKey(req *http.Request, remoteIP string) string {
+
+	// Attempts to retrieve the visitor's cookie (if it exists and is enabled)
+	visitorID := ""
+	if c.VisitorCookieName != "" {
+		visitorCookie, err := req.Cookie(c.VisitorCookieName)
+		if err == nil && visitorCookie.Value != "" {
+			visitorID = visitorCookie.Value
+			c.log.Debug("captcha:VisitorCookieName: " + visitorID)
+		}
+	}
+
+    rawKey := fmt.Sprintf("%s|%s|%s|%s", remoteIP, req.UserAgent(), req.Proto, visitorID)
+	c.log.Debug("captcha:rawKey: " + rawKey)
+    hash := md5.Sum([]byte(rawKey))
+	hashString := hex.EncodeToString(hash[:])
+	c.log.Debug("captcha:hash: " + hashString)
+    return hashString
+}
+
+// returns the name of the field (key) where the CAPTCHA solution token is expected
+func (c *Client) GetResponseKey() string {
+	if c.infoProvider != nil {
+		return c.infoProvider.response
+	}
+	return ""
 }
