@@ -781,6 +781,35 @@ CrowdSec documents the same requirement, that the bouncer must forward
 
 See [examples/bot-detection/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/bot-detection/README.md).
 
+#### AppSec bot detection: Content-Security-Policy
+
+The challenge runs an inline script and a blob: worker, so AppSec sends every challenge with a fixed Content-Security-Policy allowing both:
+
+```
+default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob:;
+```
+
+If your own policy forbids inline scripts or blob: workers, the challenge can never be solved: blank page, and Refused to
+execute inline script / Refused to create a worker in the console.
+
+The plugin replaces any policy already set on the response, as the challenge protocol
+(https://docs.crowdsec.net/docs/appsec/bot_detection/challenge_protocol#requirements-for-a-remediation-component)
+requires. Traefik's headers middleware does not: it applies its headers when the response is written, after the plugin.
+Listed before this one, it therefore overwrites the challenge policy with yours.
+
+Put your Content-Security-Policy in a headers middleware listed after this one. Your other security headers can stay
+before it.
+The captcha and ban pages get none of your default CSP so rewrite it on your template.
+
+```yaml
+  - "traefik.http.routers.my-router.middlewares=security-headers@docker,crowdsec@docker,csp@docker"
+  - "traefik.http.middlewares.security-headers.headers.frameDeny=true"
+  - "traefik.http.middlewares.csp.headers.contentSecurityPolicy=default-src 'self'"
+```
+
+/!\ CrowdSec describes the same conflict, and how to solve it in nginx, in
+[enabling bot detection: Content-Security-Policy](https://docs.crowdsec.net/docs/appsec/bot_detection/enable#content-security-policy).
+
 #### Manually add an IP to the blocklist (for testing purposes)
 
 ```bash

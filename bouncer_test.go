@@ -688,6 +688,90 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	}
 }
 
+func serveAppsecEnvelope(t *testing.T, envelope string, recorder *httptest.ResponseRecorder) bool {
+	t.Helper()
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(envelope))
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nextCalled := false
+	bouncer := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+		appsecEnabled:           true,
+		appsecScheme:            appsecURL.Scheme,
+		appsecHost:              appsecURL.Host,
+		appsecPath:              "/",
+		httpAppsecClient:        appsecServer.Client(),
+		remediationStatusCode:   http.StatusForbidden,
+		remediationCustomHeader: "X-Remediation",
+		log:                     logger.New("DEBUG", ""),
+	}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+	return nextCalled
+}
+
+func TestHandleNextServeHTTPAppsecChallengeWithoutBodyFallsBackToBan(t *testing.T) {
+	tests := []struct {
+		name     string
+		envelope string
+	}{
+		{name: "missing body", envelope: `{"action":"challenge","http_status":200}`},
+		{name: "empty body", envelope: `{"action":"challenge","http_status":200,"user_body_content":""}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			if serveAppsecEnvelope(t, tt.envelope, recorder) {
+				t.Fatal("next handler should not be called for an appsec challenge without body")
+			}
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("expected fallback ban status 403, got %d", recorder.Code)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+				t.Fatalf("expected fallback remediation header ban, got %q", got)
+			}
+		})
+	}
+}
+
+func TestHandleNextServeHTTPAppsecChallengeReplacesHeaders(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	recorder.Header().Set("Content-Security-Policy", "default-src 'none'")
+	recorder.Header().Set("Cache-Control", "public, max-age=3600")
+	envelope := `{
+		"action":"challenge",
+		"http_status":200,
+		"user_body_content":"<html>challenge</html>",
+		"user_cookies":["first=1; Path=/","second=2; Path=/"],
+		"user_headers":{
+			"Content-Security-Policy":["script-src 'self' 'unsafe-inline'"],
+			"Cache-Control":["no-store"]
+		}
+	}`
+	if serveAppsecEnvelope(t, envelope, recorder) {
+		t.Fatal("next handler should not be called for appsec challenge")
+	}
+	if got := recorder.Header().Values("Content-Security-Policy"); len(got) != 1 || got[0] != "script-src 'self' 'unsafe-inline'" {
+		t.Fatalf("expected only the challenge Content-Security-Policy, got %q", got)
+	}
+	if got := recorder.Header().Values("Cache-Control"); len(got) != 1 || got[0] != "no-store" {
+		t.Fatalf("expected only the challenge Cache-Control, got %q", got)
+	}
+	if got := recorder.Header().Values("Set-Cookie"); len(got) != 2 {
+		t.Fatalf("expected two separate Set-Cookie headers, got %q", got)
+	}
+}
+
 func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
