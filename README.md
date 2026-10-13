@@ -783,29 +783,23 @@ See [examples/bot-detection/README.md](https://github.com/maxlerebourg/crowdsec-
 
 #### AppSec bot detection: Content-Security-Policy
 
-The challenge page runs an inline script and starts its proof-of-work worker from a `blob:`
-URL. AppSec sends every challenge with a fixed Content-Security-Policy that allows both:
+The challenge runs an inline script and a blob: worker, so AppSec sends every challenge with a fixed Content-Security-Policy allowing both:
 
 ```
 default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob:;
 ```
 
-If the browser gets your site's policy instead, or next to it, and that policy forbids inline
-scripts or `blob:` workers, the challenge can never be solved. The visitor sees a blank or
-frozen page, the browser console shows `Refused to execute inline script` or
-`Refused to create a worker`, and challenges are requested but never submitted.
+If your own policy forbids inline scripts or blob: workers, the challenge can never be solved: blank page, and Refused to
+execute inline script / Refused to create a worker in the console.
 
-When it writes a challenge, the plugin replaces any policy already set on the response, as
-the [challenge protocol](https://docs.crowdsec.net/docs/appsec/bot_detection/challenge_protocol#requirements-for-a-remediation-component)
-requires. Traefik's `headers` middleware does not set its headers up front, though. It
-applies `contentSecurityPolicy` and `customResponseHeaders` when the response is written,
-that is after the plugin. So if that middleware is listed before this one on the router, it
-overwrites the challenge policy with yours.
+The plugin replaces any policy already set on the response, as the challenge protocol
+(https://docs.crowdsec.net/docs/appsec/bot_detection/challenge_protocol#requirements-for-a-remediation-component)
+requires. Traefik's headers middleware does not: it applies its headers when the response is written, after the plugin.
+Listed before this one, it therefore overwrites the challenge policy with yours.
 
-Middlewares run in the order they are listed, and this one answers a challenge itself
-without calling the middlewares after it. Put your Content-Security-Policy in a `headers`
-middleware listed after this one. Your other security headers can stay in one listed
-before it, so that the challenge and ban pages still get them:
+Put your Content-Security-Policy in a headers middleware listed after this one. Your other security headers can stay
+before it.
+The captcha and ban pages get none of your default CSP so rewrite it on your template.
 
 ```yaml
   - "traefik.http.routers.my-router.middlewares=security-headers@docker,crowdsec@docker,csp@docker"
@@ -813,11 +807,7 @@ before it, so that the challenge and ban pages still get them:
   - "traefik.http.middlewares.csp.headers.contentSecurityPolicy=default-src 'self'"
 ```
 
-If all your headers are in a single middleware, list this one first instead
-(`crowdsec@docker,security-headers@docker`). The challenge and ban pages then get none of
-those headers.
-
-CrowdSec describes the same conflict, and how to solve it in nginx, in
+/!\ CrowdSec describes the same conflict, and how to solve it in nginx, in
 [enabling bot detection: Content-Security-Policy](https://docs.crowdsec.net/docs/appsec/bot_detection/enable#content-security-policy).
 
 #### Manually add an IP to the blocklist (for testing purposes)
