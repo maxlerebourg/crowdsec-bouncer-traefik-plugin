@@ -28,6 +28,7 @@ type Decision struct {
 	Value    string `json:"value"`
 	Type     string `json:"type"`
 	Duration string `json:"duration"`
+	Origin   string `json:"origin"`
 }
 
 var (
@@ -199,7 +200,11 @@ func main() {
 			if duration == "" {
 				duration = "4h"
 			}
-			active[ip] = Decision{Value: ip, Type: dtype, Duration: duration}
+			origin := q.Get("origin")
+			if origin == "" {
+				origin = "crowdsec"
+			}
+			active[ip] = Decision{Value: ip, Type: dtype, Duration: duration, Origin: origin}
 			delete(deleted, ip)
 		case http.MethodDelete:
 			if d, ok := active[ip]; ok {
