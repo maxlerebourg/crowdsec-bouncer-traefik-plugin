@@ -1037,3 +1037,86 @@ func Test_appsecQuery_forwardsHTTPVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestServeHTTPServesAppsecCaptchaInAppsecMode(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+		_, _ = rw.Write([]byte(`{"action":"captcha","http_status":403}`))
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := CreateConfig()
+	cfg.Enabled = true
+	cfg.CrowdsecMode = configuration.AppsecMode
+	cfg.CrowdsecLapiKey = "test"
+	cfg.CrowdsecAppsecEnabled = true
+	cfg.CrowdsecAppsecHost = appsecURL.Host
+	cfg.CaptchaProvider = configuration.HcaptchaProvider
+	cfg.CaptchaSiteKey = "test-site-key"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaFilePath = "captcha.html"
+	nextCalled := false
+	handler, err := New(context.Background(), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		nextCalled = true
+	}), cfg, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
+	t.Cleanup(func() { cacheClient.Delete("192.0.2.30_captcha") })
+
+	for _, solved := range []bool{false, true} {
+		nextCalled = false
+		if solved {
+			cacheClient.Set("192.0.2.30_captcha", cache.CaptchaDoneValue, 60)
+		}
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		req.RemoteAddr = "192.0.2.30:1234"
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+
+		if nextCalled != solved {
+			t.Errorf("solved=%t: expected next handler called=%t", solved, solved)
+		}
+		if !solved && (recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "test-site-key")) {
+			t.Errorf("expected the captcha page, got status %d", recorder.Code)
+		}
+	}
+}
+
+func TestHandleNextServeHTTPKeepsChallengePathsFromTheBackend(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextCalled := false
+	bouncer := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+		appsecEnabled:    true,
+		appsecScheme:     appsecURL.Scheme,
+		appsecHost:       appsecURL.Host,
+		appsecPath:       "/",
+		httpAppsecClient: appsecServer.Client(),
+		log:              logger.New("INFO", ""),
+	}
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/crowdsec-internal/challenge/custom.js", nil)
+	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+	if nextCalled || recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected a 404 without reaching the backend, got status %d (next called: %t)", recorder.Code, nextCalled)
+	}
+}

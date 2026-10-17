@@ -376,10 +376,12 @@ make run
   - bool
   - default: true
   - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
+  - A status 401 (API key rejected) or any other unexpected status always blocks the request, whatever this option says, and is logged at INFO.
 - CrowdsecAppsecUnreachableBlock
   - bool
   - default: true
   - Block request when Crowdsec Appsec Server is unreachable.
+  - A status 502, 503 or 504 counts as unreachable.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
@@ -503,6 +505,7 @@ make run
 - CaptchaProvider
   - string
   - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
+  - Also used when AppSec answers with a `captcha` action. Without a provider, those requests are banned.
 - CaptchaCustomJsURL
   - string
   - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
@@ -771,8 +774,16 @@ with no error anywhere:
 ```
 
 The backend service never sees these requests: the plugin forwards them to the AppSec
-component and returns its response directly, so the prefix only needs to reach a router
-carrying the middleware.
+component and returns its response directly, and answers `404` when AppSec does not serve
+them (for example when it is unreachable), so the prefix only needs to reach a router
+carrying the middleware. Requests from `clientTrustedIps` bypass the plugin, so they are
+the only exception.
+
+The proof-of-work result is posted to `/crowdsec-internal/challenge/submit`, and AppSec
+has to receive that form in full. Keep `crowdsecAppsecBodyLimit` above `0` and large enough
+for it, which the default of 10MB is. With `0` the plugin sends no body to AppSec, and with
+a smaller limit the proof is cut short: either way it is rejected and the visitor is
+challenged again forever.
 
 CrowdSec documents the same requirement, that the bouncer must forward
 `/crowdsec-internal/challenge/*` unchanged: see
