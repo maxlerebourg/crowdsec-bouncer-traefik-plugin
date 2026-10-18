@@ -49,9 +49,13 @@ const (
 	appsecChallengePathPrefix       = "/crowdsec-internal/challenge/"
 	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 	statusClientClosedRequest       = 499
+	unreadableBodyWait              = time.Second
 )
 
-var errAppsecGetBody = errors.New("appsecQuery:GetBody")
+var (
+	errAppsecGetBody  = errors.New("appsecQuery:GetBody")
+	errUnreadableBody = errors.New("appsecQuery:unreadableBody dropped")
+)
 
 // ##############################################################
 // Important: traefik creates an instance of the bouncer per route.
@@ -825,6 +829,26 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
 
+type bodyRead struct {
+	data []byte
+	err  error
+}
+
+func readBodyWithin(body io.Reader, limit int64) ([]byte, error) {
+	if limit <= 0 {
+		return nil, errUnreadableBody
+	}
+	result := make(chan bodyRead, 2)
+	go func() {
+		data, err := io.ReadAll(io.LimitReader(body, limit))
+		result <- bodyRead{data: data, err: err}
+	}()
+	timer := time.AfterFunc(unreadableBodyWait, func() { result <- bodyRead{err: errUnreadableBody} })
+	read := <-result
+	timer.Stop()
+	return read.data, read.err
+}
+
 // isMethodWithBody used only when isBodyUnreadable returns true but the request method can't have body.
 func isMethodWithBody(method string) bool {
 	switch method {
@@ -845,10 +869,19 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	var req *http.Request
 	switch {
 	case isBodyUnreadable(httpReq):
-		if bouncer.appsecUnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
-			return nil, errors.New("appsecQuery:unreadableBody dropped")
+		if !bouncer.appsecUnreadableBodyBlock || !isMethodWithBody(httpReq.Method) {
+			req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
+			break
 		}
-		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
+		bodyBytes, err := readBodyWithin(httpReq.Body, bouncer.appsecBodyLimit)
+		if errors.Is(err, errUnreadableBody) {
+			return nil, err
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%w %w", errAppsecGetBody, err)
+		}
+		httpReq.Body = io.NopCloser(io.MultiReader(bytes.NewReader(bodyBytes), httpReq.Body))
+		req, _ = http.NewRequest(http.MethodPost, routeURL.String(), bytes.NewReader(bodyBytes))
 	case bouncer.appsecBodyLimit > 0 && httpReq.Body != nil:
 		var bodyBuffer bytes.Buffer
 		limitedReader := io.LimitReader(httpReq.Body, bouncer.appsecBodyLimit)
