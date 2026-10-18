@@ -385,7 +385,7 @@ make run
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
-  - Transmit only the first number of bytes to Crowdsec Appsec Server.
+  - Transmit only the first number of bytes to Crowdsec Appsec Server. If the body cannot be read while it is buffered (typically the client aborted the upload), the request is answered with `499` when the client is gone or `400` otherwise, and is neither banned nor counted as a blocked request.
 - CrowdsecAppsecUnreadableBodyBlock
   - bool
   - default: true

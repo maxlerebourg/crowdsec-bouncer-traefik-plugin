@@ -9,7 +9,9 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"text/template"
 	"time"
 
@@ -1127,5 +1129,44 @@ func TestHandleNextServeHTTPKeepsChallengePathsFromTheBackend(t *testing.T) {
 
 	if nextCalled || recorder.Code != http.StatusNotFound {
 		t.Fatalf("expected a 404 without reaching the backend, got status %d (next called: %t)", recorder.Code, nextCalled)
+	}
+}
+
+// A body that cannot be read (client aborted the upload) must not be turned into a ban (issue #395).
+func TestHandleNextServeHTTPBodyReadErrorIsNotABan(t *testing.T) {
+	tests := []struct {
+		name       string
+		clientGone bool
+		wantStatus int
+	}{
+		{name: "client gone", clientGone: true, wantStatus: statusClientClosedRequest},
+		{name: "client still connected", clientGone: false, wantStatus: http.StatusBadRequest},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bouncer := &Bouncer{
+				appsecEnabled:         true,
+				appsecBodyLimit:       10485760,
+				remediationStatusCode: http.StatusForbidden,
+				log:                   logger.New("DEBUG", ""),
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tc.clientGone {
+				cancel()
+			}
+			req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", iotest.ErrReader(io.ErrUnexpectedEOF)).WithContext(ctx)
+			recorder := httptest.NewRecorder()
+			blockedBefore := atomic.LoadInt64(&blockedRequests)
+
+			bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+			if recorder.Code != tc.wantStatus {
+				t.Errorf("expected status %d, got %d", tc.wantStatus, recorder.Code)
+			}
+			if got := atomic.LoadInt64(&blockedRequests) - blockedBefore; got != 0 {
+				t.Errorf("expected no blocked request to be counted, got %d", got)
+			}
+		})
 	}
 }

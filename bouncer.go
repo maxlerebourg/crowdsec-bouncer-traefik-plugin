@@ -48,7 +48,10 @@ const (
 	appsecCaptchaAction             = "captcha"
 	appsecChallengePathPrefix       = "/crowdsec-internal/challenge/"
 	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
+	statusClientClosedRequest       = 499
 )
+
+var errAppsecGetBody = errors.New("appsecQuery:GetBody")
 
 // ##############################################################
 // Important: traefik creates an instance of the bouncer per route.
@@ -507,7 +510,7 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 		decision, err := appsecQuery(bouncer, remoteIP, req)
 		if err != nil {
 			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
-			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+			bouncer.handleAppsecErrorServeHTTP(rw, req, remoteIP, err)
 			return
 		}
 		if bouncer.handleAppsecDecisionServeHTTP(rw, req, remoteIP, decision) {
@@ -537,6 +540,17 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 	}
 	return true
+}
+
+func (bouncer *Bouncer) handleAppsecErrorServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, err error) {
+	switch {
+	case !errors.Is(err, errAppsecGetBody):
+		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+	case req.Context().Err() != nil:
+		rw.WriteHeader(statusClientClosedRequest)
+	default:
+		rw.WriteHeader(http.StatusBadRequest)
+	}
 }
 
 func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *AppSecResponse) {
@@ -841,7 +855,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
 		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
-			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
+			return nil, fmt.Errorf("%w %w", errAppsecGetBody, err)
 		}
 		// Conserve body intact after reading it for other middlewares and service
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
