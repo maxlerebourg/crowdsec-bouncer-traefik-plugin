@@ -190,24 +190,33 @@ func Test_handleNoStreamCache(t *testing.T) {
 }
 
 func Test_handleStreamCache(t *testing.T) {
-	type args struct {
-		bouncer *Bouncer
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"deleted": [{"type": "captcha", "scope": "Ip", "value": "192.0.2.10", "duration": "-1s"}],
+			"new": [{"type": "ban", "scope": "Ip", "value": "192.0.2.10", "duration": "1h"}]
+		}`))
+	}))
+	defer server.Close()
+	serverURL, _ := url.Parse(server.URL)
+	log := logger.New("ERROR", "")
+	cacheClient := &cache.Client{}
+	cacheClient.New(log, false, "", nil, "", "")
+	bouncer := &Bouncer{
+		crowdsecScheme:      serverURL.Scheme,
+		crowdsecHost:        serverURL.Host,
+		crowdsecHeader:      "X-Api-Key",
+		crowdsecStreamRoute: "/v1/decisions/stream",
+		updateInterval:      60,
+		httpClient:          server.Client(),
+		cacheClient:         cacheClient,
+		log:                 log,
 	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+
+	if err := handleStreamCache(bouncer); err != nil {
+		t.Fatalf("handleStreamCache() error = %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := handleStreamCache(tt.args.bouncer)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("handleStreamCache() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-		})
+	if got, err := cacheClient.Get("192.0.2.10"); err != nil || got != cache.BannedValue {
+		t.Errorf("expected the replacing ban to be cached, got %q, %v", got, err)
 	}
 }
 

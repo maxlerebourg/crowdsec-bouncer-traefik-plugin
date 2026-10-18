@@ -731,6 +731,9 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parseBody %w", err)
 	}
+	for _, decision := range stream.Deleted {
+		bouncer.cacheClient.Delete(decision.Value)
+	}
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
@@ -746,9 +749,6 @@ func handleStreamCache(bouncer *Bouncer) error {
 			}
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
 		}
-	}
-	for _, decision := range stream.Deleted {
-		bouncer.cacheClient.Delete(decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
 	isCrowdsecStreamStartup = false
