@@ -294,6 +294,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bouncer := &Bouncer{
+				log:                     logger.New("ERROR", ""),
 				remediationStatusCode:   http.StatusForbidden,
 				remediationCustomHeader: "X-Test-Remediation",
 				banTemplate:             tt.banTemplate,
@@ -360,6 +361,7 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bouncer := &Bouncer{
+				log:                    logger.New("ERROR", ""),
 				remediationStatusCode:  http.StatusForbidden,
 				banTemplate:            tt.banTemplate,
 				banTemplateContentType: tt.banTemplateContentType,

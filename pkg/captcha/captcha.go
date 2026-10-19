@@ -12,6 +12,7 @@ import (
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // Client Captcha client.
@@ -95,12 +96,16 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
+		c.log.LogAttrs(r.Context(), logger.LevelRemediation, "captcha solved", slog.String("ip", remoteIP))
 		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
 		if c.remediationCustomHeader != "" {
 			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
 		}
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
+	}
+	if r.Method == http.MethodPost && r.PostForm.Get(c.infoProvider.response) != "" {
+		c.log.LogAttrs(r.Context(), logger.LevelRemediation, "captcha failed", slog.String("ip", remoteIP))
 	}
 	rw.Header().Set("Content-Type", c.templateContentType)
 	if c.remediationCustomHeader != "" {
