@@ -23,6 +23,7 @@ import (
 	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	location "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/location"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -102,6 +103,7 @@ type Bouncer struct {
 	appsecUnreachableBlock    bool
 	appsecUnreadableBodyBlock bool
 	appsecBodyLimit           int64
+	appsecExcludedLocations   *location.Matcher
 	crowdsecScheme            string
 	crowdsecHost              string
 	crowdsecPath              string
@@ -162,6 +164,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
+	appsecExcludedLocations, _ := location.NewMatcher(config.CrowdsecAppsecExcludedLocations)
 
 	var tlsAppsecConfig *tls.Config
 	if config.CrowdsecAppsecEnabled {
@@ -233,6 +236,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		appsecUnreachableBlock:    config.CrowdsecAppsecUnreachableBlock,
 		appsecUnreadableBodyBlock: config.CrowdsecAppsecUnreadableBodyBlock,
 		appsecBodyLimit:           config.CrowdsecAppsecBodyLimit,
+		appsecExcludedLocations:   appsecExcludedLocations,
 		crowdsecScheme:            config.CrowdsecLapiScheme,
 		crowdsecHost:              config.CrowdsecLapiHost,
 		crowdsecPath:              config.CrowdsecLapiPath,
@@ -506,7 +510,7 @@ func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *
 }
 
 func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) {
-	if bouncer.appsecEnabled {
+	if bouncer.appsecEnabled && !bouncer.isAppsecExcluded(req, remoteIP) {
 		decision, err := appsecQuery(bouncer, remoteIP, req)
 		if err != nil {
 			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
@@ -522,6 +526,14 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 		}
 	}
 	bouncer.next.ServeHTTP(rw, req)
+}
+
+func (bouncer *Bouncer) isAppsecExcluded(req *http.Request, remoteIP string) bool {
+	if strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) || !bouncer.appsecExcludedLocations.Contains(req) {
+		return false
+	}
+	bouncer.log.Debug(fmt.Sprintf("isAppsecExcluded ip:%s path:%s", remoteIP, req.URL.Path))
+	return true
 }
 
 func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, decision *AppSecResponse) bool {

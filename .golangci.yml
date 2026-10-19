@@ -31,6 +31,7 @@ linters-settings:
           - $gostd
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/location
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
