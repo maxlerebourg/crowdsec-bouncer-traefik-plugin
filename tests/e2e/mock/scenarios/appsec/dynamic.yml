@@ -28,5 +28,7 @@ http:
           crowdsecAppsecUnreachableBlock: "false"
           crowdsecAppsecScheme: http
           crowdsecAppsecHost: "@@APPSEC_HOST@@"
+          crowdsecAppsecExcludedLocations:
+            - /foo/excluded
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
