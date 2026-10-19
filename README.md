@@ -508,7 +508,10 @@ make run
   - Also used when AppSec answers with a `captcha` action. Without a provider, those requests are banned.
 - CaptchaCustomJsURL
   - string
-  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
+  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`). Requests to this URL from captcha-pending IPs are passed through so that they can complete the challenge.
+- CaptchaCustomChallengeURL
+  - string
+  - If CaptchaProvider is `custom`, URL used to request the challenge. Requests to this URL from captcha-pending IPs are passed through so that they can complete the challenge.
 - CaptchaCustomValidateURL
   - string
   - If CaptchaProvider is `custom`, URL used to validate the challenge (in case of hcaptcha: `https://api.hcaptcha.com/siteverify`)
