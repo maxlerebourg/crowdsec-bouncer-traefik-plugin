@@ -460,14 +460,21 @@ type Login struct {
 }
 
 // To append Headers we need to call rw.WriteHeader after set any header.
-func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string) {
+func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string, statusCode ...int) {
 	atomic.AddInt64(&blockedRequests, 1)
 
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
-	rw.Header().Set("Content-Type", bouncer.banTemplateContentType)
-	rw.WriteHeader(bouncer.remediationStatusCode)
+	code := bouncer.remediationStatusCode
+	if len(statusCode) > 0 && statusCode[0] > 0 {
+		code = statusCode[0]
+	}
+
+	if rw.Header().Get("Content-Type") == "" {
+		rw.Header().Set("Content-Type", bouncer.banTemplateContentType)
+	}
+	rw.WriteHeader(code)
 	if bouncer.banTemplate == nil || req.Method == http.MethodHead {
 		return
 	}
@@ -537,7 +544,27 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 		atomic.AddInt64(&blockedRequests, 1)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 	default:
-		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+		statusCode := bouncer.remediationStatusCode
+		if decision != nil {
+			if decision.HTTPStatus >= 400 && decision.HTTPStatus < 600 {
+				statusCode = decision.HTTPStatus
+			}
+			for name, values := range decision.UserHeaders {
+				rw.Header().Del(name)
+				for _, value := range values {
+					rw.Header().Add(name, value)
+				}
+			}
+			for _, cookie := range decision.UserCookies {
+				rw.Header().Add("Set-Cookie", cookie)
+			}
+		}
+		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, statusCode)
+		if decision != nil && decision.UserBodyContent != "" && req.Method != http.MethodHead && bouncer.banTemplate == nil {
+			if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
+				bouncer.log.Warn("handleAppsecDecisionServeHTTP could not write appsec body: " + err.Error())
+			}
+		}
 	}
 	return true
 }
