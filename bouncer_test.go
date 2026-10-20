@@ -824,6 +824,81 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	}
 }
 
+func TestHandleNextServeHTTPAppsecBanRelaysCustomStatusCode(t *testing.T) {
+	tests := []struct {
+		name         string
+		envelope     string
+		expectedCode int
+	}{
+		{
+			name:         "HTTP 505 for HTTP/1.0 block",
+			envelope:     `{"action":"ban","http_status":505}`,
+			expectedCode: http.StatusHTTPVersionNotSupported,
+		},
+		{
+			name:         "HTTP 413 Payload Too Large",
+			envelope:     `{"action":"ban","http_status":413}`,
+			expectedCode: http.StatusRequestEntityTooLarge,
+		},
+		{
+			name:         "Default 403 when http_status is 403",
+			envelope:     `{"action":"ban","http_status":403}`,
+			expectedCode: http.StatusForbidden,
+		},
+		{
+			name:         "Out of range status falls back to remediationStatusCode",
+			envelope:     `{"action":"ban","http_status":200}`,
+			expectedCode: http.StatusForbidden,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			if serveAppsecEnvelope(t, tt.envelope, recorder) {
+				t.Fatal("next handler should not be called for appsec ban")
+			}
+			if recorder.Code != tt.expectedCode {
+				t.Fatalf("expected status %d, got %d", tt.expectedCode, recorder.Code)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+				t.Fatalf("expected remediation header ban, got %q", got)
+			}
+		})
+	}
+}
+
+func TestHandleNextServeHTTPAppsecBanRelaysHeadersAndCookies(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	envelope := `{
+		"action":"ban",
+		"http_status":505,
+		"user_body_content":"HTTP/1.0 is not supported",
+		"user_cookies":["test_cookie=val; Path=/"],
+		"user_headers":{
+			"X-Custom-Block":["true"],
+			"Content-Type":["text/plain"]
+		}
+	}`
+	if serveAppsecEnvelope(t, envelope, recorder) {
+		t.Fatal("next handler should not be called for appsec ban")
+	}
+	if recorder.Code != http.StatusHTTPVersionNotSupported {
+		t.Fatalf("expected status 505, got %d", recorder.Code)
+	}
+	if got := recorder.Header().Get("X-Custom-Block"); got != "true" {
+		t.Fatalf("expected X-Custom-Block header, got %q", got)
+	}
+	if got := recorder.Header().Get("Set-Cookie"); got != "test_cookie=val; Path=/" {
+		t.Fatalf("expected Set-Cookie header, got %q", got)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "text/plain" {
+		t.Fatalf("expected Content-Type header text/plain, got %q", got)
+	}
+	if got := recorder.Body.String(); got != "HTTP/1.0 is not supported" {
+		t.Fatalf("expected custom body content, got %q", got)
+	}
+}
+
 // Test_appsecQuery_reusesConnection is a regression test for issue #384: the appsec response
 // body must be drained for non-200 status response so net/http can return the conn to the idle pool.
 func Test_appsecQuery_reusesConnection(t *testing.T) {
