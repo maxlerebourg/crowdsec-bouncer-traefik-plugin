@@ -339,6 +339,7 @@ make run
     time=2026-10-19T12:00:05.000Z level=REMEDIATION msg="captcha solved" component=CrowdsecBouncerTraefikPlugin ip=192.0.2.51
     ```
     `remediation` is `ban`, `captcha` or `challenge`; `source` is `LAPI`, `APPSEC` or `TECHNICAL_ISSUE` (the request was blocked because of an error, see `ERROR` logs). The query string is never logged.
+    `source=LAPI` means CrowdSec holds a decision for this IP. `source=APPSEC` means the AppSec component blocked this request only: whether CrowdSec then bans the IP is decided by its scenarios (for example `crowdsecurity/appsec-vpatch`), and the decision shows up in `cscli decisions list`.
 - LogFormat
   - string
   - default: `common`, expected values are: `common`, `json`
