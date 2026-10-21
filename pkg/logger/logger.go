@@ -10,10 +10,11 @@ import (
 
 // Custom log levels following slog best practices.
 const (
-	LevelDebug = slog.LevelDebug
-	LevelInfo  = slog.LevelInfo
-	LevelWarn  = slog.LevelWarn
-	LevelError = slog.LevelError
+	LevelDebug       = slog.LevelDebug
+	LevelRemediation = slog.Level(-2)
+	LevelInfo        = slog.LevelInfo
+	LevelWarn        = slog.LevelWarn
+	LevelError       = slog.LevelError
 )
 
 // New creates a Log wrapper with default format (common).
@@ -32,6 +33,8 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 		level = LevelWarn
 	case "INFO":
 		level = LevelInfo
+	case "REMEDIATION":
+		level = LevelRemediation
 	case "DEBUG":
 		level = LevelDebug
 	default:
@@ -66,6 +69,8 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 					return a
 				}
 				switch {
+				case lvl == LevelRemediation:
+					a.Value = slog.StringValue("REMEDIATION")
 				case lvl < LevelInfo:
 					a.Value = slog.StringValue("DEBUG")
 				case lvl < LevelWarn:
