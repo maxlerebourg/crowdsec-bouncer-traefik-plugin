@@ -46,22 +46,26 @@
       "datasourceTemplate": "github-tags"
     },
     {
-      "description": "Traefik image tag in the Traefik Helm values (no repository key, so match by file)",
+      "description": "Traefik Helm chart version in the Kubernetes example (helm upgrade ... traefik/traefik --version X)",
       "customType": "regex",
-      "managerFilePatterns": ["/^examples/kubernetes/traefik/values\\.ya?ml$/"],
-      "matchStrings": ["tag:\\s*(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "managerFilePatterns": ["/^examples/kubernetes/README\\.md$/"],
+      "matchStrings": [
+        "traefik/traefik --version (?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
+      ],
       "depNameTemplate": "traefik",
-      "datasourceTemplate": "docker"
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://traefik.github.io/charts"
     },
     {
-      "description": "Crowdsec image tag in the Crowdsec Helm values (no repository key, so match by file)",
+      "description": "Crowdsec Helm chart version in the Kubernetes example (helm upgrade ... crowdsec/crowdsec --version X)",
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^examples/kubernetes/crowdsec/values\\.ya?ml$/"
+      "managerFilePatterns": ["/^examples/kubernetes/README\\.md$/"],
+      "matchStrings": [
+        "crowdsec/crowdsec --version (?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
       ],
-      "matchStrings": ["tag:\\s*(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
-      "depNameTemplate": "crowdsecurity/crowdsec",
-      "datasourceTemplate": "docker"
+      "depNameTemplate": "crowdsec",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://crowdsecurity.github.io/helm-charts"
     },
     {
       "description": "Pinned Traefik binary in the e2e mock suite (TRAEFIK_VERSION:-vX in common.sh)",
