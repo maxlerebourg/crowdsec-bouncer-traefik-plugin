@@ -386,6 +386,10 @@ make run
   - int64
   - default: 10485760 (= 10MB)
   - Transmit only the first number of bytes to Crowdsec Appsec Server. If the body cannot be read while it is buffered (typically the client aborted the upload), the request is answered with `499` when the client is gone or `400` otherwise, and is neither banned nor counted as a blocked request.
+- CrowdsecAppsecTimeoutMilliseconds
+  - int64
+  - default: 0 (= use `HTTPTimeoutSeconds`)
+  - Timeout in milliseconds for contacting Crowdsec Appsec Server, independent from `HTTPTimeoutSeconds` which keeps governing the LAPI. A request that exceeds it counts as unreachable, so with `crowdsecAppsecUnreachableBlock: false` a slow or blackholed Appsec only adds this delay before the request is let through.
 - CrowdsecAppsecUnreadableBodyBlock
   - bool
   - default: true
@@ -469,7 +473,7 @@ make run
 - HTTPTimeoutSeconds
   - int64
   - default: 10
-  - Default timeout in seconds for contacting Crowdsec LAPI
+  - Default timeout in seconds for contacting Crowdsec LAPI (and Crowdsec Appsec Server unless `CrowdsecAppsecTimeoutMilliseconds` is set)
 - UpdateIntervalSeconds
   - int64
   - default: 60
@@ -630,6 +634,7 @@ http:
           crowdsecAppsecPath: "/"
           crowdsecAppsecFailureBlock: true
           crowdsecAppsecUnreachableBlock: true
+          crowdsecAppsecTimeoutMilliseconds: 0
           crowdsecAppsecBodyLimit: 10485760
           crowdsecAppsecUnreadableBodyBlock: false
           crowdsecLapiKey: privateKey-foo

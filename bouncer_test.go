@@ -1170,3 +1170,51 @@ func TestHandleNextServeHTTPBodyReadErrorIsNotABan(t *testing.T) {
 		})
 	}
 }
+
+func TestAppsecTimeoutMillisecondsSkipsSlowAppsec(t *testing.T) {
+	release := make(chan struct{})
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		select {
+		case <-release:
+		case <-time.After(3 * time.Second):
+		}
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	defer close(release)
+
+	cfg := CreateConfig()
+	cfg.Enabled = true
+	cfg.CrowdsecMode = configuration.AppsecMode
+	cfg.CrowdsecLapiKey = "test"
+	cfg.CrowdsecAppsecEnabled = true
+	cfg.CrowdsecAppsecScheme = configuration.HTTP
+	cfg.CrowdsecAppsecHost = strings.TrimPrefix(appsecServer.URL, "http://")
+	cfg.CrowdsecAppsecUnreachableBlock = false
+	cfg.HTTPTimeoutSeconds = 10
+	cfg.CrowdsecAppsecTimeoutMilliseconds = 100
+
+	nextCalled := false
+	next := http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		nextCalled = true
+		rw.WriteHeader(http.StatusOK)
+	})
+	handler, err := New(context.Background(), next, cfg, "appsec-timeout")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	req.RemoteAddr = "192.0.2.10:1234"
+	recorder := httptest.NewRecorder()
+	start := time.Now()
+	handler.ServeHTTP(recorder, req)
+	elapsed := time.Since(start)
+
+	if elapsed > time.Second {
+		t.Errorf("expected the AppSec call to give up after ~100ms, request took %s", elapsed)
+	}
+	if !nextCalled || recorder.Code != http.StatusOK {
+		t.Errorf("expected the request to reach the backend (fail open), got status %d nextCalled=%v", recorder.Code, nextCalled)
+	}
+}
