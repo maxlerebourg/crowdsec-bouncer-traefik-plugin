@@ -2,6 +2,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -865,6 +866,45 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 				t.Errorf("appsecQuery() opened %d connections for %d calls, want 1 (response body not drained?)", len(conns), calls)
 			}
 		})
+	}
+}
+
+// Test_appsecQuery_failureBlock checks that crowdsecAppsecFailureBlock governs every status
+// that is neither 200 nor 403: a 401 (rejected API key) must not block all traffic when the
+// user asked for fail-open.
+func Test_appsecQuery_failureBlock(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusInternalServerError, http.StatusTeapot} {
+		for _, failureBlock := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%d/failureBlock=%t", status, failureBlock), func(t *testing.T) {
+				appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+					rw.WriteHeader(status)
+				}))
+				defer appsecServer.Close()
+
+				appsecURL, _ := url.Parse(appsecServer.URL)
+				bouncer := &Bouncer{
+					appsecScheme:       appsecURL.Scheme,
+					appsecHost:         appsecURL.Host,
+					appsecPath:         "/",
+					appsecBodyLimit:    10485760,
+					appsecFailureBlock: failureBlock,
+					httpAppsecClient:   appsecServer.Client(),
+					log:                logger.New("INFO", ""),
+				}
+
+				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+				decision, err := appsecQuery(bouncer, "1.2.3.4", req)
+				if decision != nil {
+					t.Errorf("appsecQuery() decision = %+v, want nil", decision)
+				}
+				if failureBlock && err == nil {
+					t.Errorf("appsecQuery() with failureBlock=true returned no error, want the request blocked")
+				}
+				if !failureBlock && err != nil {
+					t.Errorf("appsecQuery() with failureBlock=false returned error %v, want the request allowed", err)
+				}
+			})
+		}
 	}
 }
 

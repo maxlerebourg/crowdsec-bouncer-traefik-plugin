@@ -932,9 +932,18 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 			return nil, errors.New("appsecQuery:challengeBodyMissing")
 		}
 		return &decision, nil
+	case http.StatusUnauthorized:
+		bouncer.log.Error("appsecQuery:unauthorized AppSec rejected the API key, check crowdsecAppsecKey/crowdsecLapiKey")
+		if bouncer.appsecFailureBlock {
+			return nil, errors.New("appsecQuery:unauthorized statusCode:401")
+		}
+		return nil, nil
 	default:
 		bouncer.log.Info(fmt.Sprintf("appsecQuery:unexpectedStatus statusCode:%d", res.StatusCode))
-		return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
+		if bouncer.appsecFailureBlock {
+			return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
+		}
+		return nil, nil
 	}
 }
 
