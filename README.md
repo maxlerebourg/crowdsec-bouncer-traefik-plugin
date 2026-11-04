@@ -493,6 +493,7 @@ make run
   - int
   - default: 403
   - HTTP status code for banned user (not captcha)
+  - When AppSec answers with a `ban` action and a `4xx` or `5xx` `http_status` (configured via `blocked_http_code` or `SetReturnCode`), AppSec's `http_status` is returned instead.
 - CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
@@ -536,6 +537,7 @@ make run
   - string
   - default: ""
   - Path where the ban file is stored (default empty ""=disabled). The Content-Type header is automatically inferred from the file extension.
+  - When set, this template and its `Content-Type` take precedence over any `user_body_content` returned by AppSec on a `ban` action.
 - TraceHeadersCustomName
   - string
   - default: ""
