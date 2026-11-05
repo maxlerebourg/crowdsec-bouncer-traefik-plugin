@@ -7,7 +7,12 @@ import (
 )
 
 func TestMatcher_Contains(t *testing.T) {
-	matcher, err := NewMatcher([]string{" /healthz ", "Registry.Example.com./v2/"})
+	matcher, err := NewMatcher([]string{
+		" /path ",
+		"only-host.com.",
+		"host-port-path.com:8000/v2/",
+		"host-port.com:8000",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -16,31 +21,35 @@ func TestMatcher_Contains(t *testing.T) {
 		target string
 		want   bool
 	}{
-		{host: "app.example.com", target: "/healthz", want: true},
-		{host: "app.example.com", target: "/healthz/live?probe=1", want: true},
-		{host: "registry.example.com", target: "/v2/", want: true},
-		{host: "registry.example.com", target: "/v2/library/nginx/manifests/sha256:0a1b", want: true},
-		{host: "REGISTRY.example.com:8443", target: "/v2/x", want: true},
-		{host: "registry.example.com.", target: "/v2/x", want: true},
-		{host: "app.example.com", target: "/healthzfoo"},
-		{host: "app.example.com", target: "/Healthz"},
-		{host: "app.example.com", target: "/admin?next=/healthz"},
-		{host: "app.example.com", target: "/v2/x"},
-		{host: "registry.example.com", target: "/v2"},
-		{host: "registry.example.com.evil.com", target: "/v2/x"},
-		{host: "app.example.com", target: "//healthz"},
-		{host: "app.example.com", target: "/healthz/../admin"},
-		{host: "app.example.com", target: "/healthz/./live"},
-		{host: "app.example.com", target: "/healthz/.../admin"},
-		{host: "app.example.com", target: "/healthz/%2e%2e/admin"},
-		{host: "app.example.com", target: "/healthz%2F..%2Fadmin"},
-		{host: "app.example.com", target: "/healthz/%252e%252e/admin"},
-		{host: "app.example.com", target: "/healthz/..;/admin"},
-		{host: "app.example.com", target: "/healthz/..%3B/admin"},
-		{host: "app.example.com", target: "/healthz/..%5Cadmin"},
-		{host: "app.example.com", target: "/healthz/%00"},
-		{host: "app.example.com", target: "/healthz/%EF%BC%8E%EF%BC%8E%EF%BC%8Fadmin"},
-		{host: "app.example.com", target: "/healthz/%6Cive"},
+		{host: "only-host.com", target: "/", want: true},
+		{host: "evil.only-host.com", target: "/"},
+		{host: "only-host.com.evil", target: "/"},
+		{host: "host-port-path.com:8000", target: "/v2/x", want: true},
+		{host: "HOST-PORT-PATH.com:8000", target: "/v2/x", want: true},
+		{host: "host-port-path.com", target: "/v2/x"},
+		{host: "host-port-path.com:9000", target: "/v2/x"},
+		{host: "host-port-path.com:8000", target: "/v2"},
+		{host: "host-port-path.com:8000", target: "/v3/x"},
+		{host: "other.com", target: "/"},
+		{host: "app.com", target: "/path", want: true},
+		{host: "app.com", target: "/path/live?probe=1", want: true},
+		{host: "app.com", target: "/pathfoo"},
+		{host: "app.com", target: "/Path"},
+		{host: "app.com", target: "/admin?next=/path"},
+		{host: "app.com", target: "/v2/x"},
+		{host: "app.com", target: "//path"},
+		{host: "app.com", target: "/path/../admin"},
+		{host: "app.com", target: "/path/./live"},
+		{host: "app.com", target: "/path/.../admin"},
+		{host: "app.com", target: "/path/%2e%2e/admin"},
+		{host: "app.com", target: "/path%2F..%2Fadmin"},
+		{host: "app.com", target: "/path/%252e%252e/admin"},
+		{host: "app.com", target: "/path/..;/admin"},
+		{host: "app.com", target: "/path/..%3B/admin"},
+		{host: "app.com", target: "/path/..%5Cadmin"},
+		{host: "app.com", target: "/path/%00"},
+		{host: "app.com", target: "/path/%EF%BC%8E%EF%BC%8E%EF%BC%8Fadmin"},
+		{host: "app.com", target: "/path/%6Cive"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.host+tt.target, func(t *testing.T) {
@@ -54,22 +63,24 @@ func TestMatcher_Contains(t *testing.T) {
 }
 
 func TestNewMatcher_rejects(t *testing.T) {
-	for _, location := range []string{
+	for _, loc := range []string{
 		"",
 		"/",
-		"healthz",
-		"registry.example.com",
-		"registry.example.com:443/v2/",
-		"*.example.com/v2/",
-		"https://registry.example.com/v2/",
-		"/healthz/../admin",
-		"//healthz",
+		"app.com:0",
+		"app.com:",
+		"app.com:abc",
+		"app.com:99999",
+		"app.com//",
+		"*.app.com/v2/",
+		"https://app.com/v2/",
+		"/path/../admin",
+		"//path",
 		"/v2/*",
 		"/a;b",
 		"/a%2Fb",
 	} {
-		if _, err := NewMatcher([]string{location}); err == nil {
-			t.Errorf("NewMatcher(%q) must fail", location)
+		if _, err := NewMatcher([]string{loc}); err == nil {
+			t.Errorf("NewMatcher(%q) must fail", loc)
 		}
 	}
 }

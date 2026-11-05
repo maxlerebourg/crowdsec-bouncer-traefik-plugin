@@ -393,7 +393,7 @@ make run
 - CrowdsecAppsecExcludedLocations
   - []string
   - default: []
-  - Requests to these locations are not sent to the Appsec Server, while LAPI decisions still apply to them. An entry is a path such as `/healthz`, which applies to every host, or a host followed by a path such as `registry.example.com/v2/`. Read [AppSec excluded locations](#appsec-excluded-locations) before using it: every entry is a WAF bypass.
+  - Requests to these locations are not sent to the Appsec Server, while LAPI decisions still apply to them. An entry is a path such as `/healthz`, which applies to every host, or a host optionally followed by a path, such as `registry.example.com` for every path on that host, or `registry.example.com/v2/`. Read [AppSec excluded locations](#appsec-excluded-locations) before using it: every entry is a WAF bypass.
 - CrowdsecAppsecKey
   - string
   - default: value of `CrowdsecLapiKey`
@@ -771,12 +771,16 @@ Currently AppSec does not support mTLS authentication for the AppSec Component.
 #### AppSec excluded locations
 
 `crowdsecAppsecExcludedLocations` skips the AppSec query for some requests, for example
-large uploads or machine-to-machine APIs where the rules mostly raise false positives.
-The request body is then neither buffered nor sent to AppSec, and
-`crowdsecAppsecUnreadableBodyBlock` does not apply. LAPI decisions (ban, captcha) still
-do. This differs from `EXCLUDE_LOCATION` in the nginx and HAProxy Lua bouncers, which
-skips the whole bouncer. In `crowdsecMode: appsec` there is no LAPI check, so an excluded
-request is not checked at all.
+large uploads or machine-to-machine APIs where the rules mostly raise false positives:
+the body is neither buffered nor sent to AppSec and `crowdsecAppsecUnreadableBodyBlock`
+does not apply, while LAPI decisions (ban, captcha) still do. This differs from
+`EXCLUDE_LOCATION` in the nginx and HAProxy Lua bouncers, which skips the whole bouncer,
+and in `crowdsecMode: appsec` there is no LAPI check, so an excluded request is not
+checked at all. A request is only excluded when its path can be read one way only: no
+percent-encoding, no `.`, `..` or empty segment, no segment made only of dots, and only
+ASCII letters, digits and `-._~!$&'()+,=:@/`. So `/healthz/..;/admin`,
+`/healthz%2F..%2Fadmin` or `/healthz/%252e%252e/admin` are inspected, not excluded, with
+`sanitizePath: false` too.
 
 ```yaml
 crowdsecAppsecExcludedLocations:
@@ -786,21 +790,16 @@ crowdsecAppsecExcludedLocations:
 
 - `/healthz` matches `/healthz` and everything below it, such as `/healthz/live`, but not
   `/healthzfoo`. An entry ending with `/`, such as `/v2/`, only matches below it.
-- An entry without a host applies to every host. With a host, the host is compared like
-  Traefik's `Host` matcher does: case-insensitive, without the port and without a
-  trailing dot. There are no wildcards or regular expressions.
+- An entry without a host applies to every host. An entry that is only a host, such as
+  `registry.example.com`, matches every path on that host. The host is compared
+  case-insensitively, without a trailing dot. An entry with a port, such as
+  `registry.example.com:8000`, only matches requests whose `Host` carries that port; an
+  entry without a port matches any port. There are no wildcards or regular expressions.
 - The path is case-sensitive, and the query string is ignored.
 - The path is the one the middleware receives. A middleware that runs before it, such as
   `stripPrefix`, changes what is matched.
 - `/crowdsec-internal/challenge/` is always sent to AppSec, so bot detection keeps working
   on an excluded host.
-
-A request is only excluded when its path can be read one way only. Its path must
-contain no percent-encoding once Traefik has decoded unreserved characters, no `.`,
-`..` or empty segment, no segment made only of dots, and only ASCII letters, digits
-and `-._~!$&'()+,=:@/`. Any other request is sent to AppSec as usual, so tricks such
-as `/healthz/..;/admin`, `/healthz%2F..%2Fadmin` or `/healthz/%252e%252e/admin`
-are inspected, not excluded. This holds with `sanitizePath: false` too.
 
 > [!WARNING]
 > Every entry is a WAF bypass for everything below it.
@@ -817,10 +816,6 @@ are inspected, not excluded. This holds with `sanitizePath: false` too.
 >   `X-Rewrite-URL`. Behind such a backend, a request to an excluded path can reach
 >   another resource uninspected. AppSec does not route on these headers either, so
 >   strip them in front of such a backend whether or not you exclude anything.
-
-If you would rather keep the exclusions in the routing, do not attach the middleware to
-the entryPoint. Attach it to each router instead, and give the routers that should skip
-AppSec a second middleware with `crowdsecAppsecEnabled: false`.
 
 #### AppSec bot detection: route `/crowdsec-internal`
 

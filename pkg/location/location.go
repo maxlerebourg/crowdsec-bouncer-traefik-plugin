@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,7 @@ const (
 
 type entry struct {
 	host   string
+	port   string
 	path   string
 	prefix string
 }
@@ -26,25 +28,32 @@ type Matcher struct {
 	entries []entry
 }
 
-// NewMatcher builds a Matcher from entries written as /path or host/path.
+// NewMatcher builds a Matcher from entries written as /path, host or host/path.
 func NewMatcher(locations []string) (*Matcher, error) {
 	matcher := &Matcher{}
 	for _, raw := range locations {
-		location := strings.TrimSpace(raw)
-		host, locationPath := "", location
-		if !strings.HasPrefix(location, "/") {
-			slash := strings.IndexByte(location, '/')
-			if slash <= 0 {
-				return nil, fmt.Errorf("location %q must be a path starting with / or host/path", location)
+		loc := strings.TrimSpace(raw)
+		host, locationPath, port := "", loc, ""
+		if !strings.HasPrefix(loc, "/") {
+			slash := strings.IndexByte(loc, '/')
+			if slash < 0 {
+				slash = len(loc)
 			}
-			host = strings.TrimSuffix(strings.ToLower(location[:slash]), ".")
-			locationPath = location[slash:]
-			if !isHost(host) {
-				return nil, fmt.Errorf("location %q: the host must be a domain name without port or wildcard", location)
+			if slash == 0 {
+				return nil, fmt.Errorf("location %q must be a path starting with /, or a host optionally followed by a path", loc)
+			}
+			var err error
+			host, port, err = parseHost(loc[:slash])
+			if err != nil {
+				return nil, fmt.Errorf("location %q: %w", loc, err)
+			}
+			locationPath = "/"
+			if slash < len(loc) {
+				locationPath = loc[slash:]
 			}
 		}
 		if !isCanonicalPath(locationPath) {
-			return nil, fmt.Errorf("location %q: the path must be clean and use only letters, digits and -._~!$&'()+,=:@/", location)
+			return nil, fmt.Errorf("location %q: the path must be clean and use only letters, digits and -._~!$&'()+,=:@/", loc)
 		}
 		if host == "" && locationPath == "/" {
 			return nil, errors.New("location \"/\" matches every request, disable AppSec instead")
@@ -53,7 +62,7 @@ func NewMatcher(locations []string) (*Matcher, error) {
 		if !strings.HasSuffix(prefix, "/") {
 			prefix += "/"
 		}
-		matcher.entries = append(matcher.entries, entry{host: host, path: locationPath, prefix: prefix})
+		matcher.entries = append(matcher.entries, entry{host: host, port: port, path: locationPath, prefix: prefix})
 	}
 	return matcher, nil
 }
@@ -64,16 +73,16 @@ func (m *Matcher) Contains(req *http.Request) bool {
 		return false
 	}
 	reqPath := req.URL.Path
-	reqHost := ""
+	reqHost, reqPort := "", ""
 	for _, e := range m.entries {
 		if reqPath != e.path && !strings.HasPrefix(reqPath, e.prefix) {
 			continue
 		}
 		if e.host != "" {
 			if reqHost == "" {
-				reqHost = canonicalHost(req.Host)
+				reqHost, reqPort = canonicalHost(req.Host)
 			}
-			if e.host != reqHost {
+			if e.host != reqHost || (e.port != "" && e.port != reqPort) {
 				continue
 			}
 		}
@@ -82,11 +91,31 @@ func (m *Matcher) Contains(req *http.Request) bool {
 	return false
 }
 
-func canonicalHost(addr string) string {
-	if host, _, err := net.SplitHostPort(addr); err == nil {
-		addr = host
+func parseHost(addr string) (string, string, error) {
+	host, port := addr, ""
+	if h, p, err := net.SplitHostPort(addr); err == nil {
+		number, err := strconv.ParseUint(p, 10, 16)
+		if err != nil || number == 0 {
+			return "", "", errors.New("the port must be a number between 1 and 65535")
+		}
+		host, port = h, strconv.FormatUint(number, 10)
 	}
-	return strings.TrimSuffix(strings.ToLower(addr), ".")
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if !isHost(host) {
+		return "", "", errors.New("the host must be a domain name, without wildcard")
+	}
+	return host, port, nil
+}
+
+func canonicalHost(addr string) (string, string) {
+	host, port := addr, ""
+	if h, p, err := net.SplitHostPort(addr); err == nil {
+		host, port = h, p
+	}
+	if number, err := strconv.ParseUint(port, 10, 16); err == nil {
+		port = strconv.FormatUint(number, 10)
+	}
+	return strings.TrimSuffix(strings.ToLower(host), "."), port
 }
 
 func isHost(host string) bool {
