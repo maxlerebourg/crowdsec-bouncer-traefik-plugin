@@ -98,7 +98,8 @@ func parseHost(addr string) (string, string, error) {
 		if err != nil || number == 0 {
 			return "", "", errors.New("the port must be a number between 1 and 65535")
 		}
-		host, port = h, strconv.FormatUint(number, 10)
+		host = h
+		port = strconv.FormatUint(number, 10)
 	}
 	host = strings.TrimSuffix(strings.ToLower(host), ".")
 	if !isHost(host) {
