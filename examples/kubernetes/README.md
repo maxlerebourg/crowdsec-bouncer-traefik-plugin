@@ -47,7 +47,7 @@ kubectl -n crowdsec wait --for=condition=Available deployment --all --timeout=5m
 ```bash
 helm repo add traefik https://traefik.github.io/charts
 helm repo update
-helm upgrade --install traefik traefik/traefik --version 42.2.0 \
+helm upgrade --install traefik traefik/traefik --version 42.3.0 \
   --namespace traefik --values ./traefik/values.yml
 kubectl -n traefik rollout status deployment/traefik
 ```
