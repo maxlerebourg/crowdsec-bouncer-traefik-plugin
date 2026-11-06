@@ -465,13 +465,17 @@ type Login struct {
 
 // To append Headers we need to call rw.WriteHeader after set any header.
 func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string) {
+	bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, reason, bouncer.remediationStatusCode)
+}
+
+func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string, statusCode int) {
 	atomic.AddInt64(&blockedRequests, 1)
 
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
 	rw.Header().Set("Content-Type", bouncer.banTemplateContentType)
-	rw.WriteHeader(bouncer.remediationStatusCode)
+	rw.WriteHeader(statusCode)
 	if bouncer.banTemplate == nil || req.Method == http.MethodHead {
 		return
 	}
@@ -548,6 +552,9 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 		}
 		atomic.AddInt64(&blockedRequests, 1)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
+	case decision.HTTPStatus == http.StatusTooManyRequests:
+		// An AppSec ban with http_status 429 (RateLimit(), or SetReturnCode(429)): keep the 429.
+		bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, http.StatusTooManyRequests)
 	default:
 		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 	}
