@@ -57,7 +57,7 @@ The `streaming mode` is recommended for performance, decisions are updated every
 
 The cache can be local to Traefik in memory or using a separate Redis instance.
 
-Below are Mermaid diagrams detailing how each mode work:
+Below are Mermaid diagrams detailing how each mode works:
 
 <details><summary>Mode none workflow</summary>
 
@@ -730,7 +730,7 @@ crowdsec:
 
 Note:
 
-> Crowdsec does not require a specific format for la LAPI-key, you may use something like FIXME-LAPI-KEY but that is not recommended for obvious reasons
+> Crowdsec does not require a specific format for the LAPI key, you may use something like FIXME-LAPI-KEY but that is not recommended for obvious reasons
 
 You can then run all the containers:
 
