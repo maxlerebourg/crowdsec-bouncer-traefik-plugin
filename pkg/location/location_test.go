@@ -9,7 +9,7 @@ import (
 func TestMatcher_Contains(t *testing.T) {
 	matcher, err := NewMatcher([]string{
 		" /path ",
-		"only-host.com.",
+		"every-port-host.com.",
 		"host-port-path.com:8000/v2/",
 		"host-port.com:8000",
 	})
@@ -21,16 +21,19 @@ func TestMatcher_Contains(t *testing.T) {
 		target string
 		want   bool
 	}{
-		{host: "only-host.com", target: "/", want: true},
-		{host: "evil.only-host.com", target: "/"},
-		{host: "only-host.com.evil", target: "/"},
+		{host: "other.com", target: "/"},
+		{host: "every-port-host.com", target: "/", want: true},
+		{host: "every-port-host.com.:1", target: "/", want: true},
+		{host: "evil.every-port-host.com", target: "/"},
+		{host: "every-port-host.com.evil", target: "/"},
 		{host: "host-port-path.com:8000", target: "/v2/x", want: true},
 		{host: "HOST-PORT-PATH.com:8000", target: "/v2/x", want: true},
 		{host: "host-port-path.com", target: "/v2/x"},
 		{host: "host-port-path.com:9000", target: "/v2/x"},
 		{host: "host-port-path.com:8000", target: "/v2"},
 		{host: "host-port-path.com:8000", target: "/v3/x"},
-		{host: "other.com", target: "/"},
+		{host: "host-port-path.com:8000", target: "/path/Forbiden%20Char"},
+		{host: "app.com", target: "/path/Forbiden%20Char"},
 		{host: "app.com", target: "/path", want: true},
 		{host: "app.com", target: "/path/live?probe=1", want: true},
 		{host: "app.com", target: "/pathfoo"},

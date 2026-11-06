@@ -72,8 +72,7 @@ func (m *Matcher) Contains(req *http.Request) bool {
 	if m == nil {
 		return false
 	}
-	reqPath := req.URL.Path
-	reqHost, reqPort := "", ""
+	reqHost, reqPort, reqPath := "", "", req.URL.Path
 	for _, e := range m.entries {
 		if reqPath != e.path && !strings.HasPrefix(reqPath, e.prefix) {
 			continue
@@ -86,7 +85,9 @@ func (m *Matcher) Contains(req *http.Request) bool {
 				continue
 			}
 		}
-		return req.URL.EscapedPath() == reqPath && isCanonicalPath(reqPath)
+		if e.path == "/" || (reqPath == req.URL.EscapedPath() && isCanonicalPath(reqPath)) {
+			return true
+		}
 	}
 	return false
 }

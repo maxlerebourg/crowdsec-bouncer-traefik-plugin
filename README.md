@@ -778,10 +778,10 @@ does not apply, while LAPI decisions (ban, captcha) still do. This differs from
 `EXCLUDE_LOCATION` in the nginx and HAProxy Lua bouncers, which skips the whole bouncer,
 and in `crowdsecMode: appsec` there is no LAPI check, so an excluded request is not
 checked at all. A request is only excluded when its path can be read one way only: no
-percent-encoding, no `.`, `..` or empty segment, no segment made only of dots, and only
-ASCII letters, digits and `-._~!$&'()+,=:@/`. So `/healthz/..;/admin`,
-`/healthz%2F..%2Fadmin` or `/healthz/%252e%252e/admin` are inspected, not excluded, with
-`sanitizePath: false` too.
+percent-encoding except `%20` for spaces, no `.`, `..` or empty segment, no segment made
+only of dots or spaces, and only ASCII letters, digits, spaces and `-._~!$&'()+,=:@/`.
+So `/healthz/..;/admin`, `/healthz%2F..%2Fadmin` or `/healthz/%252e%252e/admin` are
+inspected, not excluded, with `sanitizePath: false` too.
 
 ```yaml
 crowdsecAppsecExcludedLocations:
