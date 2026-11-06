@@ -541,7 +541,7 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 		atomic.AddInt64(&blockedRequests, 1)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 	case decision.HTTPStatus == http.StatusTooManyRequests:
-		// AppSec RateLimit() answers action "ban" with http_status 429: keep the 429.
+		// An AppSec ban with http_status 429 (RateLimit(), or SetReturnCode(429)): keep the 429.
 		bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, http.StatusTooManyRequests)
 	default:
 		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
