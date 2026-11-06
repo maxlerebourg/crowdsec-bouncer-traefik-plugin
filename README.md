@@ -441,6 +441,8 @@ make run
   - []string
   - default: []
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
+  - When set, `ForwardedHeadersCustomName` is only read from requests whose peer address is in this list; other requests are checked against their peer address. Every proxy that connects directly to Traefik must be listed.
+  - When empty, `ForwardedHeadersCustomName` is read from any peer. Only leave it empty with `X-Forwarded-For` or `X-Real-Ip`, which Traefik's entrypoint [forwarded headers](https://doc.traefik.io/traefik/routing/entrypoints/#forwarded-headers) strip from untrusted peers.
 - RedisCacheEnabled
   - bool
   - default: false

@@ -318,3 +318,38 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 
 	t.Logf("Successfully logged to file %s in common format with %d lines", logFile, len(lines))
 }
+
+func TestBouncerWarnsOnUntrustedForwardedHeader(t *testing.T) {
+	tests := []struct {
+		name       string
+		header     string
+		trustedIPs []string
+		wantWarn   bool
+	}{
+		{name: "Warn for a custom header without trusted IPs", header: "Cf-Connecting-Ip", trustedIPs: []string{}, wantWarn: true},
+		{name: "No warning for a custom header with trusted IPs", header: "Cf-Connecting-Ip", trustedIPs: []string{"173.245.48.0/20"}, wantWarn: false},
+		{name: "No warning for X-Forwarded-For without trusted IPs", header: "X-Forwarded-For", trustedIPs: []string{}, wantWarn: false},
+		{name: "No warning for x-real-ip without trusted IPs", header: "x-real-ip", trustedIPs: []string{}, wantWarn: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logFile := filepath.Join(t.TempDir(), "bouncer.log")
+			config := getTestConfig()
+			config.LogFormat = "json"
+			config.LogFilePath = logFile
+			config.ForwardedHeadersCustomName = tt.header
+			config.ForwardedHeadersTrustedIPs = tt.trustedIPs
+
+			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+			if _, err := New(context.Background(), nextHandler, config, "test-bouncer"); err != nil {
+				t.Fatalf("Failed to create bouncer: %v", err)
+			}
+
+			if gotWarn := parseLogFileAndExtractLevels(t, logFile)["WARN"]; gotWarn != tt.wantWarn {
+				t.Errorf("warning logged = %v, want %v", gotWarn, tt.wantWarn)
+			}
+		})
+	}
+}
