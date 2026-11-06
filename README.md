@@ -493,6 +493,7 @@ make run
   - int
   - default: 403
   - HTTP status code for banned user (not captcha)
+  - An AppSec `RateLimit()` block is always answered with 429, whatever this value is
 - CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
