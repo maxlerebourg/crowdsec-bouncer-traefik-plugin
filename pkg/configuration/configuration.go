@@ -70,6 +70,7 @@ type Config struct {
 	CrowdsecLapiScheme                         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                           string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiPath                           string   `json:"crowdsecLapiPath,omitempty"`
+	CrowdsecLapiOrigins                        []string `json:"crowdsecLapiOrigins,omitempty"`
 	CrowdsecLapiKey                            string   `json:"crowdsecLapiKey,omitempty"`
 	CrowdsecLapiKeyFile                        string   `json:"crowdsecLapiKeyFile,omitempty"`
 	CrowdsecLapiTLSInsecureVerify              bool     `json:"crowdsecLapiTlsInsecureVerify,omitempty"`
@@ -150,6 +151,7 @@ func New() *Config {
 		CrowdsecLapiScheme:                HTTP,
 		CrowdsecLapiHost:                  "crowdsec:8080",
 		CrowdsecLapiPath:                  "/",
+		CrowdsecLapiOrigins:               []string{},
 		CrowdsecLapiKey:                   "",
 		CrowdsecLapiTLSInsecureVerify:     false,
 		UpdateIntervalSeconds:             60,
