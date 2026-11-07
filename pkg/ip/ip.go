@@ -121,7 +121,12 @@ func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string)
 	if len(remoteIP) != 0 {
 		return remoteIP, nil
 	}
-	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
+	return GetRemoteAddrIP(req.RemoteAddr)
+}
+
+// GetRemoteAddrIP returns the IP of a host:port address, without its IPv6 zone.
+func GetRemoteAddrIP(remoteAddr string) (string, error) {
+	remoteIP, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
 		return "", fmt.Errorf("GetRemoteIP:extractIP: %w", err)
 	}
