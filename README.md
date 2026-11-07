@@ -375,8 +375,8 @@ make run
 - CrowdsecAppsecFailureBlock
   - bool
   - default: true
-  - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
-  - A status 401 (API key rejected) or any other unexpected status always blocks the request, whatever this option says, and is logged at INFO.
+  - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code), a status 401 (API key rejected) or any other unexpected status (anything but 200 and 403).
+  - A status 401 is logged at ERROR, since it comes from a misconfigured key and affects every request.
 - CrowdsecAppsecUnreachableBlock
   - bool
   - default: true
