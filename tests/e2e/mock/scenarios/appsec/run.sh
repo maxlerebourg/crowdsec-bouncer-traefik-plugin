@@ -34,11 +34,11 @@ body() {
   echo "[$SCENARIO] request http2 that send no body GET (AppSec 200)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:"
 
-  echo "[$SCENARIO] request http2 that send unreadable body GET (AppSec 403)"
-  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -d "test"
+  echo "[$SCENARIO] request http2 without content-length whose body arrives in time is inspected (AppSec 200)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -X POST -d "test"
 
-  echo "[$SCENARIO] request http2 that send unreadable body POST (AppSec 403)"
-  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -X POST -d "test"
+  echo "[$SCENARIO] request http2 without content-length whose bad body arrives in time is inspected (AppSec 403)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -X POST -d "a=0&"
 }
 
 run_scenario "$SCENARIO" "$HERE" body

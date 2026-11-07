@@ -571,6 +571,12 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 		{name: "streaming request is dropped", req: newStreamingRequest, wantErr: true},
 		// issue #351 regression: an HTTP/3 GET without content-length has no body to read, so it must not be dropped.
 		{name: "bodyless HTTP/3 GET is not dropped", req: func(done <-chan struct{}) *http.Request { return newUnreadableRequest(http.MethodGet, done) }},
+		{name: "HTTP/2 POST without content-length whose body ends in time is not dropped", req: func(_ <-chan struct{}) *http.Request {
+			req, _ := http.NewRequest(http.MethodPost, "http://localhost/repo/?create=true", io.NopCloser(strings.NewReader("a=1")))
+			req.ProtoMajor = 2
+			req.ContentLength = -1
+			return req
+		}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
