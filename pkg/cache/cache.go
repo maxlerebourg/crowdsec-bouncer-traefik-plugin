@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
@@ -26,6 +27,20 @@ const (
 	// CacheUnreachable error string when cache is unreachable.
 	CacheUnreachable = "cache:unreachable"
 )
+
+// WithOrigin adds the decision origin to a cached value.
+func WithOrigin(value, origin string) string {
+	if origin == "" {
+		return value
+	}
+	return value + "|" + origin
+}
+
+// SplitOrigin returns the remediation and the decision origin of a cached value.
+func SplitOrigin(value string) (string, string) {
+	remediation, origin, _ := strings.Cut(value, "|")
+	return remediation, origin
+}
 
 //nolint:gochecknoglobals
 var cache = ttl_map.New()

@@ -2,6 +2,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +10,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"testing/iotest"
 	"text/template"
@@ -302,7 +302,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: tt.method}
-			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST", "")
 
 			// Check status code
 			if rw.Code != http.StatusForbidden {
@@ -367,7 +367,7 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet}
-			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+			bouncer.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST", "")
 
 			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
 				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
@@ -1184,16 +1184,86 @@ func TestHandleNextServeHTTPBodyReadErrorIsNotABan(t *testing.T) {
 			}
 			req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", iotest.ErrReader(io.ErrUnexpectedEOF)).WithContext(ctx)
 			recorder := httptest.NewRecorder()
-			blockedBefore := atomic.LoadInt64(&blockedRequests)
+			blockedBefore := droppedTotal()
 
 			bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
 
 			if recorder.Code != tc.wantStatus {
 				t.Errorf("expected status %d, got %d", tc.wantStatus, recorder.Code)
 			}
-			if got := atomic.LoadInt64(&blockedRequests) - blockedBefore; got != 0 {
+			if got := droppedTotal() - blockedBefore; got != 0 {
 				t.Errorf("expected no blocked request to be counted, got %d", got)
 			}
 		})
+	}
+}
+
+func droppedTotal() int64 {
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
+	var total int64
+	for _, value := range droppedRequests {
+		total += value
+	}
+	return total
+}
+
+func Test_reportMetrics(t *testing.T) {
+	var body []byte
+	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		body, _ = io.ReadAll(req.Body)
+		rw.WriteHeader(http.StatusCreated)
+	}))
+	defer lapi.Close()
+	lapiURL, _ := url.Parse(lapi.URL)
+	bouncer := &Bouncer{
+		crowdsecScheme: "http",
+		crowdsecHost:   lapiURL.Host,
+		crowdsecPath:   "/",
+		crowdsecHeader: crowdsecLapiHeader,
+		crowdsecKey:    "test",
+		httpClient:     lapi.Client(),
+		log:            logger.New("ERROR", ""),
+	}
+
+	takeMetrics()
+	countProcessed("192.0.2.1")
+	countProcessed("2001:db8::1")
+	countDropped("lists:firehol_level1", "192.0.2.1")
+	countDropped("appsec", "2001:db8::1")
+	countDropped("", "192.0.2.1")
+	if err := reportMetrics(bouncer); err != nil {
+		t.Fatal(err)
+	}
+
+	var payload struct {
+		RemediationComponents []struct {
+			Metrics []struct {
+				Items []struct {
+					Name   string            `json:"name"`
+					Value  int64             `json:"value"`
+					Labels map[string]string `json:"labels"`
+				} `json:"items"`
+			} `json:"metrics"`
+		} `json:"remediation_components"` //nolint:tagliatelle
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]int64{}
+	for _, item := range payload.RemediationComponents[0].Metrics[0].Items {
+		got[item.Name+" "+item.Labels["origin"]+" "+item.Labels["ip_type"]] = item.Value
+	}
+	want := map[string]int64{
+		"dropped lists:firehol_level1 ipv4": 1,
+		"dropped appsec ipv6":               1,
+		"processed  ipv4":                   1,
+		"processed  ipv6":                   1,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("reported items = %v, want %v", got, want)
+	}
+	if dropped, processed := takeMetrics(); len(dropped) != 0 || len(processed) != 0 {
+		t.Errorf("counters not reset after the push: dropped=%v processed=%v", dropped, processed)
 	}
 }
