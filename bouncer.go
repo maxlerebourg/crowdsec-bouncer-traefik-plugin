@@ -678,11 +678,21 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		return cache.NoBannedValue, nil
 	}
 	var decision Decision
+	found := false
 	for _, d := range decisions {
-		decision = d
+		if isWhitelist(d) {
+			continue
+		}
+		decision, found = d, true
 		if decision.Type == "ban" {
 			break
 		}
+	}
+	if !found {
+		if isLiveMode {
+			bouncer.cacheClient.Set(remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
+		}
+		return cache.NoBannedValue, nil
 	}
 	duration, err := time.ParseDuration(decision.Duration)
 	if err != nil {
@@ -799,6 +809,11 @@ func applyStreamDecisions(bouncer *Bouncer, stream Stream, withRanges, startup b
 		ranges = ip.NewRangeSet()
 	}
 	for _, decision := range stream.Deleted {
+		if isWhitelist(decision) {
+			// Never cached, so nothing to remove; deleting the key would
+			// clear a ban another decision holds on the same value.
+			continue
+		}
 		if withRanges && isRangeScope(decision.Scope) {
 			ranges.Delete(decision.Value)
 			continue
@@ -806,6 +821,9 @@ func applyStreamDecisions(bouncer *Bouncer, stream Stream, withRanges, startup b
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	for _, decision := range stream.New {
+		if isWhitelist(decision) {
+			continue
+		}
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil && withRanges && isRangeScope(decision.Scope) {
 			if rangeErr := ranges.Add(decision.Value, remediationValue(bouncer, decision.Type), duration); rangeErr != nil {
@@ -835,6 +853,13 @@ func (bouncer *Bouncer) serveRangeDecision(rw http.ResponseWriter, req *http.Req
 	bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s range:hit remediation:%s", remoteIP, remediation))
 	bouncer.handleRemediationServeHTTP(rw, req, remoteIP, remediation)
 	return true
+}
+
+// isWhitelist reports whether a decision is an allow (type whitelist) rather
+// than a remediation. Unknown types otherwise fail closed to a ban (#403),
+// which would turn an allow into a block.
+func isWhitelist(decision Decision) bool {
+	return strings.EqualFold(decision.Type, "whitelist")
 }
 
 // isRangeScope reports whether a decision scope is CrowdSec's Range (CIDR).

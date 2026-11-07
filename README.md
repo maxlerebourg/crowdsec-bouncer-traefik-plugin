@@ -492,6 +492,8 @@ make run
   - default: false
   - Used only in `stream` mode, also enforces `Range` scope decisions (CIDR blocks, e.g. from `cscli decisions add --range` or a list import with `--scope range`). The stream is requested with `scopes=ip,range`, ranges are kept in memory and checked when the client IP itself has no decision. A ban wins over a captcha when both cover an IP.
   - Not supported with `redisCacheEnabled` (only the instance pulling the stream would hold the ranges). Without this option, `Range` decisions are not enforced in `stream` mode; `live` mode enforces them through LAPI.
+
+> Decisions of type `whitelist` are treated as an allow in every mode: they are never cached as a remediation, and removing one does not clear a ban on the same IP or range. Any other unknown type still fails closed to a ban.
   - When `true`, plugin initialization waits for Crowdsec to be ready before serving traffic.
   - **Warning**: When `false`, all requests bypass remediation until the first stream sync completes — banned IPs will be allowed through during this window. Only disable when startup availability is more important than blocking at startup.
 - DefaultDecisionSeconds
