@@ -838,8 +838,7 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 // Content-Length (typically a bidirectional gRPC stream) keeps its body open
 // for the whole life of the stream and never reaches EOF, so reading it with
 // io.ReadAll would block until the request times out and is wrongly turned into
-// a 403. This mirrors the reference lua-cs-bouncer behavior, which refuses to
-// read the body of an HTTP/2+ request that has no Content-Length.
+// a 403.
 func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
