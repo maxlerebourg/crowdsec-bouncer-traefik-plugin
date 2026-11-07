@@ -279,7 +279,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 				IdleConnTimeout:     30 * time.Second,
 				TLSClientConfig:     tlsAppsecConfig,
 			},
-			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+			Timeout: configuration.GetAppsecTimeout(config),
 		},
 		cacheClient:   &cache.Client{},
 		captchaClient: &captcha.Client{},

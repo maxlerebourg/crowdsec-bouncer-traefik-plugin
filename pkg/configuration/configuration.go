@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"time"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	location "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/location"
@@ -67,6 +68,7 @@ type Config struct {
 	CrowdsecAppsecUnreadableBodyBlock          bool     `json:"crowdsecAppsecUnreadableBodyBlock,omitempty"`
 	CrowdsecAppsecExcludedLocations            []string `json:"crowdsecAppsecExcludedLocations,omitempty"`
 	CrowdsecAppsecBodyLimit                    int64    `json:"crowdsecAppsecBodyLimit,omitempty"`
+	CrowdsecAppsecTimeoutMilliseconds          int64    `json:"crowdsecAppsecTimeoutMilliseconds,omitempty"`
 	CrowdsecLapiScheme                         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                           string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiPath                           string   `json:"crowdsecLapiPath,omitempty"`
@@ -128,6 +130,15 @@ func contains(source []string, target string) bool {
 	return false
 }
 
+// GetAppsecTimeout returns the timeout of the requests sent to the Appsec server:
+// CrowdsecAppsecTimeoutMilliseconds when set, HTTPTimeoutSeconds otherwise.
+func GetAppsecTimeout(config *Config) time.Duration {
+	if config.CrowdsecAppsecTimeoutMilliseconds > 0 {
+		return time.Duration(config.CrowdsecAppsecTimeoutMilliseconds) * time.Millisecond
+	}
+	return time.Duration(config.HTTPTimeoutSeconds) * time.Second
+}
+
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
@@ -142,6 +153,7 @@ func New() *Config {
 		CrowdsecAppsecUnreadableBodyBlock: true,
 		CrowdsecAppsecExcludedLocations:   []string{},
 		CrowdsecAppsecBodyLimit:           10485760,
+		CrowdsecAppsecTimeoutMilliseconds: 0,
 		CrowdsecAppsecScheme:              "",
 		CrowdsecAppsecHost:                "crowdsec:7422",
 		CrowdsecAppsecPath:                "/",
@@ -454,8 +466,9 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt0 := map[string]int64{
-		"CrowdsecAppsecBodyLimit":      config.CrowdsecAppsecBodyLimit,
-		"MetricsUpdateIntervalSeconds": config.MetricsUpdateIntervalSeconds,
+		"CrowdsecAppsecBodyLimit":           config.CrowdsecAppsecBodyLimit,
+		"CrowdsecAppsecTimeoutMilliseconds": config.CrowdsecAppsecTimeoutMilliseconds,
+		"MetricsUpdateIntervalSeconds":      config.MetricsUpdateIntervalSeconds,
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
