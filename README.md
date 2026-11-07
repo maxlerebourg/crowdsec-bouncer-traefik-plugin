@@ -487,6 +487,11 @@ make run
   - bool
   - default: true
   - Used only in `stream` and `alone` mode, controls whether the initial stream update runs synchronously or asynchronously during plugin initialization
+- CrowdsecStreamRanges
+  - bool
+  - default: false
+  - Used only in `stream` mode, also enforces `Range` scope decisions (CIDR blocks, e.g. from `cscli decisions add --range` or a list import with `--scope range`). The stream is requested with `scopes=ip,range`, ranges are kept in memory and checked when the client IP itself has no decision. A ban wins over a captcha when both cover an IP.
+  - Not supported with `redisCacheEnabled` (only the instance pulling the stream would hold the ranges). Without this option, `Range` decisions are not enforced in `stream` mode; `live` mode enforces them through LAPI.
   - When `true`, plugin initialization waits for Crowdsec to be ready before serving traffic.
   - **Warning**: When `false`, all requests bypass remediation until the first stream sync completes — banned IPs will be allowed through during this window. Only disable when startup availability is more important than blocking at startup.
 - DefaultDecisionSeconds
@@ -625,6 +630,7 @@ http:
           updateIntervalSeconds: 60
           updateMaxFailure: 0
           streamStartupBlock: true
+          crowdsecStreamRanges: false
           defaultDecisionSeconds: 60
           remediationStatusCode: 403
           httpTimeoutSeconds: 10

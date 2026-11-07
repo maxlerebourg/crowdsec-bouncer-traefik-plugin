@@ -96,6 +96,7 @@ type Config struct {
 	ForwardedHeadersCustomName                 string   `json:"forwardedHeadersCustomName,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                           []string `json:"clientTrustedIps,omitempty"`
+	CrowdsecStreamRanges                       bool     `json:"crowdsecStreamRanges,omitempty"`
 	RedisCacheEnabled                          bool     `json:"redisCacheEnabled,omitempty"`
 	RedisCacheHost                             string   `json:"redisCacheHost,omitempty"`
 	RedisCacheReadHosts                        []string `json:"redisCacheReadHosts,omitempty"`
@@ -174,6 +175,7 @@ func New() *Config {
 		ForwardedHeadersCustomName:        "X-Forwarded-For",
 		ForwardedHeadersTrustedIPs:        []string{},
 		ClientTrustedIPs:                  []string{},
+		CrowdsecStreamRanges:              false,
 		RedisCacheEnabled:                 false,
 		RedisCacheHost:                    "redis:6379",
 		RedisCacheReadHosts:               []string{},
@@ -486,6 +488,9 @@ func validateParamsRequired(config *Config) error {
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
 		return errors.New("CrowdsecMode: must be one of 'none', 'live', 'stream', 'alone' or 'appsec'")
 	}
+	if err := validateStreamRanges(config); err != nil {
+		return err
+	}
 	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
 		return errors.New("CrowdsecLapiScheme: must be one of 'http' or 'https'")
 	}
@@ -553,4 +558,20 @@ func GetTLSConfigCrowdsec(config *Config, log *slog.Logger, isAppsec bool) (*tls
 	}
 	prefix = "CrowdsecLapi"
 	return getTLSConfig(config, log, prefix, config.CrowdsecLapiScheme, config.CrowdsecLapiTLSInsecureVerify)
+}
+
+// validateStreamRanges checks CrowdsecStreamRanges: Range decisions are held
+// in the memory of the instance that pulls the stream, so they need stream
+// mode and the local cache (with Redis only the stream leader would hold them).
+func validateStreamRanges(config *Config) error {
+	if !config.CrowdsecStreamRanges {
+		return nil
+	}
+	if config.CrowdsecMode != StreamMode {
+		return fmt.Errorf("crowdsecStreamRanges: only supported in %s mode, got %q", StreamMode, config.CrowdsecMode)
+	}
+	if config.RedisCacheEnabled {
+		return errors.New("crowdsecStreamRanges: not supported with redisCacheEnabled")
+	}
+	return nil
 }

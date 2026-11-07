@@ -75,11 +75,15 @@ var errAppsecGetBody = errors.New("appsecQuery:GetBody")
 var (
 	isCrowdsecStreamStartup = true
 	isCrowdsecStreamHealthy = true
-	updateFailure           int64
-	streamTicker            *time.Ticker
-	metricsTicker           *time.Ticker
-	lastMetricsPush         time.Time
-	blockedRequests         int64
+	// rangeDecisions holds Range-scope decisions pulled from the stream when
+	// crowdsecStreamRanges is on. Shared like the stream ticker: one stream
+	// feeds every middleware instance.
+	rangeDecisions  = ip.NewRangeSet()
+	updateFailure   int64
+	streamTicker    *time.Ticker
+	metricsTicker   *time.Ticker
+	lastMetricsPush time.Time
+	blockedRequests int64
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -94,6 +98,7 @@ type Bouncer struct {
 	template *template.Template
 
 	enabled                   bool
+	streamRanges              bool
 	appsecEnabled             bool
 	appsecScheme              string
 	appsecHost                string
@@ -245,6 +250,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		crowdsecPassword:          config.CrowdsecCapiPassword,
 		crowdsecScenarios:         config.CrowdsecCapiScenarios,
 		updateInterval:            config.UpdateIntervalSeconds,
+		streamRanges:              config.CrowdsecStreamRanges,
 		updateMaxFailure:          config.UpdateMaxFailure,
 		remediationCustomHeader:   config.RemediationHeadersCustomName,
 		forwardedCustomHeader:     config.ForwardedHeadersCustomName,
@@ -411,6 +417,11 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 			return
 		}
+	}
+
+	// No decision on the IP itself: a Range decision may still cover it.
+	if bouncer.serveRangeDecision(rw, req, remoteIP) {
+		return
 	}
 
 	// Right here if we cannot join the stream we forbid the request to go on.
@@ -749,11 +760,18 @@ func handleStreamCache(bouncer *Bouncer) error {
 		leaseDuration = 1
 	}
 	bouncer.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
+	startup := !isCrowdsecStreamHealthy || isCrowdsecStreamStartup
+	query := fmt.Sprintf("startup=%t", startup)
+	// LAPI returns only Ip-scope decisions unless scopes is set.
+	withRanges := bouncer.streamRanges && bouncer.crowdsecMode == configuration.StreamMode
+	if withRanges {
+		query += "&scopes=ip,range"
+	}
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup),
+		RawQuery: query,
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
@@ -764,28 +782,77 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parseBody %w", err)
 	}
+	applyStreamDecisions(bouncer, stream, withRanges, startup)
+	bouncer.log.Debug("handleStreamCache:updated")
+	isCrowdsecStreamStartup = false
+	return nil
+}
+
+// applyStreamDecisions writes a stream pull into the IP cache and, with
+// crowdsecStreamRanges, the range set. Deletions run before additions so a
+// decision replaced within one pull is enforced.
+func applyStreamDecisions(bouncer *Bouncer, stream Stream, withRanges, startup bool) {
+	// A startup pull is the full decision list: build the range set from
+	// scratch so ranges deleted while the stream was down do not linger.
+	ranges := rangeDecisions
+	if withRanges && startup {
+		ranges = ip.NewRangeSet()
+	}
 	for _, decision := range stream.Deleted {
+		if withRanges && isRangeScope(decision.Scope) {
+			ranges.Delete(decision.Value)
+			continue
+		}
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
-		if err == nil {
-			var value string
-			switch decision.Type {
-			case "ban":
-				value = cache.BannedValue
-			case "captcha":
-				value = cache.CaptchaValue
-			default:
-				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
-				value = cache.BannedValue
+		if err == nil && withRanges && isRangeScope(decision.Scope) {
+			if rangeErr := ranges.Add(decision.Value, remediationValue(bouncer, decision.Type), duration); rangeErr != nil {
+				bouncer.log.Info("handleStreamCache:range " + rangeErr.Error())
 			}
-			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+			continue
+		}
+		if err == nil {
+			bouncer.cacheClient.Set(decision.Value, remediationValue(bouncer, decision.Type), int64(duration.Seconds()))
 		}
 	}
-	bouncer.log.Debug("handleStreamCache:updated")
-	isCrowdsecStreamStartup = false
-	return nil
+	if withRanges && startup {
+		rangeDecisions.Replace(ranges)
+	}
+}
+
+// serveRangeDecision answers the request when crowdsecStreamRanges is on and
+// a Range decision covers remoteIP. It reports whether it did.
+func (bouncer *Bouncer) serveRangeDecision(rw http.ResponseWriter, req *http.Request, remoteIP string) bool {
+	if !bouncer.streamRanges {
+		return false
+	}
+	remediation, inRange := rangeDecisions.Get(remoteIP)
+	if !inRange {
+		return false
+	}
+	bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s range:hit remediation:%s", remoteIP, remediation))
+	bouncer.handleRemediationServeHTTP(rw, req, remoteIP, remediation)
+	return true
+}
+
+// isRangeScope reports whether a decision scope is CrowdSec's Range (CIDR).
+func isRangeScope(scope string) bool {
+	return strings.EqualFold(scope, "range")
+}
+
+// remediationValue maps a decision type to the cache value, like the IP path.
+func remediationValue(bouncer *Bouncer, decisionType string) string {
+	switch decisionType {
+	case "ban":
+		return cache.BannedValue
+	case "captcha":
+		return cache.CaptchaValue
+	default:
+		bouncer.log.Info("handleStreamCache:unknownType " + decisionType)
+		return cache.BannedValue
+	}
 }
 
 func isReverseProxyError(statusCode int) bool {
