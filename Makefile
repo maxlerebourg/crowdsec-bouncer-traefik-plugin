@@ -1,10 +1,10 @@
-.PHONY: lint test vendor clean e2e_mock
+.PHONY: lint test vendor clean e2e e2e_mock
 
 export GO111MODULE=on
 
 # Binary/mock suite (Traefik binary + mock LAPI). This is what CI runs.
-# The local Docker suite (make e2e) lives in a separate PR/branch.
 E2E_MOCK_SCENARIOS := $(notdir $(wildcard tests/e2e/mock/scenarios/*))
+E2E_SCENARIOS := $(notdir $(wildcard tests/e2e/scenarios/*))
 
 default: lint test
 
@@ -21,6 +21,11 @@ e2e_mock: $(addprefix e2e_mock_,$(E2E_MOCK_SCENARIOS))
 
 e2e_mock_%:
 	bash ./tests/e2e/mock/scenarios/$*/run.sh
+
+e2e: $(addprefix e2e_,$(E2E_SCENARIOS))
+
+e2e_%:
+	bash ./tests/e2e/scenarios/$*/run.sh
 
 vendor:
 	go mod vendor
