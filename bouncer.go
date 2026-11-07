@@ -15,7 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"text/template"
 	"time"
 
@@ -47,6 +47,7 @@ const (
 	appsecAllowAction               = "allow"
 	appsecChallengeAction           = "challenge"
 	appsecCaptchaAction             = "captcha"
+	appsecOrigin                    = "appsec"
 	appsecChallengePathPrefix       = "/crowdsec-internal/challenge/"
 	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 	statusClientClosedRequest       = 499
@@ -79,7 +80,9 @@ var (
 	streamTicker            *time.Ticker
 	metricsTicker           *time.Ticker
 	lastMetricsPush         time.Time
-	blockedRequests         int64
+	metricsMu               sync.Mutex
+	droppedRequests         = map[string]int64{}
+	processedRequests       = map[string]int64{}
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -365,13 +368,14 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.forwardedCustomHeader)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
-		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, "")
 		return
 	}
+	countProcessed(remoteIP)
 	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
 		bouncer.log.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
-		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, "")
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
@@ -399,7 +403,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 			if cacheErrString != cache.CacheMiss {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
-				bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+				bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, "")
 				return
 			}
 		} else {
@@ -419,7 +423,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
-			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, "")
 		}
 	} else {
 		value, err := handleNoStreamCache(bouncer, remoteIP)
@@ -464,12 +468,12 @@ type Login struct {
 }
 
 // To append Headers we need to call rw.WriteHeader after set any header.
-func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string) {
-	bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, reason, bouncer.remediationStatusCode)
+func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason, origin string) {
+	bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, reason, origin, bouncer.remediationStatusCode)
 }
 
-func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string, statusCode int) {
-	atomic.AddInt64(&blockedRequests, 1)
+func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason, origin string, statusCode int) {
+	countDropped(origin, remoteIP)
 
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
@@ -499,18 +503,19 @@ func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *ht
 	}
 }
 
-func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
+func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, value string) {
+	remediation, origin := cache.SplitOrigin(value)
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}
-		atomic.AddInt64(&blockedRequests, 1) //  If we serve a captcha that should count as a dropped request.
+		countDropped(origin, remoteIP)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
-	bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonLAPI)
+	bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonLAPI, origin)
 }
 
 func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) {
@@ -545,18 +550,18 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 	case decision == nil || decision.Action == appsecAllowAction:
 		return false
 	case decision.Action == appsecChallengeAction:
-		bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
+		bouncer.handleAppsecResponseServeHTTP(rw, req, remoteIP, decision)
 	case decision.Action == appsecCaptchaAction && bouncer.captchaClient.Valid && req.Method != http.MethodHead:
 		if bouncer.captchaClient.Check(remoteIP) {
 			return false
 		}
-		atomic.AddInt64(&blockedRequests, 1)
+		countDropped(appsecOrigin, remoteIP)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 	case decision.HTTPStatus == http.StatusTooManyRequests:
 		// An AppSec ban with http_status 429 (RateLimit(), or SetReturnCode(429)): keep the 429.
-		bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, http.StatusTooManyRequests)
+		bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, appsecOrigin, http.StatusTooManyRequests)
 	default:
-		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, appsecOrigin)
 	}
 	return true
 }
@@ -564,7 +569,7 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 func (bouncer *Bouncer) handleAppsecErrorServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, err error) {
 	switch {
 	case !errors.Is(err, errAppsecGetBody):
-		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, "")
 	case req.Context().Err() != nil:
 		rw.WriteHeader(statusClientClosedRequest)
 	default:
@@ -572,9 +577,9 @@ func (bouncer *Bouncer) handleAppsecErrorServeHTTP(rw http.ResponseWriter, req *
 	}
 }
 
-func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *AppSecResponse) {
+func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, decision *AppSecResponse) {
 	if !strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) {
-		atomic.AddInt64(&blockedRequests, 1)
+		countDropped(appsecOrigin, remoteIP)
 	}
 
 	for name, values := range decision.UserHeaders {
@@ -687,6 +692,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 		value = cache.BannedValue
 	}
+	value = cache.WithOrigin(value, decisionOrigin(decision))
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
 		durationSecond := int64(duration.Seconds())
 		if bouncer.defaultDecisionTimeout < durationSecond {
@@ -780,7 +786,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 				value = cache.BannedValue
 			}
-			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+			bouncer.cacheClient.Set(decision.Value, cache.WithOrigin(value, decisionOrigin(decision)), int64(duration.Seconds()))
 		}
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
@@ -957,12 +963,78 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	}
 }
 
+func decisionOrigin(decision Decision) string {
+	if decision.Origin == "lists" && decision.Scenario != "" {
+		return "lists:" + decision.Scenario
+	}
+	return decision.Origin
+}
+
+func ipType(remoteIP string) string {
+	if strings.Contains(remoteIP, ":") {
+		return "ipv6"
+	}
+	return "ipv4"
+}
+
+func countDropped(origin, remoteIP string) {
+	if origin == "" {
+		return
+	}
+	metricsMu.Lock()
+	droppedRequests[origin+"|"+ipType(remoteIP)]++
+	metricsMu.Unlock()
+}
+
+func countProcessed(remoteIP string) {
+	metricsMu.Lock()
+	processedRequests[ipType(remoteIP)]++
+	metricsMu.Unlock()
+}
+
+func takeMetrics() (map[string]int64, map[string]int64) {
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
+	dropped, processed := droppedRequests, processedRequests
+	droppedRequests, processedRequests = map[string]int64{}, map[string]int64{}
+	return dropped, processed
+}
+
+func restoreMetrics(dropped, processed map[string]int64) {
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
+	for key, value := range dropped {
+		droppedRequests[key] += value
+	}
+	for key, value := range processed {
+		processedRequests[key] += value
+	}
+}
+
 func reportMetrics(bouncer *Bouncer) error {
 	now := time.Now()
-	currentCount := atomic.LoadInt64(&blockedRequests)
 	windowSizeSeconds := int(now.Sub(lastMetricsPush).Seconds())
+	dropped, processed := takeMetrics()
 
-	bouncer.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
+	items := []map[string]interface{}{}
+	for key, value := range dropped {
+		origin, ipVersion, _ := strings.Cut(key, "|")
+		items = append(items, map[string]interface{}{
+			"name":   "dropped",
+			"value":  value,
+			"unit":   "request",
+			"labels": map[string]string{"origin": origin, "ip_type": ipVersion},
+		})
+	}
+	for ipVersion, value := range processed {
+		items = append(items, map[string]interface{}{
+			"name":   "processed",
+			"value":  value,
+			"unit":   "request",
+			"labels": map[string]string{"ip_type": ipVersion},
+		})
+	}
+	bouncer.log.Debug(fmt.Sprintf("reportMetrics: items=%d window_size=%ds", len(items), windowSizeSeconds))
 
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{
@@ -972,16 +1044,7 @@ func reportMetrics(bouncer *Bouncer) error {
 				"name":    "traefik_plugin",
 				"metrics": []map[string]interface{}{
 					{
-						"items": []map[string]interface{}{
-							{
-								"name":  "dropped",
-								"value": currentCount,
-								"unit":  "request",
-								"labels": map[string]string{
-									"type": "traefik_plugin",
-								},
-							},
-						},
+						"items": items,
 						"meta": map[string]interface{}{
 							"window_size_seconds": windowSizeSeconds,
 							"utc_now_timestamp":   now.Unix(),
@@ -1000,6 +1063,7 @@ func reportMetrics(bouncer *Bouncer) error {
 
 	data, err := json.Marshal(metrics)
 	if err != nil {
+		restoreMetrics(dropped, processed)
 		return fmt.Errorf("reportMetrics:marshal %w", err)
 	}
 
@@ -1011,10 +1075,10 @@ func reportMetrics(bouncer *Bouncer) error {
 
 	_, err = crowdsecQuery(bouncer, metricsURL.String(), data)
 	if err != nil {
+		restoreMetrics(dropped, processed)
 		return fmt.Errorf("reportMetrics:query %w", err)
 	}
 
-	atomic.StoreInt64(&blockedRequests, 0)
 	lastMetricsPush = now
 	return nil
 }
