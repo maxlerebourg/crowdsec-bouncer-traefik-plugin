@@ -854,7 +854,7 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 // Test_appsecQuery_reusesConnection is a regression test for issue #384: the appsec response
 // body must be drained for non-200 status response so net/http can return the conn to the idle pool.
 func Test_appsecQuery_reusesConnection(t *testing.T) {
-	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
+	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError, http.StatusServiceUnavailable} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			var mu sync.Mutex
 			conns := map[string]bool{}
@@ -1193,6 +1193,51 @@ func TestHandleNextServeHTTPBodyReadErrorIsNotABan(t *testing.T) {
 			}
 			if got := atomic.LoadInt64(&blockedRequests) - blockedBefore; got != 0 {
 				t.Errorf("expected no blocked request to be counted, got %d", got)
+			}
+		})
+	}
+}
+
+func Test_appsecQuery_unreachableReason(t *testing.T) {
+	unavailable := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer unavailable.Close()
+	unavailableURL, _ := url.Parse(unavailable.URL)
+
+	tests := []struct {
+		name    string
+		host    string
+		block   bool
+		wantErr string
+	}{
+		{name: "503 blocks with its status", host: unavailableURL.Host, block: true, wantErr: "appsecQuery:unreachable statusCode:503"},
+		{name: "connection refused blocks with its cause", host: "127.0.0.1:1", block: true, wantErr: "connection refused"},
+		{name: "503 lets the request through", host: unavailableURL.Host},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bouncer := &Bouncer{
+				appsecScheme:           "http",
+				appsecHost:             tt.host,
+				appsecPath:             "/",
+				appsecUnreachableBlock: tt.block,
+				httpAppsecClient:       &http.Client{Timeout: time.Second},
+				log:                    logger.New("ERROR", ""),
+			}
+			req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+			decision, err := appsecQuery(bouncer, "1.2.3.4", req)
+			if decision != nil {
+				t.Errorf("appsecQuery() decision = %+v, want nil", decision)
+			}
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Errorf("appsecQuery() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("appsecQuery() error = %v, want it to contain %q", err, tt.wantErr)
 			}
 		})
 	}

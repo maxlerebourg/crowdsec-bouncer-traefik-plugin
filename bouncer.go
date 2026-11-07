@@ -900,8 +900,13 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpAppsecClient.Do(req)
-	if err != nil || isReverseProxyError(res.StatusCode) {
-		bouncer.log.Error("appsecQuery:unreachable")
+	if err == nil && isReverseProxyError(res.StatusCode) {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+		err = fmt.Errorf("statusCode:%d", res.StatusCode)
+	}
+	if err != nil {
+		bouncer.log.Error("appsecQuery:unreachable " + err.Error())
 		if bouncer.appsecUnreachableBlock {
 			return nil, fmt.Errorf("appsecQuery:unreachable %w", err)
 		}
