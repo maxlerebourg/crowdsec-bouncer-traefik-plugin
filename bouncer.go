@@ -466,6 +466,7 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 
 func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string, statusCode int) {
 	atomic.AddInt64(&blockedRequests, 1)
+	bouncer.logRemediation(req, remoteIP, "ban", reason)
 
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
@@ -495,6 +496,20 @@ func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *ht
 	}
 }
 
+func (bouncer *Bouncer) logRemediation(req *http.Request, remoteIP, remediation, source string) {
+	if !bouncer.log.Enabled(req.Context(), logger.LevelRemediation) {
+		return
+	}
+	bouncer.log.LogAttrs(req.Context(), logger.LevelRemediation, "remediation",
+		slog.String("ip", remoteIP),
+		slog.String("remediation", remediation),
+		slog.String("source", source),
+		slog.String("method", req.Method),
+		slog.String("host", req.Host),
+		slog.String("path", req.URL.Path),
+	)
+}
+
 func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
@@ -503,6 +518,7 @@ func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *
 			return
 		}
 		atomic.AddInt64(&blockedRequests, 1) //  If we serve a captcha that should count as a dropped request.
+		bouncer.logRemediation(req, remoteIP, "captcha", configuration.ReasonLAPI)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
@@ -533,12 +549,13 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 	case decision == nil || decision.Action == appsecAllowAction:
 		return false
 	case decision.Action == appsecChallengeAction:
-		bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
+		bouncer.handleAppsecResponseServeHTTP(rw, req, remoteIP, decision)
 	case decision.Action == appsecCaptchaAction && bouncer.captchaClient.Valid && req.Method != http.MethodHead:
 		if bouncer.captchaClient.Check(remoteIP) {
 			return false
 		}
 		atomic.AddInt64(&blockedRequests, 1)
+		bouncer.logRemediation(req, remoteIP, "captcha", configuration.ReasonAPPSEC)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 	case decision.HTTPStatus == http.StatusTooManyRequests:
 		// An AppSec ban with http_status 429 (RateLimit(), or SetReturnCode(429)): keep the 429.
@@ -560,9 +577,10 @@ func (bouncer *Bouncer) handleAppsecErrorServeHTTP(rw http.ResponseWriter, req *
 	}
 }
 
-func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *AppSecResponse) {
+func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, decision *AppSecResponse) {
 	if !strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) {
 		atomic.AddInt64(&blockedRequests, 1)
+		bouncer.logRemediation(req, remoteIP, "challenge", configuration.ReasonAPPSEC)
 	}
 
 	for name, values := range decision.UserHeaders {

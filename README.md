@@ -331,8 +331,15 @@ make run
   - Enable the plugin
 - LogLevel
   - string
-  - default: `INFO`, expected values are: `DEBUG`, `INFO`, `WARN`, `ERROR`
+  - default: `INFO`, expected values are: `DEBUG`, `REMEDIATION`, `INFO`, `WARN`, `ERROR`
   - Log are written to `stdout` / `stderr` or file if LogFilePath is provided
+  - `REMEDIATION` logs everything `INFO` does, plus one line for each request that is banned or sent a captcha or an AppSec challenge, and one for each captcha solved or failed. `INFO` output is unchanged. Expect one line per blocked request, so a flood from a banned IP produces as many lines.
+    ```
+    time=2026-10-19T12:00:00.000Z level=REMEDIATION msg=remediation component=CrowdsecBouncerTraefikPlugin ip=192.0.2.50 remediation=ban source=LAPI method=GET host=example.com path=/login
+    time=2026-10-19T12:00:05.000Z level=REMEDIATION msg="captcha solved" component=CrowdsecBouncerTraefikPlugin ip=192.0.2.51
+    ```
+    `remediation` is `ban`, `captcha` or `challenge`; `source` is `LAPI`, `APPSEC` or `TECHNICAL_ISSUE` (the request was blocked because of an error, see `ERROR` logs). The query string is never logged.
+    `source=LAPI` means CrowdSec holds a decision for this IP. `source=APPSEC` means the AppSec component blocked this request only: whether CrowdSec then bans the IP is decided by its scenarios (for example `crowdsecurity/appsec-vpatch`), and the decision shows up in `cscli decisions list`.
 - LogFormat
   - string
   - default: `common`, expected values are: `common`, `json`

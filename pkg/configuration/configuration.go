@@ -29,6 +29,7 @@ const (
 	HTTPS             = "https"
 	HTTP              = "http"
 	LogDEBUG          = "DEBUG"
+	LogREMEDIATION    = "REMEDIATION"
 	LogINFO           = "INFO"
 	LogWARN           = "WARN"
 	LogERROR          = "ERROR"
@@ -352,8 +353,8 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 
 	// Check logging configuration
 	// to upper allow of anycase of log level
-	if !contains([]string{LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
-		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogWARN, LogERROR)
+	if !contains([]string{LogDEBUG, LogREMEDIATION, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s,%s)", LogDEBUG, LogREMEDIATION, LogINFO, LogWARN, LogERROR)
 	}
 	if config.LogFilePath != "" {
 		_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)

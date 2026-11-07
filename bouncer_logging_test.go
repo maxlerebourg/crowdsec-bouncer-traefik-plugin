@@ -318,3 +318,66 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 
 	t.Logf("Successfully logged to file %s in common format with %d lines", logFile, len(lines))
 }
+
+func TestBouncerRemediationLogLevel(t *testing.T) {
+	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		_, _ = rw.Write([]byte(`[{"type":"ban","scope":"Ip","value":"192.0.2.50","duration":"1h"}]`))
+	}))
+	defer lapi.Close()
+
+	want := map[string]interface{}{"msg": "remediation", "ip": "192.0.2.50", "remediation": "ban", "source": "LAPI", "method": "GET", "host": "example.com", "path": "/test"}
+	for _, logLevel := range []string{"INFO", "REMEDIATION", "DEBUG"} {
+		t.Run(logLevel, func(t *testing.T) {
+			logFile := filepath.Join(t.TempDir(), "bouncer.log")
+			config := getTestConfig()
+			config.LogLevel = logLevel
+			config.LogFormat = "json"
+			config.LogFilePath = logFile
+			config.CrowdsecLapiHost = strings.TrimPrefix(lapi.URL, "http://")
+			handler, err := New(context.Background(), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), config, "test-bouncer")
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/test?token=secret", nil)
+			req.RemoteAddr = "192.0.2.50:1234"
+			rw := httptest.NewRecorder()
+			handler.ServeHTTP(rw, req)
+			if rw.Code != http.StatusForbidden {
+				t.Fatalf("expected a ban, got status %d", rw.Code)
+			}
+
+			content, remediations := readRemediationLines(t, logFile)
+			if logLevel == "INFO" {
+				if len(content) != 0 {
+					t.Errorf("expected no log at INFO, got %s", content)
+				}
+				return
+			}
+			if len(remediations) != 1 {
+				t.Fatalf("expected one REMEDIATION line, got %d in %s", len(remediations), content)
+			}
+			for key, value := range want {
+				if remediations[0][key] != value {
+					t.Errorf("%s = %v, want %v", key, remediations[0][key], value)
+				}
+			}
+		})
+	}
+}
+
+func readRemediationLines(t *testing.T, logFile string) ([]byte, []map[string]interface{}) {
+	t.Helper()
+	// #nosec G304 - logFile is a test-generated temporary file path
+	content, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var remediations []map[string]interface{}
+	for _, line := range strings.Split(strings.TrimSpace(string(content)), "\n") {
+		var entry map[string]interface{}
+		if json.Unmarshal([]byte(line), &entry) == nil && entry["level"] == "REMEDIATION" {
+			remediations = append(remediations, entry)
+		}
+	}
+	return content, remediations
+}
