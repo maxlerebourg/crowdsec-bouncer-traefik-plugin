@@ -854,7 +854,7 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 // Test_appsecQuery_reusesConnection is a regression test for issue #384: the appsec response
 // body must be drained for non-200 status response so net/http can return the conn to the idle pool.
 func Test_appsecQuery_reusesConnection(t *testing.T) {
-	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
+	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError, http.StatusServiceUnavailable} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			var mu sync.Mutex
 			conns := map[string]bool{}
