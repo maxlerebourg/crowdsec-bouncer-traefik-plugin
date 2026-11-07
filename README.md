@@ -318,7 +318,7 @@ make run
 >
 > If you define different caches for different middlewares, only the first one to be instantiated will be bound to the crowdsec stream.
 >
-> Overall, this middleware is designed in such a way that **only one instance of the plugin is _possible_.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, etc.). The `CrowdsecAppsec*` options are the exception: each middleware uses its own, so a router can use a middleware with `crowdsecAppsecEnabled: false` next to routers that use AppSec.
+> Overall, this middleware is designed in such a way that **only one instance of the plugin is _possible_.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, CrowdsecLapiOrigins, etc.). The `CrowdsecAppsec*` options are the exception: each middleware uses its own, so a router can use a middleware with `crowdsecAppsecEnabled: false` next to routers that use AppSec.
 
 > [!WARNING]  
 > **Appsec maximum body limit is defaulted to 10MB** > _Be careful when you upgrade to >1.4.x_
@@ -409,6 +409,11 @@ make run
   - string
   - default: "/"
   - Crowdsec LAPI Server available on this path. Will be appended to CrowdsecLapiHost. Need to finish with "/".
+- CrowdsecLapiOrigins
+  - []string
+  - default: []
+  - Only apply the LAPI decisions that come from these origins, for example `CAPI,lists` for the community blocklist and the blocklist subscriptions, or `crowdsec,cscli` for your own scenarios and manual decisions. Empty applies every origin. Not used in `alone` mode.
+  - Like `CrowdsecMode`, it must be the same in every crowdsec middleware of a Traefik instance, and in every instance that shares a Redis cache, because the decisions are cached per IP.
 - CrowdsecLapiKey
   - string
   - default: ""
