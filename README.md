@@ -878,6 +878,32 @@ The captcha and ban pages get none of your default CSP so rewrite it on your tem
 /!\ CrowdSec describes the same conflict, and how to solve it in nginx, in
 [enabling bot detection: Content-Security-Policy](https://docs.crowdsec.net/docs/appsec/bot_detection/enable#content-security-policy).
 
+#### TCP routers
+
+With a Traefik version that supports plugins in TCP middlewares (not released yet, see
+[traefik/traefik#10593](https://github.com/traefik/traefik/issues/10593)), the plugin can also protect TCP routers:
+
+```yaml
+tcp:
+  routers:
+    my-router:
+      rule: HostSNI(`*`)
+      middlewares:
+        - crowdsec
+      service: my-service
+  middlewares:
+    crowdsec:
+      plugin:
+        bouncer:
+          enabled: true
+          crowdsecMode: stream
+          crowdsecLapiKey: privateKey-foo
+```
+
+A connection from an IP with a decision is closed, and a captcha decision is handled as a ban.
+The client IP is the address of the connection, so the forwarded headers options do not apply, and neither do
+AppSec, the ban page and the usage metrics. `crowdsecMode: appsec` is refused on a TCP router.
+
 #### Manually add an IP to the blocklist (for testing purposes)
 
 ```bash
