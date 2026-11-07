@@ -35,7 +35,7 @@ Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) an
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
 
-On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
+On successful completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more information and configuration instructions.  
 The following captcha providers are supported now:
 
 - [hcaptcha](https://www.hcaptcha.com/)
@@ -57,7 +57,7 @@ The `streaming mode` is recommended for performance, decisions are updated every
 
 The cache can be local to Traefik in memory or using a separate Redis instance.
 
-Below are Mermaid diagrams detailling how each mode work:
+Below are Mermaid diagrams detailing how each mode works:
 
 <details><summary>Mode none workflow</summary>
 
@@ -548,7 +548,7 @@ For each plugin, the Traefik static configuration must define the module name (a
 
 The following declaration (given here in YAML) defines a plugin:
 
-> Note that you don't need to copy all thoses settings but only the ones you want to use.  
+> Note that you don't need to copy all those settings but only the ones you want to use.  
 > See the examples for advanced usage.
 
 ```yaml
@@ -730,7 +730,7 @@ crowdsec:
 
 Note:
 
-> Crowdsec does not require a specific format for la LAPI-key, you may use something like FIXME-LAPI-KEY but that is not recommanded for obvious reasons
+> Crowdsec does not require a specific format for the LAPI key, you may use something like FIXME-LAPI-KEY but that is not recommended for obvious reasons
 
 You can then run all the containers:
 
@@ -834,7 +834,7 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 
 ### Examples
 
-#### 1. Behind another proxy service (ex: clouflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)
+#### 1. Behind another proxy service (ex: cloudflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)
 
 #### 2. With Redis as an external shared cache [examples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/redis-cache/README.md)
 
@@ -885,7 +885,7 @@ The source code of the plugin should be organized as follows:
 ```
 
 For local development, a `docker-compose.local.yml` is provided which reproduces the directory layout needed by Traefik.  
-This works once you have generated and filled your _LAPI-KEY_ (crowdsecLapiKey), if not read above for informations.
+This works once you have generated and filled your _LAPI-KEY_ (crowdsecLapiKey), if not read above for information.
 
 ```bash
 docker compose -f docker-compose.local.yml up -d
