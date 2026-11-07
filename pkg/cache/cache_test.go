@@ -130,7 +130,7 @@ func indexOfReader(rc *redisCache, r *simpleredis.SimpleRedis) int {
 		return -1
 	}
 	for i := range rc.readers {
-		if r == &rc.readers[i] {
+		if r == rc.readers[i] {
 			return i
 		}
 	}
@@ -151,7 +151,10 @@ func Test_nextReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rc := &redisCache{log: logger.New("INFO", "")}
-			rc.readers = make([]simpleredis.SimpleRedis, tt.readers)
+			rc.readers = make([]*simpleredis.SimpleRedis, tt.readers)
+			for i := range rc.readers {
+				rc.readers[i] = &simpleredis.SimpleRedis{}
+			}
 			for call, want := range tt.want {
 				if got := indexOfReader(rc, rc.nextReader()); got != want {
 					t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d]", call, got, want)

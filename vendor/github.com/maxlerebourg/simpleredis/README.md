@@ -1,7 +1,12 @@
 # simpleredis
-Minimal go redis with only `get`, `set` and `delete` operation.  
+Minimal go redis with only `get`, `mget`, `set` and `delete` operation.  
 It supports password authentication with redis.
 With **NO** external dependencies.
+
+Connections are pooled: a command reuses an already authenticated connection when
+one is idle, so `AUTH` and `SELECT` are paid once per connection instead of once
+per command. A `SimpleRedis` is safe for concurrent use and must not be copied
+once initialized.
 
 ## Example
 ```go
@@ -11,7 +16,7 @@ var redis simpleredis.SimpleRedis
 
 redis.Init("redis:6379", "", "") // redisHost, redisPass, redisDatabase
 
-err := redis.Set("test", []bytes("whatever"), 60),  // Set key "test" with "whatever" for 60 seconds
+err := redis.Set("test", []byte("whatever"), 60) // Set key "test" with "whatever" for 60 seconds
 if err != nil {
   ...
 }
