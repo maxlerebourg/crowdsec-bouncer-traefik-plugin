@@ -858,6 +858,8 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 
 #### 12. Using Traefik with AppSec bot detection enabled [examples/bot-detection/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/bot-detection/README.md)
 
+#### 13. Using Crowdsec and Traefik in Nomad [examples/nomad/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/nomad/README.md)
+
 ### Local Mode
 
 Traefik also offers a developer mode that can be used for temporary testing of plugins not hosted on GitHub.
