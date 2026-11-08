@@ -78,7 +78,10 @@ var (
 	// rangeDecisions holds Range-scope decisions pulled from the stream when
 	// crowdsecStreamRanges is on. Shared like the stream ticker: one stream
 	// feeds every middleware instance.
-	rangeDecisions  = ip.NewRangeSet()
+	rangeDecisions = ip.NewRangeSet()
+	// allowDecisions holds Ip-scope whitelist decisions under the same option:
+	// they exempt an IP from rangeDecisions (not from its own Ip decisions).
+	allowDecisions  = ip.NewAllowSet()
 	updateFailure   int64
 	streamTicker    *time.Ticker
 	metricsTicker   *time.Ticker
@@ -804,14 +807,16 @@ func handleStreamCache(bouncer *Bouncer) error {
 func applyStreamDecisions(bouncer *Bouncer, stream Stream, withRanges, startup bool) {
 	// A startup pull is the full decision list: build the range set from
 	// scratch so ranges deleted while the stream was down do not linger.
-	ranges := rangeDecisions
+	ranges, allows := rangeDecisions, allowDecisions
 	if withRanges && startup {
-		ranges = ip.NewRangeSet()
+		ranges, allows = ip.NewRangeSet(), ip.NewAllowSet()
 	}
 	for _, decision := range stream.Deleted {
 		if isWhitelist(decision) {
 			// Never cached, so nothing to remove; deleting the key would
-			// clear a ban another decision holds on the same value.
+			// clear a ban another decision holds on the same value. An allow
+			// in allowDecisions lapses at its own expiry: the stream does not
+			// say which of several stacked whitelists on an IP went away.
 			continue
 		}
 		if withRanges && isRangeScope(decision.Scope) {
@@ -821,22 +826,28 @@ func applyStreamDecisions(bouncer *Bouncer, stream Stream, withRanges, startup b
 		bouncer.cacheClient.Delete(decision.Value)
 	}
 	for _, decision := range stream.New {
-		if isWhitelist(decision) {
+		duration, err := time.ParseDuration(decision.Duration)
+		if err != nil {
 			continue
 		}
-		duration, err := time.ParseDuration(decision.Duration)
-		if err == nil && withRanges && isRangeScope(decision.Scope) {
+		switch {
+		case isWhitelist(decision):
+			// Only meaningful against ranges: an Ip whitelist never clears the
+			// IP's own ban, and range-scope allows are not supported.
+			if withRanges && !isRangeScope(decision.Scope) {
+				allows.Add(decision.Value, duration)
+			}
+		case withRanges && isRangeScope(decision.Scope):
 			if rangeErr := ranges.Add(decision.Value, remediationValue(bouncer, decision.Type), duration); rangeErr != nil {
 				bouncer.log.Info("handleStreamCache:range " + rangeErr.Error())
 			}
-			continue
-		}
-		if err == nil {
+		default:
 			bouncer.cacheClient.Set(decision.Value, remediationValue(bouncer, decision.Type), int64(duration.Seconds()))
 		}
 	}
 	if withRanges && startup {
 		rangeDecisions.Replace(ranges)
+		allowDecisions.Replace(allows)
 	}
 }
 
@@ -848,6 +859,10 @@ func (bouncer *Bouncer) serveRangeDecision(rw http.ResponseWriter, req *http.Req
 	}
 	remediation, inRange := rangeDecisions.Get(remoteIP)
 	if !inRange {
+		return false
+	}
+	if allowDecisions.Has(remoteIP) {
+		bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s range:hit allowed:whitelist", remoteIP))
 		return false
 	}
 	bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s range:hit remediation:%s", remoteIP, remediation))

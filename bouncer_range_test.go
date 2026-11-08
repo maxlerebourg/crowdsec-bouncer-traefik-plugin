@@ -51,7 +51,11 @@ func newRangeStreamBouncer(t *testing.T, ranges bool, body string, gotQuery *ato
 	clearKeys()
 	t.Cleanup(clearKeys)
 	rangeDecisions.Replace(ip.NewRangeSet())
-	t.Cleanup(func() { rangeDecisions.Replace(ip.NewRangeSet()) })
+	allowDecisions.Replace(ip.NewAllowSet())
+	t.Cleanup(func() {
+		rangeDecisions.Replace(ip.NewRangeSet())
+		allowDecisions.Replace(ip.NewAllowSet())
+	})
 	return &Bouncer{
 		crowdsecScheme:      serverURL.Scheme,
 		crowdsecHost:        serverURL.Host,

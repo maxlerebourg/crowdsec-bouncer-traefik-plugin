@@ -9,7 +9,9 @@ import (
 	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -84,5 +86,82 @@ func TestHandleNoStreamCacheWhitelist(t *testing.T) {
 				t.Fatalf("value = %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+// TestStreamWhitelistOverridesRange: a verified crawler whose IP sits in a
+// banned range is allowed by its own Ip-scope whitelist decision, while an
+// Ip ban next to a whitelist still bans and other range members stay blocked.
+// A whitelist deletion is ignored: the entry lapses at its own expiry.
+func TestStreamWhitelistOverridesRange(t *testing.T) {
+	var q atomic.Value
+	bouncer := newRangeStreamBouncer(t, true, `{
+		"deleted": [{"type": "whitelist", "scope": "Ip", "value": "203.0.113.11", "duration": "-1s"}],
+		"new": [
+			{"type": "ban", "scope": "Range", "value": "203.0.113.0/24", "duration": "1h"},
+			{"type": "whitelist", "scope": "Ip", "value": "203.0.113.9", "duration": "6h"},
+			{"type": "whitelist", "scope": "Ip", "value": "203.0.113.11", "duration": "6h"},
+			{"type": "whitelist", "scope": "Ip", "value": "203.0.113.10", "duration": "6h"},
+			{"type": "ban", "scope": "Ip", "value": "203.0.113.10", "duration": "1h"}
+		]
+	}`, &q)
+	for _, k := range []string{"203.0.113.9", "203.0.113.10", "203.0.113.11", "203.0.113.12"} {
+		bouncer.cacheClient.Delete(k)
+	}
+	t.Cleanup(func() {
+		for _, k := range []string{"203.0.113.9", "203.0.113.10", "203.0.113.11", "203.0.113.12"} {
+			bouncer.cacheClient.Delete(k)
+		}
+	})
+	isCrowdsecStreamStartup = false
+	t.Cleanup(func() { isCrowdsecStreamStartup = true })
+	if err := handleStreamCache(bouncer); err != nil {
+		t.Fatalf("handleStreamCache: %v", err)
+	}
+
+	checker, err := ip.NewChecker(bouncer.log, []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bouncer.next = http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})
+	bouncer.enabled = true
+	bouncer.serverPoolStrategy = &ip.PoolStrategy{Checker: checker}
+	bouncer.clientPoolStrategy = &ip.PoolStrategy{Checker: checker}
+	bouncer.captchaClient = &captcha.Client{}
+	bouncer.remediationStatusCode = http.StatusForbidden
+	bouncer.banTemplateContentType = "text/html"
+
+	for _, c := range []struct {
+		remote string
+		want   int
+	}{
+		{"203.0.113.9:4000", http.StatusOK},         // whitelisted inside the range
+		{"203.0.113.11:4000", http.StatusOK},        // deletion ignored until expiry
+		{"203.0.113.10:4000", http.StatusForbidden}, // its own Ip ban still bans
+		{"203.0.113.12:4000", http.StatusForbidden}, // rest of the range blocked
+	} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://example.test/", nil)
+		req.RemoteAddr = c.remote
+		bouncer.ServeHTTP(rec, req)
+		if rec.Code != c.want {
+			t.Errorf("%s: status %d, want %d", c.remote, rec.Code, c.want)
+		}
+	}
+}
+
+// TestStreamWhitelistStartupResync: a startup pull is the full list, so a
+// whitelist that is gone from it no longer overrides a range.
+func TestStreamWhitelistStartupResync(t *testing.T) {
+	var q atomic.Value
+	bouncer := newRangeStreamBouncer(t, true, `{"deleted": [], "new": [
+		{"type": "ban", "scope": "Range", "value": "203.0.113.0/24", "duration": "1h"}]}`, &q)
+	allowDecisions.Add("203.0.113.9", time.Hour)
+	isCrowdsecStreamStartup = true
+	if err := handleStreamCache(bouncer); err != nil {
+		t.Fatalf("handleStreamCache: %v", err)
+	}
+	if allowDecisions.Has("203.0.113.9") {
+		t.Fatal("stale whitelist survived the startup resync")
 	}
 }
