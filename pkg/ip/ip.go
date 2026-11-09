@@ -103,7 +103,7 @@ func (s *PoolStrategy) getIP(req *http.Request, customHeader string) string {
 	xffs := strings.Split(xff, ",")
 
 	for i := len(xffs) - 1; i >= 0; i-- {
-		xffTrimmed := strings.TrimSpace(xffs[i])
+		xffTrimmed := removeIPv6Zone(strings.TrimSpace(xffs[i]))
 		if len(xffTrimmed) == 0 {
 			continue
 		}
@@ -125,5 +125,12 @@ func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string)
 	if err != nil {
 		return "", fmt.Errorf("GetRemoteIP:extractIP: %w", err)
 	}
-	return remoteIP, nil
+	return removeIPv6Zone(remoteIP), nil
+}
+
+func removeIPv6Zone(addr string) string {
+	if before, _, found := strings.Cut(addr, "%"); found {
+		return before
+	}
+	return addr
 }

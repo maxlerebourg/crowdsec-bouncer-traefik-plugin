@@ -737,6 +737,33 @@ func serveAppsecEnvelope(t *testing.T, envelope string, recorder *httptest.Respo
 	return nextCalled
 }
 
+// AppSec RateLimit() sends {"action":"ban","http_status":429}; the client must see 429, not 403.
+func TestHandleNextServeHTTPAppsecBanKeepsStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		envelope string
+		want     int
+	}{
+		{name: "rate limit", envelope: `{"action":"ban","http_status":429}`, want: http.StatusTooManyRequests},
+		{name: "plain ban", envelope: `{"action":"ban","http_status":403}`, want: http.StatusForbidden},
+		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, want: http.StatusForbidden},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			if serveAppsecEnvelope(t, tt.envelope, recorder) {
+				t.Fatal("next handler should not be called for an appsec ban")
+			}
+			if recorder.Code != tt.want {
+				t.Fatalf("expected status %d, got %d", tt.want, recorder.Code)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+				t.Fatalf("expected remediation header ban, got %q", got)
+			}
+		})
+	}
+}
+
 func TestHandleNextServeHTTPAppsecChallengeWithoutBodyFallsBackToBan(t *testing.T) {
 	tests := []struct {
 		name     string
