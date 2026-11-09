@@ -437,10 +437,10 @@ make run
   - string
   - default: ""
   - Name of the header you want in response when request are handled by plugin (possible value of the header `ban`, `challenge`, `captcha` or `solved-captcha`)
-- RemediationCaptchaAction
-  - string
-  - default: "captcha"
-  - What this middleware does with a `captcha` decision from the LAPI: `captcha` serves the captcha, or bans when no `CaptchaProvider` is set; `continue` skips it and carries on to AppSec, when enabled, then to the service. `ban` decisions are always enforced. It is read per middleware, so a middleware on API routes can use `continue` while another one serves captchas.
+- RemediationCaptchaContinue
+  - bool
+  - default: false
+  - When `true`, this middleware skips a `captcha` decision from the LAPI and carries on to AppSec, when enabled, then to the service. When `false`, it serves the captcha, or bans when no `CaptchaProvider` is set. `ban` decisions are always enforced. It is read per middleware, so a middleware on API routes can continue while another one serves captchas.
 - ForwardedHeadersCustomName
   - string
   - default: "X-Forwarded-For"

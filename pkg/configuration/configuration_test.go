@@ -106,10 +106,6 @@ func Test_ValidateParams(t *testing.T) {
 	cfg9.LogLevel = "info"
 	cfg10 := getMinimalConfig()
 	cfg10.LogLevel = "Warning"
-	cfg11 := getMinimalConfig()
-	cfg11.RemediationCaptchaAction = ContinueAction
-	cfg12 := getMinimalConfig()
-	cfg12.RemediationCaptchaAction = "allow"
 	type args struct {
 		config *Config
 	}
@@ -131,8 +127,6 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Valid log level uppercase INFO", args: args{config: cfg8}, wantErr: false},
 		{name: "Valid log level lowercase info", args: args{config: cfg9}, wantErr: false},
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
-		{name: "Valid captcha remediation action continue", args: args{config: cfg11}, wantErr: false},
-		{name: "Invalid captcha remediation action", args: args{config: cfg12}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
