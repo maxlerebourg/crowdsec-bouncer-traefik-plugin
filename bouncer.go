@@ -178,7 +178,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 		apiAppsecKey, errAppsecKey := configuration.GetVariable(config, "CrowdsecAppsecKey")
 		if errAppsecKey != nil && len(tlsAppsecConfig.Certificates) == 0 {
-			log.Info("New:crowdsecLapiKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
+			log.Warn("New:crowdsecLapiKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
 		}
 		config.CrowdsecAppsecKey = apiAppsecKey
 	}
@@ -501,10 +501,10 @@ func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *ht
 }
 
 func (bouncer *Bouncer) logRemediation(req *http.Request, remoteIP, remediation, source string) {
-	if !bouncer.log.Enabled(req.Context(), logger.LevelRemediation) {
+	if !bouncer.log.Enabled(req.Context(), slog.LevelInfo) {
 		return
 	}
-	bouncer.log.LogAttrs(req.Context(), logger.LevelRemediation, "remediation",
+	bouncer.log.LogAttrs(req.Context(), slog.LevelInfo, "remediation",
 		slog.String("ip", remoteIP),
 		slog.String("remediation", remediation),
 		slog.String("source", source),
@@ -702,7 +702,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	case "captcha":
 		value = cache.CaptchaValue
 	default:
-		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
+		bouncer.log.Warn("handleStreamCache:unknownType " + decision.Type)
 		value = cache.BannedValue
 	}
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
@@ -795,7 +795,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 			case "captcha":
 				value = cache.CaptchaValue
 			default:
-				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
+				bouncer.log.Warn("handleStreamCache:unknownType " + decision.Type)
 				value = cache.BannedValue
 			}
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
@@ -937,7 +937,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	}()
 	switch res.StatusCode {
 	case http.StatusInternalServerError:
-		bouncer.log.Info("appsecQuery:failure")
+		bouncer.log.Error("appsecQuery:failure")
 		if bouncer.appsecFailureBlock {
 			return nil, errors.New("appsecQuery:failure statusCode:500")
 		}
@@ -970,7 +970,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		}
 		return &decision, nil
 	default:
-		bouncer.log.Info(fmt.Sprintf("appsecQuery:unexpectedStatus statusCode:%d", res.StatusCode))
+		bouncer.log.Error(fmt.Sprintf("appsecQuery:unexpectedStatus statusCode:%d", res.StatusCode))
 		return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
 	}
 }
