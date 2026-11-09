@@ -17,6 +17,7 @@ import (
 	"text/template"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	location "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/location"
 )
 
 // Enums for crowdsec mode.
@@ -65,6 +66,7 @@ type Config struct {
 	CrowdsecAppsecFailureBlock                 bool     `json:"crowdsecAppsecFailureBlock,omitempty"`
 	CrowdsecAppsecUnreachableBlock             bool     `json:"crowdsecAppsecUnreachableBlock,omitempty"`
 	CrowdsecAppsecUnreadableBodyBlock          bool     `json:"crowdsecAppsecUnreadableBodyBlock,omitempty"`
+	CrowdsecAppsecExcludedLocations            []string `json:"crowdsecAppsecExcludedLocations,omitempty"`
 	CrowdsecAppsecBodyLimit                    int64    `json:"crowdsecAppsecBodyLimit,omitempty"`
 	CrowdsecLapiScheme                         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                           string   `json:"crowdsecLapiHost,omitempty"`
@@ -139,6 +141,7 @@ func New() *Config {
 		CrowdsecAppsecFailureBlock:        true,
 		CrowdsecAppsecUnreachableBlock:    true,
 		CrowdsecAppsecUnreadableBodyBlock: true,
+		CrowdsecAppsecExcludedLocations:   []string{},
 		CrowdsecAppsecBodyLimit:           10485760,
 		CrowdsecAppsecScheme:              "",
 		CrowdsecAppsecHost:                "crowdsec:7422",
@@ -261,10 +264,7 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	if err := validateParamsIPs(log, config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
-		return err
-	}
-	if err := validateParamsIPs(log, config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
+	if err := validateParamsLists(log, config); err != nil {
 		return err
 	}
 
@@ -399,6 +399,19 @@ func validateParamsTLS(config *Config) error {
 	tlsConfig.RootCAs = x509.NewCertPool()
 	if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuth)) {
 		return errors.New("failed parsing pem file")
+	}
+	return nil
+}
+
+func validateParamsLists(log *slog.Logger, config *Config) error {
+	if err := validateParamsIPs(log, config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
+		return err
+	}
+	if err := validateParamsIPs(log, config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
+		return err
+	}
+	if _, err := location.NewMatcher(config.CrowdsecAppsecExcludedLocations); err != nil {
+		return fmt.Errorf("CrowdsecAppsecExcludedLocations: %w", err)
 	}
 	return nil
 }
