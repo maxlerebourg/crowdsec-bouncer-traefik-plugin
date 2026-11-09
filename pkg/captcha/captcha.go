@@ -89,18 +89,22 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
 	valid, err := c.Validate(r)
 	if err != nil {
-		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
+		c.log.Error("captcha:ServeHTTP:validate " + err.Error())
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
+		c.log.LogAttrs(r.Context(), slog.LevelInfo, "captcha solved", slog.String("ip", remoteIP))
 		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
 		if c.remediationCustomHeader != "" {
 			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
 		}
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
+	}
+	if r.Method == http.MethodPost && r.PostForm.Get(c.infoProvider.response) != "" {
+		c.log.LogAttrs(r.Context(), slog.LevelInfo, "captcha failed", slog.String("ip", remoteIP))
 	}
 	rw.Header().Set("Content-Type", c.templateContentType)
 	if c.remediationCustomHeader != "" {
@@ -113,7 +117,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		"FrontendKey": c.infoProvider.key,
 	})
 	if err != nil {
-		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
+		c.log.Warn("captcha:ServeHTTP captchaTemplateServe " + err.Error())
 	}
 }
 

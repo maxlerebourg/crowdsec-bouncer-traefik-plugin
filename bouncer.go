@@ -178,7 +178,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		}
 		apiAppsecKey, errAppsecKey := configuration.GetVariable(config, "CrowdsecAppsecKey")
 		if errAppsecKey != nil && len(tlsAppsecConfig.Certificates) == 0 {
-			log.Info("New:crowdsecLapiKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
+			log.Warn("New:crowdsecLapiKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
 		}
 		config.CrowdsecAppsecKey = apiAppsecKey
 	}
@@ -470,6 +470,7 @@ func (bouncer *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Req
 
 func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string, statusCode int) {
 	atomic.AddInt64(&blockedRequests, 1)
+	bouncer.logRemediation(req, remoteIP, "ban", reason)
 
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
@@ -499,6 +500,20 @@ func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *ht
 	}
 }
 
+func (bouncer *Bouncer) logRemediation(req *http.Request, remoteIP, remediation, source string) {
+	if !bouncer.log.Enabled(req.Context(), slog.LevelInfo) {
+		return
+	}
+	bouncer.log.LogAttrs(req.Context(), slog.LevelInfo, "remediation",
+		slog.String("ip", remoteIP),
+		slog.String("remediation", remediation),
+		slog.String("source", source),
+		slog.String("method", req.Method),
+		slog.String("host", req.Host),
+		slog.String("path", req.URL.Path),
+	)
+}
+
 func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
@@ -507,6 +522,7 @@ func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *
 			return
 		}
 		atomic.AddInt64(&blockedRequests, 1) //  If we serve a captcha that should count as a dropped request.
+		bouncer.logRemediation(req, remoteIP, "captcha", configuration.ReasonLAPI)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
@@ -545,12 +561,13 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 	case decision == nil || decision.Action == appsecAllowAction:
 		return false
 	case decision.Action == appsecChallengeAction:
-		bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
+		bouncer.handleAppsecResponseServeHTTP(rw, req, remoteIP, decision)
 	case decision.Action == appsecCaptchaAction && bouncer.captchaClient.Valid && req.Method != http.MethodHead:
 		if bouncer.captchaClient.Check(remoteIP) {
 			return false
 		}
 		atomic.AddInt64(&blockedRequests, 1)
+		bouncer.logRemediation(req, remoteIP, "captcha", configuration.ReasonAPPSEC)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 	case decision.HTTPStatus == http.StatusTooManyRequests:
 		// An AppSec ban with http_status 429 (RateLimit(), or SetReturnCode(429)): keep the 429.
@@ -572,9 +589,10 @@ func (bouncer *Bouncer) handleAppsecErrorServeHTTP(rw http.ResponseWriter, req *
 	}
 }
 
-func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *AppSecResponse) {
+func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, decision *AppSecResponse) {
 	if !strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) {
 		atomic.AddInt64(&blockedRequests, 1)
+		bouncer.logRemediation(req, remoteIP, "challenge", configuration.ReasonAPPSEC)
 	}
 
 	for name, values := range decision.UserHeaders {
@@ -684,7 +702,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	case "captcha":
 		value = cache.CaptchaValue
 	default:
-		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
+		bouncer.log.Warn("handleStreamCache:unknownType " + decision.Type)
 		value = cache.BannedValue
 	}
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
@@ -777,7 +795,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 			case "captcha":
 				value = cache.CaptchaValue
 			default:
-				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
+				bouncer.log.Warn("handleStreamCache:unknownType " + decision.Type)
 				value = cache.BannedValue
 			}
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
@@ -919,7 +937,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	}()
 	switch res.StatusCode {
 	case http.StatusInternalServerError:
-		bouncer.log.Info("appsecQuery:failure")
+		bouncer.log.Error("appsecQuery:failure")
 		if bouncer.appsecFailureBlock {
 			return nil, errors.New("appsecQuery:failure statusCode:500")
 		}
@@ -952,7 +970,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		}
 		return &decision, nil
 	default:
-		bouncer.log.Info(fmt.Sprintf("appsecQuery:unexpectedStatus statusCode:%d", res.StatusCode))
+		bouncer.log.Error(fmt.Sprintf("appsecQuery:unexpectedStatus statusCode:%d", res.StatusCode))
 		return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
 	}
 }
