@@ -1,18 +1,30 @@
-image:
-  tag: v3.7.13
-
-logs:
-  general:
-    level: DEBUG
-  access:
-    enabled: true
-    format: json
-    fields:
-      headers: 
-        defaultmode: keep
-
 experimental:
   plugins:
     bouncer:
-      moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      version: "v1.7.1"
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: "v1.8.1"
+
+volumes:
+  - name: crowdsec-bouncer-key
+    mountPath: /etc/traefik/crowdsec
+    type: secret
+
+log:
+  level: INFO
+
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        User-Agent: keep
+
+ingressRoute:
+  dashboard:
+    enabled: true
+
+service:
+  spec:
+    externalTrafficPolicy: Local
