@@ -2,6 +2,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -636,6 +637,41 @@ func Test_appsecQuery_oversizedResponse(t *testing.T) {
 				t.Fatalf("appsecQuery() returned decision: %v", decision)
 			}
 		})
+	}
+}
+
+func Test_appsecQuery_failureStatuses(t *testing.T) {
+	statuses := []int{http.StatusUnauthorized, http.StatusNotFound, http.StatusInternalServerError, http.StatusNotImplemented}
+	for _, status := range statuses {
+		for _, failureBlock := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%d failureBlock=%t", status, failureBlock), func(t *testing.T) {
+				appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+					rw.WriteHeader(status)
+				}))
+				defer appsecServer.Close()
+
+				appsecURL, _ := url.Parse(appsecServer.URL)
+				bouncer := &Bouncer{
+					appsecScheme:       appsecURL.Scheme,
+					appsecHost:         appsecURL.Host,
+					appsecPath:         "/",
+					appsecFailureBlock: failureBlock,
+					httpAppsecClient:   appsecServer.Client(),
+					log:                logger.New("ERROR", ""),
+				}
+
+				decision, err := appsecQuery(bouncer, "1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
+				if failureBlock && err == nil {
+					t.Fatal("appsecQuery() expected error, got nil")
+				}
+				if !failureBlock && err != nil {
+					t.Fatalf("appsecQuery() returned error: %v", err)
+				}
+				if decision != nil {
+					t.Fatalf("appsecQuery() returned decision: %v", decision)
+				}
+			})
+		}
 	}
 }
 

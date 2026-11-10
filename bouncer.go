@@ -918,12 +918,6 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		}
 	}()
 	switch res.StatusCode {
-	case http.StatusInternalServerError:
-		bouncer.log.Info("appsecQuery:failure")
-		if bouncer.appsecFailureBlock {
-			return nil, errors.New("appsecQuery:failure statusCode:500")
-		}
-		return nil, nil
 	case http.StatusOK:
 		return nil, nil
 	case http.StatusForbidden:
@@ -953,7 +947,10 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		return &decision, nil
 	default:
 		bouncer.log.Info(fmt.Sprintf("appsecQuery:unexpectedStatus statusCode:%d", res.StatusCode))
-		return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
+		if bouncer.appsecFailureBlock {
+			return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
+		}
+		return nil, nil
 	}
 }
 
