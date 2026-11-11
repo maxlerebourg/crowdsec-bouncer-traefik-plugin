@@ -249,7 +249,7 @@ func Test_crowdsecQuery_returnsBody(t *testing.T) {
 
 func Test_crowdsecQuery_reverseProxyStatuses(t *testing.T) {
 	for _, status := range []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
-		t.Run(fmt.Sprintf("%d", status), func(t *testing.T) {
+		t.Run(http.StatusText(status), func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 				rw.WriteHeader(status)
 				_, _ = io.WriteString(rw, "proxy error")
