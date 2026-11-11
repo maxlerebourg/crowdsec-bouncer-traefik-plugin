@@ -107,6 +107,7 @@ type Bouncer struct {
 	crowdsecScheme            string
 	crowdsecHost              string
 	crowdsecPath              string
+	crowdsecOrigins           []string
 	crowdsecKey               string
 	crowdsecMode              string
 	crowdsecMachineID         string
@@ -240,6 +241,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		crowdsecScheme:            config.CrowdsecLapiScheme,
 		crowdsecHost:              config.CrowdsecLapiHost,
 		crowdsecPath:              config.CrowdsecLapiPath,
+		crowdsecOrigins:           trimOrigins(config.CrowdsecLapiOrigins),
 		crowdsecKey:               config.CrowdsecLapiKey,
 		crowdsecMachineID:         config.CrowdsecCapiMachineID,
 		crowdsecPassword:          config.CrowdsecCapiPassword,
@@ -631,6 +633,23 @@ func runTicker(ticks <-chan time.Time, work func()) {
 	}
 }
 
+func trimOrigins(origins []string) []string {
+	var trimmed []string
+	for _, origin := range origins {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			trimmed = append(trimmed, origin)
+		}
+	}
+	return trimmed
+}
+
+func (bouncer *Bouncer) originsQuery() string {
+	if len(bouncer.crowdsecOrigins) == 0 || bouncer.crowdsecMode == configuration.AloneMode {
+		return ""
+	}
+	return "&origins=" + url.QueryEscape(strings.Join(bouncer.crowdsecOrigins, ","))
+}
+
 // We are now in none or live mode.
 func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	isLiveMode := bouncer.crowdsecMode == configuration.LiveMode
@@ -638,7 +657,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + crowdsecLapiRoute,
-		RawQuery: fmt.Sprintf("ip=%v", remoteIP),
+		RawQuery: fmt.Sprintf("ip=%v", remoteIP) + bouncer.originsQuery(),
 	}
 	body, err := crowdsecQuery(bouncer, routeURL.String(), nil)
 	if err != nil {
@@ -753,7 +772,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
 		Path:     bouncer.crowdsecPath + bouncer.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup),
+		RawQuery: fmt.Sprintf("startup=%t", !isCrowdsecStreamHealthy || isCrowdsecStreamStartup) + bouncer.originsQuery(),
 	}
 	body, err := crowdsecQuery(bouncer, streamRouteURL.String(), nil)
 	if err != nil {
