@@ -909,7 +909,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 
 	res, err := bouncer.httpAppsecClient.Do(req)
 	if err != nil {
-		bouncer.log.Error("appsecQuery:unreachable")
+		bouncer.log.Error("appsecQuery:unreachable " + err.Error())
 		if bouncer.appsecUnreachableBlock {
 			return nil, fmt.Errorf("appsecQuery:unreachable %w", err)
 		}
