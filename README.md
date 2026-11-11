@@ -388,7 +388,7 @@ make run
 - CrowdsecAppsecUnreadableBodyBlock
   - bool
   - default: true
-  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. Mirrors the reference bouncers' `APPSEC_DROP_UNREADABLE_BODY` option.
+  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. The lua bouncer differs: since crowdsecurity/lua-cs-bouncer#163 it reads such bodies, only treats gRPC bodies as unreadable, and its `APPSEC_DROP_UNREADABLE_BODY` defaults to `false`.
 - CrowdsecAppsecExcludedLocations
   - []string
   - default: []

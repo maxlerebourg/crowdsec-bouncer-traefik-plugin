@@ -615,7 +615,7 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 
 // Test_appsecQuery_dropUnreadableBody verifies that, when configured to do so,
 // a request with an unreadable body is dropped (blocked) instead of forwarded
-// without its body, mirroring the reference APPSEC_DROP_UNREADABLE_BODY option.
+// without its body.
 func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
