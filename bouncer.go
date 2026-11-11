@@ -805,14 +805,22 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpClient.Do(req)
-	if err != nil || isReverseProxyError(res.StatusCode) {
+	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
 	}
 	defer func() {
-		if err = res.Body.Close(); err != nil {
-			bouncer.log.Error("crowdsecQuery:closeBody " + err.Error())
+		// net/http returns a conn to the idle pool once its body has been read to EOF, closing early discards it.
+		// Drain the body from the non-200 paths, which return earlier, keep their connections too.
+		if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
+			bouncer.log.Debug("crowdsecQuery:drainBody " + errDrain.Error())
+		}
+		if errClose := res.Body.Close(); errClose != nil {
+			bouncer.log.Error("crowdsecQuery:closeBody " + errClose.Error())
 		}
 	}()
+	if isReverseProxyError(res.StatusCode) {
+		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s statusCode:%d", stringURL, res.StatusCode)
+	}
 	if res.StatusCode == http.StatusUnauthorized && bouncer.crowdsecMode == configuration.AloneMode {
 		if errToken := getToken(bouncer); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
@@ -900,11 +908,6 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+pluginVersion)
 
 	res, err := bouncer.httpAppsecClient.Do(req)
-	if err == nil && isReverseProxyError(res.StatusCode) {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-		err = fmt.Errorf("statusCode:%d", res.StatusCode)
-	}
 	if err != nil {
 		bouncer.log.Error("appsecQuery:unreachable " + err.Error())
 		if bouncer.appsecUnreachableBlock {
@@ -922,13 +925,14 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 			bouncer.log.Error("appsecQuery:closeBody " + errClose.Error())
 		}
 	}()
-	switch res.StatusCode {
-	case http.StatusInternalServerError:
-		bouncer.log.Info("appsecQuery:failure")
-		if bouncer.appsecFailureBlock {
-			return nil, errors.New("appsecQuery:failure statusCode:500")
+	if isReverseProxyError(res.StatusCode) {
+		bouncer.log.Error(fmt.Sprintf("appsecQuery:unreachable statusCode:%d", res.StatusCode))
+		if bouncer.appsecUnreachableBlock {
+			return nil, fmt.Errorf("appsecQuery:unreachable statusCode:%d", res.StatusCode)
 		}
 		return nil, nil
+	}
+	switch res.StatusCode {
 	case http.StatusOK:
 		return nil, nil
 	case http.StatusForbidden:
@@ -958,7 +962,10 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		return &decision, nil
 	default:
 		bouncer.log.Info(fmt.Sprintf("appsecQuery:unexpectedStatus statusCode:%d", res.StatusCode))
-		return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
+		if bouncer.appsecFailureBlock {
+			return nil, fmt.Errorf("appsecQuery: statusCode:%d", res.StatusCode)
+		}
+		return nil, nil
 	}
 }
 
