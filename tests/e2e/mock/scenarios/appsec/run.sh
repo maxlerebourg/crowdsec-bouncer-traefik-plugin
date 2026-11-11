@@ -34,11 +34,14 @@ body() {
   echo "[$SCENARIO] request http2 that send no body GET (AppSec 200)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:"
 
-  echo "[$SCENARIO] request http2 that send unreadable body GET (AppSec 403)"
-  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -d "test"
+  echo "[$SCENARIO] request http2 that send empty body POST without Content-Length (AppSec 200)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -H "Content-Type: binary/octet-stream" -X POST -d ""
 
-  echo "[$SCENARIO] request http2 that send unreadable body POST (AppSec 403)"
-  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -X POST -d "test"
+  echo "[$SCENARIO] request http2 that send bad body POST without Content-Length must be inspected and blocked (AppSec 403)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -X POST -d "a=0&______"
+
+  echo "[$SCENARIO] request http2 that send unreadable gRPC stream body POST (AppSec 403)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" --http2-prior-knowledge -H "Content-Length:" -H "Content-Type: application/grpc" -X POST -d "test"
 
   echo "[$SCENARIO] request to an excluded location must skip AppSec"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/excluded/403" 200 -H "X-Forwarded-For: 1.2.3.4"

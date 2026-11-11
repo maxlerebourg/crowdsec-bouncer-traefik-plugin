@@ -841,14 +841,24 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	return body, nil
 }
 
-// isBodyUnreadable reports whether the request body cannot be buffered before
-// forwarding it to the Appsec component. An HTTP/2 or HTTP/3 request without a
-// Content-Length (typically a bidirectional gRPC stream) keeps its body open
-// for the whole life of the stream and never reaches EOF, so reading it with
-// io.ReadAll would block until the request times out and is wrongly turned into
-// a 403.
+// isStreamingContentType reports whether the Content-Type is a gRPC or Connect stream.
+func isStreamingContentType(contentType string) bool {
+	mediaType, _, _ := strings.Cut(contentType, ";")
+	mediaType = strings.TrimSpace(strings.ToLower(mediaType))
+	return mediaType == "application/grpc" ||
+		strings.HasPrefix(mediaType, "application/grpc+") ||
+		strings.HasPrefix(mediaType, "application/grpc-") ||
+		strings.HasPrefix(mediaType, "application/connect+")
+}
+
+// isBodyUnreadable reports whether the request body cannot be buffered for the Appsec query: an
+// HTTP/2 or HTTP/3 request without a Content-Length that is a gRPC or Connect stream, which may
+// never reach EOF, or whose method takes no body.
 func isBodyUnreadable(httpReq *http.Request) bool {
-	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
+	if httpReq.Body == nil || httpReq.Body == http.NoBody || httpReq.ProtoMajor < 2 || httpReq.ContentLength >= 0 {
+		return false
+	}
+	return !isMethodWithBody(httpReq.Method) || isStreamingContentType(httpReq.Header.Get("Content-Type"))
 }
 
 // isMethodWithBody used only when isBodyUnreadable returns true but the request method can't have body.

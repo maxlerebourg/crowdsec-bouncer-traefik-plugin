@@ -530,23 +530,33 @@ func Test_isBodyUnreadable(t *testing.T) {
 	realBody := func() io.ReadCloser { return io.NopCloser(strings.NewReader("data")) }
 	tests := []struct {
 		name          string
+		method        string
 		protoMajor    int
 		contentLength int64
+		contentType   string
 		body          io.ReadCloser
 		want          bool
 	}{
-		{name: "http2 grpc stream without content-length", protoMajor: 2, contentLength: -1, body: realBody(), want: true},
-		{name: "http3 stream without content-length", protoMajor: 3, contentLength: -1, body: realBody(), want: true},
-		{name: "http2 with content-length", protoMajor: 2, contentLength: 42, body: realBody(), want: false},
-		{name: "http1.1 chunked without content-length", protoMajor: 1, contentLength: -1, body: realBody(), want: false},
-		{name: "http2 without body", protoMajor: 2, contentLength: -1, body: nil, want: false},
-		{name: "http2 with http.NoBody", protoMajor: 2, contentLength: -1, body: http.NoBody, want: false},
+		{name: "http2 grpc stream without content-length", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "application/grpc", body: realBody(), want: true},
+		{name: "http2 grpc+proto stream without content-length", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "application/grpc+proto; charset=utf-8", body: realBody(), want: true},
+		{name: "http3 grpc stream without content-length", method: http.MethodPost, protoMajor: 3, contentLength: -1, contentType: "application/grpc", body: realBody(), want: true},
+		{name: "http3 GET without content-length", method: http.MethodGet, protoMajor: 3, contentLength: -1, body: realBody(), want: true},
+		{name: "http3 DELETE without content-length", method: http.MethodDelete, protoMajor: 3, contentLength: -1, body: realBody(), want: true},
+		{name: "http2 POST without content-length and non-streaming content-type", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "binary/octet-stream", body: realBody(), want: false},
+		{name: "http3 POST without content-length and non-streaming content-type", method: http.MethodPost, protoMajor: 3, contentLength: -1, contentType: "application/json", body: realBody(), want: false},
+		{name: "http2 with content-length", method: http.MethodPost, protoMajor: 2, contentLength: 42, contentType: "application/grpc", body: realBody(), want: false},
+		{name: "http1.1 chunked without content-length", method: http.MethodPost, protoMajor: 1, contentLength: -1, contentType: "application/grpc", body: realBody(), want: false},
+		{name: "http2 without body", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "application/grpc", body: nil, want: false},
+		{name: "http2 with http.NoBody", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "application/grpc", body: http.NoBody, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodPost, "http://localhost", nil)
+			req, _ := http.NewRequest(tt.method, "http://localhost", nil)
 			req.ProtoMajor = tt.protoMajor
 			req.ContentLength = tt.contentLength
+			if tt.contentType != "" {
+				req.Header.Set("Content-Type", tt.contentType)
+			}
 			req.Body = tt.body
 			if got := isBodyUnreadable(req); got != tt.want {
 				t.Errorf("isBodyUnreadable() = %v, want %v", got, tt.want)
@@ -1132,6 +1142,8 @@ func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
 				appsecPath:                "/",
 				appsecBodyLimit:           10485760,
 				appsecUnreadableBodyBlock: true,
+				appsecUnreachableBlock:    true,
+				appsecFailureBlock:        true,
 				httpAppsecClient:          appsecServer.Client(),
 				log:                       logger.New("INFO", ""),
 			}
@@ -1139,9 +1151,14 @@ func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
 			done := make(chan struct{})
 			defer close(done)
 
+			req := newUnreadableRequest(tt.method, done)
+			if tt.wantDropped {
+				req.Header.Set("Content-Type", "application/grpc")
+			}
+
 			finished := make(chan error, 1)
 			go func() {
-				_, err := appsecQuery(bouncer, "1.2.3.4", newUnreadableRequest(tt.method, done))
+				_, err := appsecQuery(bouncer, "1.2.3.4", req)
 				finished <- err
 			}()
 
