@@ -884,7 +884,7 @@ func TestHandleNextServeHTTPAppsecBanKeepsStatus(t *testing.T) {
 	}{
 		{name: "rate limit", envelope: `{"action":"ban","http_status":429}`, want: http.StatusTooManyRequests},
 		{name: "plain ban", envelope: `{"action":"ban","http_status":403}`, want: http.StatusForbidden},
-		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, want: http.StatusForbidden},
+		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, want: http.StatusTeapot},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -995,6 +995,214 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	}
 }
 
+func TestHandleNextServeHTTPAppsecBanRelaysCustomStatusCode(t *testing.T) {
+	tests := []struct {
+		name         string
+		envelope     string
+		expectedCode int
+	}{
+		{
+			name:         "HTTP 505 for HTTP/1.0 block",
+			envelope:     `{"action":"ban","http_status":505}`,
+			expectedCode: http.StatusHTTPVersionNotSupported,
+		},
+		{
+			name:         "HTTP 413 Payload Too Large",
+			envelope:     `{"action":"ban","http_status":413}`,
+			expectedCode: http.StatusRequestEntityTooLarge,
+		},
+		{
+			name:         "HTTP 403 overrides custom remediationStatusCode",
+			envelope:     `{"action":"ban","http_status":403}`,
+			expectedCode: http.StatusForbidden,
+		},
+		{
+			name:         "Status below 400 falls back to remediationStatusCode",
+			envelope:     `{"action":"ban","http_status":200}`,
+			expectedCode: http.StatusTeapot,
+		},
+		{
+			name:         "Status 600 or above falls back to remediationStatusCode",
+			envelope:     `{"action":"ban","http_status":600}`,
+			expectedCode: http.StatusTeapot,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(tt.envelope))
+			}))
+			defer appsecServer.Close()
+
+			appsecURL, err := url.Parse(appsecServer.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			nextCalled := false
+			bouncer := &Bouncer{
+				next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+					nextCalled = true
+				}),
+				appsecEnabled:           true,
+				appsecScheme:            appsecURL.Scheme,
+				appsecHost:              appsecURL.Host,
+				appsecPath:              "/",
+				httpAppsecClient:        appsecServer.Client(),
+				remediationStatusCode:   http.StatusTeapot,
+				remediationCustomHeader: "X-Remediation",
+				log:                     logger.New("DEBUG", ""),
+			}
+
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+			bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+			if nextCalled {
+				t.Fatal("next handler should not be called for appsec ban")
+			}
+			if recorder.Code != tt.expectedCode {
+				t.Fatalf("expected status %d, got %d", tt.expectedCode, recorder.Code)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+				t.Fatalf("expected remediation header ban, got %q", got)
+			}
+		})
+	}
+}
+
+func TestHandleNextServeHTTPAppsecBanRelaysHeadersAndCookies(t *testing.T) {
+	envelope := `{
+		"action":"ban",
+		"http_status":505,
+		"user_body_content":"HTTP/1.0 is not supported",
+		"user_cookies":["first=1; Path=/","second=2; Path=/"],
+		"user_headers":{
+			"X-Custom-Block":["true"],
+			"Content-Type":["text/plain"]
+		}
+	}`
+
+	t.Run("GET relays headers, cookies and body", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		recorder.Header().Set("X-Custom-Block", "stale")
+		if serveAppsecEnvelope(t, envelope, recorder) {
+			t.Fatal("next handler should not be called for appsec ban")
+		}
+		if recorder.Code != http.StatusHTTPVersionNotSupported {
+			t.Fatalf("expected status 505, got %d", recorder.Code)
+		}
+		if got := recorder.Header().Values("X-Custom-Block"); len(got) != 1 || got[0] != "true" {
+			t.Fatalf("expected X-Custom-Block header replaced with true, got %q", got)
+		}
+		if got := recorder.Header().Values("Set-Cookie"); len(got) != 2 {
+			t.Fatalf("expected two Set-Cookie headers, got %q", got)
+		}
+		if got := recorder.Header().Get("Content-Type"); got != "text/plain" {
+			t.Fatalf("expected Content-Type header text/plain, got %q", got)
+		}
+		if got := recorder.Body.String(); got != "HTTP/1.0 is not supported" {
+			t.Fatalf("expected custom body content, got %q", got)
+		}
+	})
+
+	t.Run("HEAD relays status and headers without body", func(t *testing.T) {
+		appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(envelope))
+		}))
+		defer appsecServer.Close()
+
+		appsecURL, err := url.Parse(appsecServer.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		bouncer := &Bouncer{
+			next:                    http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+			appsecEnabled:           true,
+			appsecScheme:            appsecURL.Scheme,
+			appsecHost:              appsecURL.Host,
+			appsecPath:              "/",
+			httpAppsecClient:        appsecServer.Client(),
+			remediationStatusCode:   http.StatusForbidden,
+			remediationCustomHeader: "X-Remediation",
+			log:                     logger.New("DEBUG", ""),
+		}
+
+		recorder := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodHead, "http://example.com/protected", nil)
+		bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+		if recorder.Code != http.StatusHTTPVersionNotSupported {
+			t.Fatalf("expected status 505, got %d", recorder.Code)
+		}
+		if got := recorder.Header().Get("Content-Type"); got != "text/plain" {
+			t.Fatalf("expected Content-Type header text/plain, got %q", got)
+		}
+		if got := recorder.Body.String(); got != "" {
+			t.Fatalf("expected empty body for HEAD request, got %q", got)
+		}
+	})
+
+	t.Run("Body without Content-Type does not set empty Content-Type header", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		bodyOnly := `{"action":"ban","http_status":403,"user_body_content":"blocked"}`
+		if serveAppsecEnvelope(t, bodyOnly, recorder) {
+			t.Fatal("next handler should not be called for appsec ban")
+		}
+		if got := recorder.Header().Values("Content-Type"); len(got) != 0 {
+			t.Fatalf("expected no empty Content-Type header when neither banTemplate nor user_headers sets one, got %q", got)
+		}
+		if got := recorder.Body.String(); got != "blocked" {
+			t.Fatalf("expected custom body content, got %q", got)
+		}
+	})
+}
+
+func TestHandleNextServeHTTPUnsupportedAppsecActionFallsBackToCleanBan(t *testing.T) {
+	tests := []struct {
+		name     string
+		envelope string
+	}{
+		{
+			name:     "unknown action does not leak body, headers or cookies",
+			envelope: `{"action":"unknown_challenge","http_status":200,"user_body_content":"<script>challenge()</script>","user_cookies":["tok=1; Path=/"],"user_headers":{"X-Challenge":["1"],"Content-Type":["text/html"]}}`,
+		},
+		{
+			name:     "unconfigured captcha action falls back to clean ban",
+			envelope: `{"action":"captcha","http_status":200,"user_body_content":"captcha","user_cookies":["tok=1; Path=/"],"user_headers":{"X-Captcha":["1"],"Content-Type":["text/html"]}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			if serveAppsecEnvelope(t, tt.envelope, recorder) {
+				t.Fatal("next handler should not be called for unsupported appsec action")
+			}
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("expected fallback ban status 403, got %d", recorder.Code)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+				t.Fatalf("expected remediation header ban, got %q", got)
+			}
+			if got := recorder.Body.String(); got != "" {
+				t.Fatalf("expected empty fallback ban body, got %q", got)
+			}
+			if got := recorder.Header().Values("Set-Cookie"); len(got) != 0 {
+				t.Fatalf("expected no Set-Cookie leaked on fallback ban, got %q", got)
+			}
+			if got := recorder.Header().Get("X-Challenge"); got != "" {
+				t.Fatalf("expected no X-Challenge header leaked on fallback ban, got %q", got)
+			}
+			if got := recorder.Header().Get("X-Captcha"); got != "" {
+				t.Fatalf("expected no X-Captcha header leaked on fallback ban, got %q", got)
+			}
+		})
+	}
+}
+
 // Test_appsecQuery_reusesConnection is a regression test for issue #384: the appsec response
 // body must be drained for non-200 status response so net/http can return the conn to the idle pool.
 func Test_appsecQuery_reusesConnection(t *testing.T) {
@@ -1050,7 +1258,18 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"action":"ban","http_status":403,"user_body_content":"appsec default page"}`))
+		_, _ = w.Write([]byte(`{
+			"action":"ban",
+			"http_status":505,
+			"user_body_content":"appsec default page",
+			"user_cookies":["test_cookie=val; Path=/"],
+			"user_headers":{
+				"Content-Type":["text/plain"],
+				"Content-Length":["19"],
+				"Content-Encoding":["gzip"],
+				"X-Custom-Block":["true"]
+			}
+		}`))
 	}))
 	defer appsecServer.Close()
 
@@ -1088,8 +1307,8 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	if nextCalled {
 		t.Fatal("next handler should not be called for an appsec ban")
 	}
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", recorder.Code)
+	if recorder.Code != http.StatusHTTPVersionNotSupported {
+		t.Fatalf("expected 505, got %d", recorder.Code)
 	}
 	want := "<html>BAN ip=192.0.2.10 reason=APPSEC</html>"
 	if got := recorder.Body.String(); got != want {
@@ -1097,6 +1316,18 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	}
 	if got := recorder.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Fatalf("expected banTemplateContentType, got %q", got)
+	}
+	if got := recorder.Header().Get("Content-Length"); got != "" {
+		t.Fatalf("expected Content-Length stripped for banTemplate, got %q", got)
+	}
+	if got := recorder.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("expected Content-Encoding stripped for banTemplate, got %q", got)
+	}
+	if got := recorder.Header().Get("X-Custom-Block"); got != "true" {
+		t.Fatalf("expected X-Custom-Block relayed, got %q", got)
+	}
+	if got := recorder.Header().Get("Set-Cookie"); got != "test_cookie=val; Path=/" {
+		t.Fatalf("expected Set-Cookie relayed, got %q", got)
 	}
 	if got := recorder.Header().Get("X-Remediation"); got != "ban" {
 		t.Fatalf("expected remediation header ban, got %q", got)

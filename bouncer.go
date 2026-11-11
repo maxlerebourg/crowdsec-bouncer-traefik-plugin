@@ -45,6 +45,7 @@ const (
 	crowdsecCapiStreamRoute         = "v2/decisions/stream"
 	cacheTimeoutKey                 = "updated"
 	appsecAllowAction               = "allow"
+	appsecBanAction                 = "ban"
 	appsecChallengeAction           = "challenge"
 	appsecCaptchaAction             = "captcha"
 	appsecChallengePathPrefix       = "/crowdsec-internal/challenge/"
@@ -474,7 +475,16 @@ func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *ht
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "ban")
 	}
-	rw.Header().Set("Content-Type", bouncer.banTemplateContentType)
+	contentType := bouncer.banTemplateContentType
+	if bouncer.banTemplate != nil {
+		rw.Header().Del("Content-Length")
+		rw.Header().Del("Content-Encoding")
+	} else if rw.Header().Get("Content-Type") != "" {
+		contentType = ""
+	}
+	if contentType != "" {
+		rw.Header().Set("Content-Type", contentType)
+	}
 	rw.WriteHeader(statusCode)
 	if bouncer.banTemplate == nil || req.Method == http.MethodHead {
 		return
@@ -501,7 +511,7 @@ func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *ht
 
 func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
-	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
+	if bouncer.captchaClient != nil && bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 			return
@@ -546,19 +556,32 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 		return false
 	case decision.Action == appsecChallengeAction:
 		bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
-	case decision.Action == appsecCaptchaAction && bouncer.captchaClient.Valid && req.Method != http.MethodHead:
+	case decision.Action == appsecCaptchaAction && bouncer.captchaClient != nil && bouncer.captchaClient.Valid && req.Method != http.MethodHead:
 		if bouncer.captchaClient.Check(remoteIP) {
 			return false
 		}
 		atomic.AddInt64(&blockedRequests, 1)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
-	case decision.HTTPStatus == http.StatusTooManyRequests:
-		// An AppSec ban with http_status 429 (RateLimit(), or SetReturnCode(429)): keep the 429.
-		bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, http.StatusTooManyRequests)
+	case decision.Action == appsecBanAction:
+		bouncer.handleAppsecBanServeHTTP(rw, req, remoteIP, decision)
 	default:
 		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 	}
 	return true
+}
+
+func (bouncer *Bouncer) handleAppsecBanServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, decision *AppSecResponse) {
+	statusCode := bouncer.remediationStatusCode
+	if decision.HTTPStatus >= 400 && decision.HTTPStatus < 600 {
+		statusCode = decision.HTTPStatus
+	}
+	applyAppsecHeaders(rw, decision)
+	bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, statusCode)
+	if decision.UserBodyContent != "" && req.Method != http.MethodHead && bouncer.banTemplate == nil {
+		if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
+			bouncer.log.Warn("handleAppsecBanServeHTTP could not write appsec body: " + err.Error())
+		}
+	}
 }
 
 func (bouncer *Bouncer) handleAppsecErrorServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string, err error) {
@@ -572,11 +595,7 @@ func (bouncer *Bouncer) handleAppsecErrorServeHTTP(rw http.ResponseWriter, req *
 	}
 }
 
-func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *AppSecResponse) {
-	if !strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) {
-		atomic.AddInt64(&blockedRequests, 1)
-	}
-
+func applyAppsecHeaders(rw http.ResponseWriter, decision *AppSecResponse) {
 	for name, values := range decision.UserHeaders {
 		rw.Header().Del(name)
 		for _, value := range values {
@@ -586,6 +605,14 @@ func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, re
 	for _, cookie := range decision.UserCookies {
 		rw.Header().Add("Set-Cookie", cookie)
 	}
+}
+
+func (bouncer *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *AppSecResponse) {
+	if !strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) {
+		atomic.AddInt64(&blockedRequests, 1)
+	}
+
+	applyAppsecHeaders(rw, decision)
 	if bouncer.remediationCustomHeader != "" {
 		rw.Header().Set(bouncer.remediationCustomHeader, "challenge")
 	}
