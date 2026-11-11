@@ -93,6 +93,7 @@ type Config struct {
 	HTTPTimeoutSeconds                         int64    `json:"httpTimeoutSeconds,omitempty"`
 	TraceHeadersCustomName                     string   `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string   `json:"remediationHeadersCustomName,omitempty"`
+	RemediationCaptchaContinue                 bool     `json:"remediationCaptchaContinue,omitempty"`
 	ForwardedHeadersCustomName                 string   `json:"forwardedHeadersCustomName,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                           []string `json:"clientTrustedIps,omitempty"`
