@@ -309,7 +309,7 @@ func Test_crowdsecQuery_reusesConnection(t *testing.T) {
 			}
 
 			const calls = 10
-			for i := 0; i < calls; i++ {
+			for i := 0; i < calls; i++ { //nolint:intrange
 				_, _ = crowdsecQuery(bouncer, server.URL, nil)
 			}
 
