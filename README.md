@@ -388,7 +388,12 @@ make run
 - CrowdsecAppsecUnreadableBodyBlock
   - bool
   - default: true
-  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. The lua bouncer differs: since crowdsecurity/lua-cs-bouncer#163 it reads such bodies, only treats gRPC bodies as unreadable, and its `APPSEC_DROP_UNREADABLE_BODY` defaults to `false`.
+  - Behaviour when the request body cannot be buffered for inspection: an HTTP/2 or HTTP/3 request without a `Content-Length` whose `Content-Type` is gRPC or a Connect stream (`application/grpc*`, `application/connect+*`). When `true` the request is blocked outright. When `false` it is forwarded to the Appsec Server with headers only (the body is left to stream through untouched).
+  - Other HTTP/2 and HTTP/3 bodies without a `Content-Length` are read up to `CrowdsecAppsecBodyLimit` and inspected like any other body.
+  - Not supported:
+    - gRPC, unary calls included: blocked with the default `true`. Set this option to `false`, or add the service to `CrowdsecAppsecExcludedLocations`.
+    - Any other long-lived request stream: the plugin waits for a body that never ends, and the request fails after Traefik's `readTimeout` (60 seconds by default), whatever this option. Add its location to `CrowdsecAppsecExcludedLocations`.
+  - The lua bouncer handles gRPC the same way since crowdsecurity/lua-cs-bouncer#163, but its `APPSEC_DROP_UNREADABLE_BODY` defaults to `false`.
 - CrowdsecAppsecExcludedLocations
   - []string
   - default: []
