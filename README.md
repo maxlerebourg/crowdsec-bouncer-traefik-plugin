@@ -389,7 +389,7 @@ make run
 - CrowdsecAppsecTimeoutMilliseconds
   - int64
   - default: 0 (= use `HTTPTimeoutSeconds`)
-  - Timeout in milliseconds for contacting Crowdsec Appsec Server, independent from `HTTPTimeoutSeconds` which keeps governing the LAPI. A request that exceeds it counts as unreachable, so with `crowdsecAppsecUnreachableBlock: false` a slow or blackholed Appsec only adds this delay before the request is let through.
+  - Timeout in milliseconds for the whole Appsec call (connecting, sending the body, and waiting while Appsec queues and evaluates the request), independent from `HTTPTimeoutSeconds` which keeps governing the LAPI. A request that exceeds it counts as unreachable: it is blocked with the default `crowdsecAppsecUnreachableBlock: true`, and let through uninspected with `false`. Size it for Appsec under load, not for its usual few milliseconds: with Appsec's default single routine, a few concurrent uploads near `crowdsecAppsecBodyLimit` delay every other request by hundreds of milliseconds.
 - CrowdsecAppsecUnreadableBodyBlock
   - bool
   - default: true
