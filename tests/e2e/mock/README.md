@@ -32,7 +32,7 @@ Crowdsec.
 | Traefik   | Binary downloaded into `.cache/` (reused across local runs; re-downloaded on fresh CI runners) |
 | Plugin    | Loaded via `experimental.localPlugins` from the repo root (symlinked into `plugins-local/`) |
 | LAPI      | `mocklapi` — a stdlib-only Go command (its own nested module), compiled and cached under `.cache/`, driven through `/admin` endpoints instead of `cscli`. Serves plain HTTP, or HTTPS when `--lapi-tls-cert/--lapi-tls-key` are passed (the `tls-system-ca` scenario) |
-| AppSec    | WAF stand-in built into the mock — answers 403/500/502 when the forwarded URI contains `403`/`500`/`502`, and 403 when the forwarded body (within `crowdsecAppsecBodyLimit`) contains `a=0`; anything else is allowed |
+| AppSec    | WAF stand-in built into the mock — answers 403/500/502 when the forwarded URI contains `403`/`500`/`502`, and a ban with `http_status` 418 when it contains `418`. Otherwise it decides from the forwarded body (within `crowdsecAppsecBodyLimit`): `action=ban` gets a 403, `action=challenge` gets a challenge, or passes with `Cookie: success`; anything else is allowed |
 | Captcha   | Siteverify stub on the mock LAPI (`/captcha/validate`): answers `{"success":true}` only for the token `ok` |
 | Redis     | Primary and replica stand-ins on plain TCP (inline-command wire format): the replica serves the hardcoded verdicts, the primary always misses on GET, so a scenario can prove reads are offloaded to the replica |
 | Backend   | A plain HTTP responder built into the mock |

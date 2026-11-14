@@ -30,7 +30,7 @@ type Decision struct {
 	Duration string `json:"duration"`
 }
 
-// AppSecResponse is the common resonse from Appsec the plugin actually reads
+// AppSecResponse is the common response from Appsec the plugin actually reads
 type AppSecResponse struct {
 	Action string `json:"action"`
 	Status int    `json:"http_status"`
