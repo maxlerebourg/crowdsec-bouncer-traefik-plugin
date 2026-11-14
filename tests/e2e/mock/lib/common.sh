@@ -16,7 +16,7 @@ set -euo pipefail
 # Pinned to match the Docker suite (tests/e2e/scenarios/*/docker-compose.yml).
 TRAEFIK_VERSION="${TRAEFIK_VERSION:-v3.7.17}"
 
-WEB_PORT="${WEB_PORT:-8000}"
+WEB_PORT="${WEB_PORT:-8089}"
 LAPI_PORT="${LAPI_PORT:-8090}"
 BACKEND_PORT="${BACKEND_PORT:-8091}"
 APPSEC_PORT="${APPSEC_PORT:-8092}"
@@ -181,7 +181,7 @@ start_stack() {
   mkdir -p "$WORKDIR/plugins-local/src/github.com/maxlerebourg"
   ln -s "$REPO_ROOT" "$WORKDIR/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
 
-  cp "$MOCK_LIB_DIR/traefik.yml" "$WORKDIR/traefik.yml"
+  sed -e "s|@@WEB_PORT@@|${WEB_PORT}|g" "$MOCK_LIB_DIR/traefik.yml" > "$WORKDIR/traefik.yml"
 
   # Render the scenario's dynamic config with the live ports / key / paths.
   sed \

@@ -503,7 +503,7 @@ make run
   - int
   - default: 403
   - HTTP status code for banned user (not captcha)
-  - An AppSec ban whose `http_status` is 429, such as a `RateLimit()` block, is answered with 429, whatever this value is
+  - AppSec bans are answered with the `http_status` of the AppSec response instead, which is 403 unless `user_blocked_http_code` or [SetReturnCode()](https://docs.crowdsec.net/docs/appsec/hooks/#on_match) changes it
 - CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
