@@ -326,3 +326,38 @@ func Test_getContentTypeFromPath(t *testing.T) {
 		})
 	}
 }
+
+func Test_GetAppsecTimeout(t *testing.T) {
+	tests := []struct {
+		name          string
+		httpSeconds   int64
+		appsecMillis  int64
+		wantTimeoutMs int64
+	}{
+		{name: "falls back to HTTPTimeoutSeconds when unset", httpSeconds: 10, appsecMillis: 0, wantTimeoutMs: 10000},
+		{name: "uses CrowdsecAppsecTimeoutMilliseconds when set", httpSeconds: 10, appsecMillis: 300, wantTimeoutMs: 300},
+		{name: "may be longer than HTTPTimeoutSeconds", httpSeconds: 1, appsecMillis: 2500, wantTimeoutMs: 2500},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := getMinimalConfig()
+			cfg.HTTPTimeoutSeconds = tt.httpSeconds
+			cfg.CrowdsecAppsecTimeoutMilliseconds = tt.appsecMillis
+			if got := GetAppsecTimeout(cfg).Milliseconds(); got != tt.wantTimeoutMs {
+				t.Errorf("GetAppsecTimeout() = %dms, want %dms", got, tt.wantTimeoutMs)
+			}
+		})
+	}
+}
+
+func Test_validateParamsRequiredAppsecTimeout(t *testing.T) {
+	cfg := getMinimalConfig()
+	cfg.CrowdsecAppsecTimeoutMilliseconds = -1
+	if err := validateParamsRequired(cfg); err == nil {
+		t.Error("validateParamsRequired() accepted a negative CrowdsecAppsecTimeoutMilliseconds")
+	}
+	cfg.CrowdsecAppsecTimeoutMilliseconds = 0
+	if err := validateParamsRequired(cfg); err != nil {
+		t.Errorf("validateParamsRequired() rejected CrowdsecAppsecTimeoutMilliseconds=0: %v", err)
+	}
+}
