@@ -33,6 +33,13 @@ type Decision struct {
 	Duration string `json:"duration"`
 }
 
+// AppSecResponse is the common response from Appsec the plugin actually reads
+type AppSecResponse struct {
+	Action string `json:"action"`
+	Status int    `json:"http_status"`
+	Body   string `json:"user_body_content"`
+}
+
 var (
 	mu      sync.Mutex
 	active  = map[string]Decision{} // ip -> decision currently in force
@@ -182,25 +189,34 @@ func main() {
 	// exercised without standing up the real WAF.
 	go func() {
 		log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403") {
+			switch {
+			case strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403"):
 				w.WriteHeader(http.StatusForbidden)
-			}
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500") {
+			case strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "418"):
+				w.WriteHeader(http.StatusForbidden)
+				writeJSON(w, AppSecResponse{Action: "ban", Status: http.StatusTeapot})
+			case strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500"):
 				w.WriteHeader(http.StatusInternalServerError)
-			}
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502") {
+			case strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502"):
 				w.WriteHeader(http.StatusBadGateway)
-			}
-			// Read body
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			defer r.Body.Close()
-			if strings.Contains(string(body), "a=0") {
-				w.WriteHeader(http.StatusForbidden)
-				return
+			default:
+				rawBody, err := io.ReadAll(r.Body)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				defer r.Body.Close()
+				body := string(rawBody)
+				switch {
+				case strings.Contains(body, "action=ban"):
+					w.WriteHeader(http.StatusForbidden)
+				case strings.Contains(body, "action=challenge") && r.Header.Get("Cookie") == "success":
+					w.WriteHeader(http.StatusOK)
+					writeJSON(w, AppSecResponse{Action: "allow", Status: http.StatusForbidden})
+				case strings.Contains(body, "action=challenge"):
+					w.WriteHeader(http.StatusForbidden)
+					writeJSON(w, AppSecResponse{Action: "challenge", Status: http.StatusOK, Body: "CHALLENGE"})
+				}
 			}
 		})))
 	}()
