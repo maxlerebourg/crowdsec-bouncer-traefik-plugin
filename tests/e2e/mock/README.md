@@ -32,7 +32,7 @@ that lives upstream in Crowdsec.
 | Plugin    | Loaded via `experimental.localPlugins` from the repo root (symlinked into `plugins-local/`) |
 | LAPI      | `mocklapi` — a stdlib-only Go command (its own nested module), compiled and cached under `.cache/`, driven through `/admin` endpoints instead of `cscli`. Serves plain HTTP, or HTTPS when `--lapi-tls-cert/--lapi-tls-key` are passed (the `tls-system-ca` scenario) |
 | AppSec    | WAF stand-in built into the mock — blocks URIs containing `rpc2`, allows the rest |
-| Captcha   | Siteverify stub on the mock LAPI (`/captcha/validate`): only the `captcha-ok` token validates, so the `captcha` scenario can exercise the browser's form submission without calling Cloudflare |
+| Captcha   | Siteverify stub on the mock LAPI (`/captcha/validate`): only the `response=ok` token validates |
 | Backend   | A plain HTTP responder built into the mock |
 
 Fixed ports (override with env vars if needed): Traefik `8000`, LAPI `8090`,
