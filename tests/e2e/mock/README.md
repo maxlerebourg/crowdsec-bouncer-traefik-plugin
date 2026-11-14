@@ -14,28 +14,31 @@ ships in its own PR (#333).
 
 These tests validate the **plugin's own behaviour**: the request flow through
 the Traefik middleware, the live / none / stream modes, caching, trusted-IP
-bypass, ban / captcha page rendering, and the AppSec request path (header
-forwarding + enforcing the engine's allow/block verdict).
+bypass, ban / captcha page rendering, the browser's captcha submission, and the
+AppSec request path (header forwarding + enforcing the engine's allow/block
+verdict).
 
 The mock stands in for Crowdsec, emulating the slice of the LAPI HTTP contract
-the plugin consumes — including a single, deterministic AppSec rule (block any
-URI containing `rpc2`, the probe from [`examples/appsec-enabled`](../../../examples/appsec-enabled)).
-It is not the real WAF engine, so this suite exercises the plugin's AppSec
-*wiring* rather than the detection accuracy of OWASP CRS / virtual patching —
-that lives upstream in Crowdsec.
+the plugin consumes, plus a deterministic AppSec stand-in that decides from
+markers in the forwarded request (see the table below). It is not the real WAF
+engine, so this suite exercises the plugin's AppSec *wiring* rather than the
+detection accuracy of OWASP CRS / virtual patching — that lives upstream in
+Crowdsec.
 
 ## What runs
 
 | Component | How |
 |-----------|-----|
-| Traefik   | Binary `v3.7.1`, downloaded into `.cache/` (reused across local runs; re-downloaded on fresh CI runners) |
+| Traefik   | Binary downloaded into `.cache/` (reused across local runs; re-downloaded on fresh CI runners) |
 | Plugin    | Loaded via `experimental.localPlugins` from the repo root (symlinked into `plugins-local/`) |
 | LAPI      | `mocklapi` — a stdlib-only Go command (its own nested module), compiled and cached under `.cache/`, driven through `/admin` endpoints instead of `cscli`. Serves plain HTTP, or HTTPS when `--lapi-tls-cert/--lapi-tls-key` are passed (the `tls-system-ca` scenario) |
-| AppSec    | WAF stand-in built into the mock — blocks URIs containing `rpc2`, allows the rest |
+| AppSec    | WAF stand-in built into the mock — answers 403/500/502 when the forwarded URI contains `403`/`500`/`502`, and 403 when the forwarded body (within `crowdsecAppsecBodyLimit`) contains `a=0`; anything else is allowed |
+| Captcha   | Siteverify stub on the mock LAPI (`/captcha/validate`): answers `{"success":true}` only for the token `ok` |
+| Redis     | Primary and replica stand-ins on plain TCP (inline-command wire format): the replica serves the hardcoded verdicts, the primary always misses on GET, so a scenario can prove reads are offloaded to the replica |
 | Backend   | A plain HTTP responder built into the mock |
 
-Fixed ports (override with env vars if needed): Traefik `8000`, LAPI `8090`,
-backend `8091`, AppSec `8092`.
+Fixed ports (override with env vars if needed): Traefik `8000`, LAPI `8090`, backend `8091`, AppSec
+`8092`, Redis primary `8093`, Redis replica `8094`.
 
 ## Running locally
 
@@ -69,7 +72,7 @@ mock/
     traefik.yml   # static Traefik config (shared by all scenarios)
   mocklapi/
     go.mod        # nested module — kept out of the plugin's build/lint/vendor
-    main.go       # mock LAPI + AppSec stand-in + backend
+    main.go       # mock LAPI + AppSec stand-in + captcha validator + Redis stubs + backend
   scenarios/
     <name>/
       dynamic.yml # Traefik dynamic config (router + bouncer middleware + backend)

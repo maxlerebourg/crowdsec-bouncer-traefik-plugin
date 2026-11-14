@@ -408,6 +408,10 @@ func validateParamsLists(log *slog.Logger, config *Config) error {
 	if err := validateParamsIPs(log, config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
 		return err
 	}
+	forwardedHeader := http.CanonicalHeaderKey(config.ForwardedHeadersCustomName)
+	if len(config.ForwardedHeadersTrustedIPs) == 0 && forwardedHeader != "X-Forwarded-For" && forwardedHeader != "X-Real-Ip" {
+		log.Warn(fmt.Sprintf("New:forwardedHeadersTrustedIps is empty, header:%s is read from any client and can be spoofed", forwardedHeader))
+	}
 	if err := validateParamsIPs(log, config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
 		return err
 	}
