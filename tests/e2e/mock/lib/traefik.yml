@@ -3,7 +3,7 @@
 # dynamic.yml, generated per scenario by common.sh.
 entryPoints:
   web:
-    address: ":8000"
+    address: ":8089"
     forwardedHeaders:
       # The test's curl sets X-Forwarded-For; preserve it through the proxy.
       insecure: true
