@@ -164,10 +164,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
-	forwardedHeader := http.CanonicalHeaderKey(config.ForwardedHeadersCustomName)
-	if len(config.ForwardedHeadersTrustedIPs) == 0 && forwardedHeader != "X-Forwarded-For" && forwardedHeader != "X-Real-Ip" {
-		log.Warn(fmt.Sprintf("New:forwardedHeadersTrustedIps is empty, header:%s is read from any client and can be spoofed", forwardedHeader))
-	}
 	appsecExcludedLocations, _ := location.NewMatcher(config.CrowdsecAppsecExcludedLocations)
 
 	var tlsAppsecConfig *tls.Config
@@ -556,9 +552,9 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 		}
 		atomic.AddInt64(&blockedRequests, 1)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
-	case decision.HTTPStatus == http.StatusTooManyRequests:
-		// An AppSec ban with http_status 429 (RateLimit(), or SetReturnCode(429)): keep the 429.
-		bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, http.StatusTooManyRequests)
+	case decision.HTTPStatus != 0:
+		// An AppSec ban with http_status set by SetReturnCode(), response with it.
+		bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, decision.HTTPStatus)
 	default:
 		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 	}
