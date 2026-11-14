@@ -2,6 +2,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +10,9 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"text/template"
 	"time"
 
@@ -190,50 +193,130 @@ func Test_handleNoStreamCache(t *testing.T) {
 }
 
 func Test_handleStreamCache(t *testing.T) {
-	type args struct {
-		bouncer *Bouncer
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"deleted": [{"type": "captcha", "scope": "Ip", "value": "192.0.2.10", "duration": "-1s"}],
+			"new": [{"type": "ban", "scope": "Ip", "value": "192.0.2.10", "duration": "1h"}]
+		}`))
+	}))
+	defer server.Close()
+	serverURL, _ := url.Parse(server.URL)
+	log := logger.New("ERROR", "")
+	cacheClient := &cache.Client{}
+	cacheClient.New(log, false, "", nil, "", "")
+	bouncer := &Bouncer{
+		crowdsecScheme:      serverURL.Scheme,
+		crowdsecHost:        serverURL.Host,
+		crowdsecHeader:      "X-Api-Key",
+		crowdsecStreamRoute: "/v1/decisions/stream",
+		updateInterval:      60,
+		httpClient:          server.Client(),
+		cacheClient:         cacheClient,
+		log:                 log,
 	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+
+	if err := handleStreamCache(bouncer); err != nil {
+		t.Fatalf("handleStreamCache() error = %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := handleStreamCache(tt.args.bouncer)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("handleStreamCache() error = %v, wantErr %v", err, tt.wantErr)
-				return
+	if got, err := cacheClient.Get("192.0.2.10"); err != nil || got != cache.BannedValue {
+		t.Errorf("expected the replacing ban to be cached, got %q, %v", got, err)
+	}
+}
+
+func Test_crowdsecQuery_returnsBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(rw, `{"new":[]}`)
+	}))
+	defer server.Close()
+
+	bouncer := &Bouncer{
+		crowdsecHeader: "X-Api-Key",
+		crowdsecKey:    "test",
+		crowdsecMode:   configuration.LiveMode,
+		httpClient:     server.Client(),
+		log:            logger.New("ERROR", ""),
+	}
+
+	body, err := crowdsecQuery(bouncer, server.URL, nil)
+	if err != nil {
+		t.Fatalf("crowdsecQuery() unexpected error: %v", err)
+	}
+	if got, want := string(body), `{"new":[]}`; got != want {
+		t.Fatalf("crowdsecQuery() body = %q, want %q", got, want)
+	}
+}
+
+func Test_crowdsecQuery_reverseProxyStatuses(t *testing.T) {
+	for _, status := range []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+				rw.WriteHeader(status)
+				_, _ = io.WriteString(rw, "proxy error")
+			}))
+			defer server.Close()
+
+			bouncer := &Bouncer{
+				crowdsecHeader: "X-Api-Key",
+				crowdsecKey:    "test",
+				crowdsecMode:   configuration.LiveMode,
+				httpClient:     server.Client(),
+				log:            logger.New("ERROR", ""),
+			}
+
+			_, err := crowdsecQuery(bouncer, server.URL, nil)
+			if err == nil {
+				t.Fatalf("crowdsecQuery() expected an error for status %d", status)
+			}
+			if want := fmt.Sprintf("statusCode:%d", status); !strings.Contains(err.Error(), want) {
+				t.Errorf("crowdsecQuery() error = %q, want it to contain %q", err, want)
+			}
+			if strings.Contains(err.Error(), "%!") {
+				t.Errorf("crowdsecQuery() error = %q wraps a nil error", err)
 			}
 		})
 	}
 }
 
-func Test_crowdsecQuery(t *testing.T) {
-	type args struct {
-		bouncer   *Bouncer
-		stringURL string
-		data      []byte
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []byte
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := crowdsecQuery(tt.args.bouncer, tt.args.stringURL, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("crowdsecQuery() error = %v, wantErr %v", err, tt.wantErr)
-				return
+func Test_crowdsecQuery_reusesConnection(t *testing.T) {
+	for _, status := range []int{
+		http.StatusOK,
+		http.StatusForbidden,
+		http.StatusUnauthorized,
+		http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+	} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var mu sync.Mutex
+			conns := map[string]bool{}
+			server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				conns[r.RemoteAddr] = true
+				mu.Unlock()
+				rw.WriteHeader(status)
+				_, _ = io.WriteString(rw, strings.Repeat("x", 1024))
+			}))
+			defer server.Close()
+
+			bouncer := &Bouncer{
+				crowdsecHeader: "X-Api-Key",
+				crowdsecKey:    "test",
+				crowdsecMode:   configuration.LiveMode,
+				httpClient:     server.Client(),
+				log:            logger.New("ERROR", ""),
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("crowdsecQuery() = %v, want %v", got, tt.want)
+
+			const calls = 10
+			for i := 0; i < calls; i++ { //nolint:intrange
+				_, _ = crowdsecQuery(bouncer, server.URL, nil)
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			if len(conns) != 1 {
+				t.Errorf("crowdsecQuery() opened %d connections for %d calls, want 1 (response body not drained?)", len(conns), calls)
 			}
 		})
 	}
@@ -532,7 +615,7 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 
 // Test_appsecQuery_dropUnreadableBody verifies that, when configured to do so,
 // a request with an unreadable body is dropped (blocked) instead of forwarded
-// without its body, mirroring the reference APPSEC_DROP_UNREADABLE_BODY option.
+// without its body.
 func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
@@ -628,6 +711,78 @@ func Test_appsecQuery_oversizedResponse(t *testing.T) {
 	}
 }
 
+func Test_appsecQuery_failureStatuses(t *testing.T) {
+	statuses := []int{http.StatusUnauthorized, http.StatusNotFound, http.StatusInternalServerError, http.StatusNotImplemented}
+	for _, status := range statuses {
+		for _, failureBlock := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%d failureBlock=%t", status, failureBlock), func(t *testing.T) {
+				appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+					rw.WriteHeader(status)
+				}))
+				defer appsecServer.Close()
+
+				appsecURL, _ := url.Parse(appsecServer.URL)
+				bouncer := &Bouncer{
+					appsecScheme:       appsecURL.Scheme,
+					appsecHost:         appsecURL.Host,
+					appsecPath:         "/",
+					appsecFailureBlock: failureBlock,
+					httpAppsecClient:   appsecServer.Client(),
+					log:                logger.New("ERROR", ""),
+				}
+
+				decision, err := appsecQuery(bouncer, "1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
+				if failureBlock && err == nil {
+					t.Fatal("appsecQuery() expected error, got nil")
+				}
+				if !failureBlock && err != nil {
+					t.Fatalf("appsecQuery() returned error: %v", err)
+				}
+				if decision != nil {
+					t.Fatalf("appsecQuery() returned decision: %v", decision)
+				}
+			})
+		}
+	}
+}
+
+func Test_appsecQuery_reverseProxyStatuses(t *testing.T) {
+	statuses := []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout}
+	for _, status := range statuses {
+		for _, unreachableBlock := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%d unreachableBlock=%t", status, unreachableBlock), func(t *testing.T) {
+				appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+					rw.WriteHeader(status)
+				}))
+				defer appsecServer.Close()
+
+				appsecURL, _ := url.Parse(appsecServer.URL)
+				bouncer := &Bouncer{
+					appsecScheme: appsecURL.Scheme,
+					appsecHost:   appsecURL.Host,
+					appsecPath:   "/",
+					// The opposite value proves that reverse proxy statuses ignore appsecFailureBlock.
+					appsecUnreachableBlock: unreachableBlock,
+					appsecFailureBlock:     !unreachableBlock,
+					httpAppsecClient:       appsecServer.Client(),
+					log:                    logger.New("ERROR", ""),
+				}
+
+				decision, err := appsecQuery(bouncer, "1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
+				if unreachableBlock && err == nil {
+					t.Fatal("appsecQuery() expected error, got nil")
+				}
+				if !unreachableBlock && err != nil {
+					t.Fatalf("appsecQuery() returned error: %v", err)
+				}
+				if decision != nil {
+					t.Fatalf("appsecQuery() returned decision: %v", decision)
+				}
+			})
+		}
+	}
+}
+
 func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -718,6 +873,33 @@ func serveAppsecEnvelope(t *testing.T, envelope string, recorder *httptest.Respo
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
 	return nextCalled
+}
+
+// AppSec RateLimit() sends {"action":"ban","http_status":429}; the client must see 429, not 403.
+func TestHandleNextServeHTTPAppsecBanKeepsStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		envelope string
+		want     int
+	}{
+		{name: "rate limit", envelope: `{"action":"ban","http_status":429}`, want: http.StatusTooManyRequests},
+		{name: "plain ban", envelope: `{"action":"ban","http_status":403}`, want: http.StatusForbidden},
+		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, want: http.StatusForbidden},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			if serveAppsecEnvelope(t, tt.envelope, recorder) {
+				t.Fatal("next handler should not be called for an appsec ban")
+			}
+			if recorder.Code != tt.want {
+				t.Fatalf("expected status %d, got %d", tt.want, recorder.Code)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+				t.Fatalf("expected remediation header ban, got %q", got)
+			}
+		})
+	}
 }
 
 func TestHandleNextServeHTTPAppsecChallengeWithoutBodyFallsBackToBan(t *testing.T) {
@@ -816,7 +998,15 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 // Test_appsecQuery_reusesConnection is a regression test for issue #384: the appsec response
 // body must be drained for non-200 status response so net/http can return the conn to the idle pool.
 func Test_appsecQuery_reusesConnection(t *testing.T) {
-	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
+	for _, status := range []int{
+		http.StatusOK,
+		http.StatusForbidden,
+		http.StatusUnauthorized,
+		http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+	} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			var mu sync.Mutex
 			conns := map[string]bool{}
@@ -1118,5 +1308,44 @@ func TestHandleNextServeHTTPKeepsChallengePathsFromTheBackend(t *testing.T) {
 
 	if nextCalled || recorder.Code != http.StatusNotFound {
 		t.Fatalf("expected a 404 without reaching the backend, got status %d (next called: %t)", recorder.Code, nextCalled)
+	}
+}
+
+// A body that cannot be read (client aborted the upload) must not be turned into a ban (issue #395).
+func TestHandleNextServeHTTPBodyReadErrorIsNotABan(t *testing.T) {
+	tests := []struct {
+		name       string
+		clientGone bool
+		wantStatus int
+	}{
+		{name: "client gone", clientGone: true, wantStatus: statusClientClosedRequest},
+		{name: "client still connected", clientGone: false, wantStatus: http.StatusBadRequest},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bouncer := &Bouncer{
+				appsecEnabled:         true,
+				appsecBodyLimit:       10485760,
+				remediationStatusCode: http.StatusForbidden,
+				log:                   logger.New("DEBUG", ""),
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tc.clientGone {
+				cancel()
+			}
+			req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", iotest.ErrReader(io.ErrUnexpectedEOF)).WithContext(ctx)
+			recorder := httptest.NewRecorder()
+			blockedBefore := atomic.LoadInt64(&blockedRequests)
+
+			bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+
+			if recorder.Code != tc.wantStatus {
+				t.Errorf("expected status %d, got %d", tc.wantStatus, recorder.Code)
+			}
+			if got := atomic.LoadInt64(&blockedRequests) - blockedBefore; got != 0 {
+				t.Errorf("expected no blocked request to be counted, got %d", got)
+			}
+		})
 	}
 }
