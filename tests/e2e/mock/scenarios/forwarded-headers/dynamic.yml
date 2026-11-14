@@ -1,0 +1,43 @@
+http:
+  routers:
+    r:
+      rule: "PathPrefix(`/foo`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer
+    legacy:
+      rule: "PathPrefix(`/legacy`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer-legacy
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecMode: live
+          defaultDecisionSeconds: "2"
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: "@@LAPI_HOST@@"
+          crowdsecLapiKey: "@@APIKEY@@"
+          forwardedHeadersCustomName: Cf-Connecting-Ip
+          forwardedHeadersTrustedIps:
+            - "127.0.0.3/32"
+    bouncer-legacy:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecMode: live
+          defaultDecisionSeconds: "2"
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: "@@LAPI_HOST@@"
+          crowdsecLapiKey: "@@APIKEY@@"

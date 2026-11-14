@@ -2,8 +2,10 @@
 package captcha
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -36,6 +38,8 @@ type infoProvider struct {
 	response string
 	validate string
 }
+
+const responseFormLimit = 64 << 10
 
 //nolint:gochecknoglobals
 var infoProviders = map[string]*infoProvider{
@@ -96,10 +100,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
 		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
-		if c.remediationCustomHeader != "" {
-			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
-		}
-		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
+		c.ServeSolved(rw, r)
 		return
 	}
 	rw.Header().Set("Content-Type", c.templateContentType)
@@ -115,6 +116,31 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
 	}
+}
+
+// ServeSolved redirects a request whose captcha is solved to its own URL.
+func (c *Client) ServeSolved(rw http.ResponseWriter, r *http.Request) {
+	if c.remediationCustomHeader != "" {
+		rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
+	}
+	http.Redirect(rw, r, r.URL.String(), http.StatusFound)
+}
+
+// HasResponse reports whether the request is a captcha form submission.
+func (c *Client) HasResponse(r *http.Request) bool {
+	if r.Method != http.MethodPost || r.ContentLength <= 0 || r.ContentLength > responseFormLimit {
+		return false
+	}
+	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+		return false
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, r.ContentLength))
+	r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), r.Body))
+	if err != nil {
+		return false
+	}
+	values, err := url.ParseQuery(string(body))
+	return err == nil && values.Get(c.infoProvider.response) != ""
 }
 
 // Check Verify if the captcha is already done.
