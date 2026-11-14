@@ -890,7 +890,8 @@ func TestHandleNextServeHTTPAppsecBanKeepsStatus(t *testing.T) {
 	}{
 		{name: "rate limit", envelope: `{"action":"ban","http_status":429}`, want: http.StatusTooManyRequests},
 		{name: "plain ban", envelope: `{"action":"ban","http_status":403}`, want: http.StatusForbidden},
-		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, want: http.StatusForbidden},
+		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, want: http.StatusTeapot},
+		{name: "invalid user code", envelope: `{"action":"ban","http_status":99}`, want: http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
