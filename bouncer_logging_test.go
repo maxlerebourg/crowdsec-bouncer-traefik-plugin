@@ -199,10 +199,10 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 			forbiddenLevels: []string{},
 		},
 		{
-			name:            "INFO level should show no logs (bouncer doesn't generate INFO during normal operation)",
-			logLevel:        "INFO",
+			name:            "WARN level should show no logs (bouncer doesn't generate WARN during normal operation)",
+			logLevel:        "WARN",
 			expectedLevels:  []string{}, // No logs expected for normal operation
-			forbiddenLevels: []string{"DEBUG"},
+			forbiddenLevels: []string{"DEBUG", "INFO"},
 		},
 	}
 
