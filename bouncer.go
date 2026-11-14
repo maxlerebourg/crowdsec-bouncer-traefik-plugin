@@ -503,6 +503,10 @@ func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
+			if bouncer.captchaClient.HasResponse(req) {
+				bouncer.captchaClient.ServeSolved(rw, req)
+				return
+			}
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}
@@ -548,7 +552,11 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 		bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
 	case decision.Action == appsecCaptchaAction && bouncer.captchaClient.Valid && req.Method != http.MethodHead:
 		if bouncer.captchaClient.Check(remoteIP) {
-			return false
+			if !bouncer.captchaClient.HasResponse(req) {
+				return false
+			}
+			bouncer.captchaClient.ServeSolved(rw, req)
+			return true
 		}
 		atomic.AddInt64(&blockedRequests, 1)
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)

@@ -199,6 +199,13 @@ func main() {
 		w.WriteHeader(http.StatusCreated)
 	})
 
+	// captcha siteverify stand-in: the plugin posts the browser's token back to
+	// the "provider"; only the known-good token solves the challenge.
+	mux.HandleFunc("/captcha/validate", func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		writeJSON(w, map[string]bool{"success": r.FormValue("response") == "ok"})
+	})
+
 	// Test control plane: add / remove decisions instead of cscli.
 	mux.HandleFunc("/admin/decisions", func(_ http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
