@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -143,9 +144,36 @@ type AppSecResponse struct {
 }
 
 // New creates the crowdsec bouncer plugin.
-//
-//nolint:nestif,gocyclo,gocognit,funlen,maintidx
 func New(_ context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
+	bouncer, err := createBouncer(next, config, name)
+	if err != nil {
+		return nil, err
+	}
+	return bouncer, nil
+}
+
+// NewTCP creates the crowdsec bouncer plugin for TCP routers.
+func NewTCP(_ context.Context, next func(context.Context, net.Conn, func() error), config *configuration.Config, name string) (func(context.Context, net.Conn, func() error), error) {
+	if config.CrowdsecMode == configuration.AppsecMode {
+		return nil, errors.New("NewTCP: crowdsecMode appsec has no decision to apply to TCP connections")
+	}
+	bouncer, err := createBouncer(http.NotFoundHandler(), config, name)
+	if err != nil {
+		return nil, err
+	}
+	return func(ctx context.Context, conn net.Conn, closeWrite func() error) {
+		if bouncer.allowConn(conn) {
+			next(ctx, conn, closeWrite)
+			return
+		}
+		if errClose := conn.Close(); errClose != nil {
+			bouncer.log.Debug("NewTCP:close " + errClose.Error())
+		}
+	}, nil
+}
+
+//nolint:nestif,gocyclo,gocognit,funlen,maintidx
+func createBouncer(next http.Handler, config *configuration.Config, name string) (*Bouncer, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
 
@@ -353,8 +381,6 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 }
 
 // ServeHTTP principal function of plugin.
-//
-//nolint:nestif
 func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !bouncer.enabled {
 		bouncer.next.ServeHTTP(rw, req)
@@ -386,6 +412,41 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	value, isTechError := bouncer.getDecision(remoteIP)
+	switch {
+	case isTechError:
+		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+	case value == cache.NoBannedValue:
+		bouncer.handleNextServeHTTP(rw, req, remoteIP)
+	default:
+		bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value)
+	}
+}
+
+func (bouncer *Bouncer) allowConn(conn net.Conn) bool {
+	if !bouncer.enabled {
+		return true
+	}
+	remoteIP, err := ip.GetRemoteAddrIP(conn.RemoteAddr().String())
+	if err != nil {
+		bouncer.log.Error("allowConn:getRemoteIp " + err.Error())
+		return false
+	}
+	isTrusted, err := bouncer.clientPoolStrategy.Checker.Contains(remoteIP)
+	if err != nil {
+		bouncer.log.Error(fmt.Sprintf("allowConn:checkerContains ip:%s %s", remoteIP, err.Error()))
+		return false
+	}
+	if isTrusted {
+		return true
+	}
+	value, _ := bouncer.getDecision(remoteIP)
+	bouncer.log.Debug(fmt.Sprintf("allowConn ip:%s remediation:%s", remoteIP, value))
+	return value == cache.NoBannedValue
+}
+
+//nolint:nestif
+func (bouncer *Bouncer) getDecision(remoteIP string) (string, bool) {
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
 		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
@@ -394,45 +455,35 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
 			if !bouncer.redisUnreachableBlock && cacheErrString == cache.CacheUnreachable {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", remoteIP))
-				bouncer.handleNextServeHTTP(rw, req, remoteIP)
-				return
+				return cache.NoBannedValue, false
 			}
 			if cacheErrString != cache.CacheMiss {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
-				bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
-				return
+				return cache.BannedValue, true
 			}
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
-			if value == cache.NoBannedValue {
-				bouncer.handleNextServeHTTP(rw, req, remoteIP)
-			} else {
-				bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value)
-			}
-			return
+			return value, false
 		}
 	}
 
 	// Right here if we cannot join the stream we forbid the request to go on.
 	if bouncer.crowdsecMode == configuration.StreamMode || bouncer.crowdsecMode == configuration.AloneMode {
 		if isCrowdsecStreamHealthy {
-			bouncer.handleNextServeHTTP(rw, req, remoteIP)
-		} else {
-			bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
-			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+			return cache.NoBannedValue, false
 		}
-	} else {
-		value, err := handleNoStreamCache(bouncer, remoteIP)
-		if err != nil {
-			bouncer.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
-		}
-		if value == cache.NoBannedValue {
-			bouncer.handleNextServeHTTP(rw, req, remoteIP)
-		} else {
-			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:%v %s", remoteIP, value, err.Error()))
-			bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value)
-		}
+		bouncer.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s updateFailure:%d", remoteIP, updateFailure))
+		return cache.BannedValue, true
 	}
+
+	value, err := handleNoStreamCache(bouncer, remoteIP)
+	if err != nil {
+		bouncer.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
+	}
+	if value != cache.NoBannedValue {
+		bouncer.log.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:%v %s", remoteIP, value, err.Error()))
+	}
+	return value, false
 }
 
 // CUSTOM CODE.

@@ -128,11 +128,10 @@ func (s *PoolStrategy) trustsPeer(peerIP string) bool {
 
 // GetRemoteIP returns the first IP of the custom header that is not in the pool when the peer is trusted, or the peer IP otherwise.
 func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string) (string, error) {
-	peerIP, _, err := net.SplitHostPort(req.RemoteAddr)
+	peerIP, err := GetRemoteAddrIP(req.RemoteAddr)
 	if err != nil {
-		return "", fmt.Errorf("GetRemoteIP:extractIP: %w", err)
+		return "", err
 	}
-	peerIP = removeIPv6Zone(peerIP)
 	if !strategy.trustsPeer(peerIP) {
 		return peerIP, nil
 	}
@@ -140,6 +139,15 @@ func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string)
 		return remoteIP, nil
 	}
 	return peerIP, nil
+}
+
+// GetRemoteAddrIP returns the IP of a host:port address, without its IPv6 zone.
+func GetRemoteAddrIP(remoteAddr string) (string, error) {
+	remoteIP, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return "", fmt.Errorf("GetRemoteIP:extractIP: %w", err)
+	}
+	return removeIPv6Zone(remoteIP), nil
 }
 
 func removeIPv6Zone(addr string) string {
