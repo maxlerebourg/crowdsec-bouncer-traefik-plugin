@@ -131,7 +131,7 @@ func indexOfReader(rc *redisCache, r *simpleredis.SimpleRedis) int {
 		return -1
 	}
 	for i := range rc.readers {
-		if r == &rc.readers[i] {
+		if r == rc.readers[i] {
 			return i
 		}
 	}
@@ -152,7 +152,10 @@ func Test_nextReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rc := &redisCache{log: logger.New("INFO", "")}
-			rc.readers = make([]simpleredis.SimpleRedis, tt.readers)
+			rc.readers = make([]*simpleredis.SimpleRedis, tt.readers)
+			for i := range rc.readers {
+				rc.readers[i] = &simpleredis.SimpleRedis{}
+			}
 			for call, want := range tt.want {
 				if got := indexOfReader(rc, rc.nextReader()); got != want {
 					t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d]", call, got, want)
@@ -167,6 +170,7 @@ func Test_nextReader(t *testing.T) {
 type countingCache struct {
 	values map[string]string
 	reads  int
+	keys   int
 }
 
 func newCountingCache() *countingCache {
@@ -179,6 +183,18 @@ func (c *countingCache) get(key string) (string, error) {
 		return value, nil
 	}
 	return "", errors.New(CacheMiss)
+}
+
+func (c *countingCache) mget(keys []string) ([]string, error) {
+	c.reads++
+	c.keys += len(keys)
+	values := make([]string, len(keys))
+	for i, key := range keys {
+		if value, found := c.values[key]; found {
+			values[i] = value
+		}
+	}
+	return values, nil
 }
 
 func (c *countingCache) set(key, value string, _ int64) {
@@ -304,42 +320,61 @@ func Test_GetCIDR_Reads(t *testing.T) {
 		decisions map[string]string
 		clientIP  string
 		wantReads int
+		wantKeys  int
 	}{
-		{name: "no decision at all, IPv4", decisions: nil, clientIP: "10.0.0.1", wantReads: 1},
-		{name: "no decision at all, IPv6", decisions: nil, clientIP: "2001:db8::1", wantReads: 1},
+		{name: "no decision at all, IPv4", decisions: nil, clientIP: "10.0.0.1", wantReads: 1, wantKeys: 0},
+		{name: "no decision at all, IPv6", decisions: nil, clientIP: "2001:db8::1", wantReads: 1, wantKeys: 0},
 		{
 			name:      "one prefix length, hit",
 			decisions: map[string]string{"10.0.0.0/24": BannedValue},
 			clientIP:  "10.0.0.1",
 			wantReads: 2,
+			wantKeys:  1,
 		},
 		{
 			name:      "one prefix length, miss",
 			decisions: map[string]string{"10.0.0.0/24": BannedValue},
 			clientIP:  "11.0.0.1",
 			wantReads: 2,
+			wantKeys:  1,
 		},
 		{
-			name:      "three prefix lengths, miss probes each once",
+			name:      "three prefix lengths still cost one batched read",
 			decisions: map[string]string{"10.0.0.0/8": BannedValue, "10.1.0.0/16": BannedValue, "10.1.2.0/24": BannedValue},
 			clientIP:  "11.0.0.1",
-			wantReads: 4,
+			wantReads: 2,
+			wantKeys:  3,
+		},
+		{
+			name: "eight prefix lengths still cost one batched read",
+			decisions: map[string]string{
+				"10.0.0.0/8": BannedValue, "10.1.0.0/16": BannedValue, "10.1.2.0/24": BannedValue,
+				"10.0.0.0/9": BannedValue, "10.0.0.0/10": BannedValue, "10.0.0.0/11": BannedValue,
+				"10.0.0.0/12": BannedValue, "10.0.0.0/13": BannedValue,
+			},
+			clientIP:  "11.0.0.1",
+			wantReads: 2,
+			wantKeys:  8,
 		},
 		{
 			name:      "IPv6 client does not probe every length",
 			decisions: map[string]string{"2001:db8::/32": BannedValue},
 			clientIP:  "2001:dead::1",
 			wantReads: 2,
+			wantKeys:  1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, counting := newCIDRClient(tt.decisions)
 			counting.reads = 0
-			// Only the number of reads matters here, the result is covered above.
+			counting.keys = 0
 			_, _ = client.GetCIDR(tt.clientIP)
 			if counting.reads != tt.wantReads {
 				t.Errorf("GetCIDR(%q) did %d cache reads, want %d", tt.clientIP, counting.reads, tt.wantReads)
+			}
+			if counting.keys != tt.wantKeys {
+				t.Errorf("GetCIDR(%q) probed %d keys, want %d", tt.clientIP, counting.keys, tt.wantKeys)
 			}
 		})
 	}

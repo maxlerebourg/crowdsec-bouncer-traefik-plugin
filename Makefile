@@ -52,6 +52,9 @@ run_tlsauth:
 run_appsec:
 	docker compose -f examples/appsec-enabled/docker-compose.yml up -d --remove-orphans
 
+run_bot_detection:
+	docker compose -f examples/bot-detection/docker-compose.yml up -d --remove-orphans
+
 run_custom_captcha:
 	docker compose -f examples/custom-captcha/docker-compose.yml up -d --remove-orphans
 
@@ -109,6 +112,7 @@ clean_all_docker:
 	docker compose -f examples/trusted-ips/docker-compose.yml down --remove-orphans
 	docker compose -f examples/tls-auth/docker-compose.yml down --remove-orphans
 	docker compose -f examples/appsec-enabled/docker-compose.yml down --remove-orphans
+	docker compose -f examples/bot-detection/docker-compose.yml down --remove-orphans
 	docker compose -f examples/captcha/docker-compose.yml down --remove-orphans
 	docker compose -f examples/custom-captcha/docker-compose.yml down --remove-orphans
 	docker compose -f examples/custom-ban-page/docker-compose.yml down --remove-orphans

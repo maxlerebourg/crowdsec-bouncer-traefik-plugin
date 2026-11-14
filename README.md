@@ -21,6 +21,8 @@ When used with Crowdsec it will leverage the local API which will analyze Traefi
 
 Appsec feature is supported from plugin version 1.2.0 and Crowdsec 1.6.0.
 
+Appsec bot detection is supported from plugin version 1.8.0 and Crowdsec 1.8.0.
+
 The AppSec Component offers:
 
 - Low-effort virtual patching capabilities.
@@ -33,7 +35,7 @@ Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) an
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
 
-On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
+On successful completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more information and configuration instructions.  
 The following captcha providers are supported now:
 
 - [hcaptcha](https://www.hcaptcha.com/)
@@ -55,7 +57,7 @@ The `streaming mode` is recommended for performance, decisions are updated every
 
 The cache can be local to Traefik in memory or using a separate Redis instance.
 
-Below are Mermaid diagrams detailling how each mode work:
+Below are Mermaid diagrams detailing how each mode works:
 
 <details><summary>Mode none workflow</summary>
 
@@ -316,7 +318,7 @@ make run
 >
 > If you define different caches for different middlewares, only the first one to be instantiated will be bound to the crowdsec stream.
 >
-> Overall, this middleware is designed in such a way that **only one instance of the plugin is _possible_.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, CrowdsecAppsecEnabled, etc.)
+> Overall, this middleware is designed in such a way that **only one instance of the plugin is _possible_.** You can have multiple crowdsec middlewares in the same cluster, the key parameters must be aligned (MetricsUpdateIntervalSeconds, CrowdsecMode, etc.). The `CrowdsecAppsec*` options are the exception: each middleware uses its own, so a router can use a middleware with `crowdsecAppsecEnabled: false` next to routers that use AppSec.
 
 > [!WARNING]  
 > **Appsec maximum body limit is defaulted to 10MB** > _Be careful when you upgrade to >1.4.x_
@@ -373,19 +375,24 @@ make run
 - CrowdsecAppsecFailureBlock
   - bool
   - default: true
-  - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
+  - Block request when Crowdsec Appsec Server returns any unexpected [status](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code). These statuses are logged at INFO.
 - CrowdsecAppsecUnreachableBlock
   - bool
   - default: true
   - Block request when Crowdsec Appsec Server is unreachable.
+  - A status 502, 503 or 504 counts as unreachable.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
-  - Transmit only the first number of bytes to Crowdsec Appsec Server.
+  - Transmit only the first number of bytes to Crowdsec Appsec Server. If the body cannot be read while it is buffered (typically the client aborted the upload), the request is answered with `499` when the client is gone or `400` otherwise, and is neither banned nor counted as a blocked request.
 - CrowdsecAppsecUnreadableBodyBlock
   - bool
   - default: true
-  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. Mirrors the reference bouncers' `APPSEC_DROP_UNREADABLE_BODY` option.
+  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. The lua bouncer differs: since crowdsecurity/lua-cs-bouncer#163 it reads such bodies, only treats gRPC bodies as unreadable, and its `APPSEC_DROP_UNREADABLE_BODY` defaults to `false`.
+- CrowdsecAppsecExcludedLocations
+  - []string
+  - default: []
+  - Requests to these locations are not sent to the Appsec Server, while LAPI decisions still apply to them. An entry is a path such as `/healthz`, which applies to every host, or a host optionally followed by a path, such as `registry.example.com` for every path on that host, or `registry.example.com/v2/`. Read [AppSec excluded locations](#appsec-excluded-locations) before using it: every entry is a WAF bypass.
 - CrowdsecAppsecKey
   - string
   - default: value of `CrowdsecLapiKey`
@@ -428,7 +435,7 @@ make run
 - RemediationHeadersCustomName
   - string
   - default: ""
-  - Name of the header you want in response when request are handled by plugin (possible value of the header `ban`, `captcha` or `solved-captcha`)
+  - Name of the header you want in response when request are handled by plugin (possible value of the header `ban`, `challenge`, `captcha` or `solved-captcha`)
 - ForwardedHeadersCustomName
   - string
   - default: "X-Forwarded-For"
@@ -437,6 +444,8 @@ make run
   - []string
   - default: []
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
+  - When set, `ForwardedHeadersCustomName` is only read from requests whose peer address is in this list; other requests are checked against their peer address. Every proxy that connects directly to Traefik must be listed.
+  - When empty, `ForwardedHeadersCustomName` is read from any peer. Only leave it empty with `X-Forwarded-For` or `X-Real-Ip`, which Traefik's entrypoint [forwarded headers](https://doc.traefik.io/traefik/routing/entrypoints/#forwarded-headers) strip from untrusted peers.
 - RedisCacheEnabled
   - bool
   - default: false
@@ -473,7 +482,8 @@ make run
 - UpdateMaxFailure
   - int64
   - default: 0
-  - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
+  - In `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
+  - In `live` and `none` mode, only `-1` has an effect: a request is let through instead of blocked when Crowdsec cannot be reached. Any other value blocks on the first failure, there is no failure counter on that path.
 - StreamStartupBlock
   - bool
   - default: true
@@ -488,6 +498,7 @@ make run
   - int
   - default: 403
   - HTTP status code for banned user (not captcha)
+  - AppSec bans are answered with the `http_status` of the AppSec response instead, which is 403 unless `user_blocked_http_code` or [SetReturnCode()](https://docs.crowdsec.net/docs/appsec/hooks/#on_match) changes it
 - CrowdsecCapiMachineId
   - string
   - Used only in `alone` mode, login for Crowdsec CAPI
@@ -500,6 +511,7 @@ make run
 - CaptchaProvider
   - string
   - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
+  - Also used when AppSec answers with a `captcha` action. Without a provider, those requests are banned.
 - CaptchaCustomJsURL
   - string
   - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
@@ -541,7 +553,7 @@ For each plugin, the Traefik static configuration must define the module name (a
 
 The following declaration (given here in YAML) defines a plugin:
 
-> Note that you don't need to copy all thoses settings but only the ones you want to use.  
+> Note that you don't need to copy all those settings but only the ones you want to use.  
 > See the examples for advanced usage.
 
 ```yaml
@@ -626,6 +638,9 @@ http:
           crowdsecAppsecUnreachableBlock: true
           crowdsecAppsecBodyLimit: 10485760
           crowdsecAppsecUnreadableBodyBlock: false
+          crowdsecAppsecExcludedLocations:
+            - /healthz
+            - registry.example.com/v2/
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiScheme: http
           crowdsecLapiHost: crowdsec:8080
@@ -723,7 +738,7 @@ crowdsec:
 
 Note:
 
-> Crowdsec does not require a specific format for la LAPI-key, you may use something like FIXME-LAPI-KEY but that is not recommanded for obvious reasons
+> Crowdsec does not require a specific format for the LAPI key, you may use something like FIXME-LAPI-KEY but that is not recommended for obvious reasons
 
 You can then run all the containers:
 
@@ -755,6 +770,115 @@ Set `crowdsecAppsecScheme` to `https`. Same three options as for the LAPI, prefi
 
 Currently AppSec does not support mTLS authentication for the AppSec Component.
 
+#### AppSec excluded locations
+
+`crowdsecAppsecExcludedLocations` skips the AppSec query for some requests, for example
+large uploads or machine-to-machine APIs where the rules mostly raise false positives:
+the body is neither buffered nor sent to AppSec and `crowdsecAppsecUnreadableBodyBlock`
+does not apply, while LAPI decisions (ban, captcha) still do. This differs from
+`EXCLUDE_LOCATION` in the nginx and HAProxy Lua bouncers, which skips the whole bouncer,
+and in `crowdsecMode: appsec` there is no LAPI check, so an excluded request is not
+checked at all. For an entry with a path, a request is only excluded when its path can be
+read one way only: no percent-encoding, no `.`, `..` or empty segment, no segment made only
+of dots, and only ASCII letters, digits and `-._~!$&'()+,=:@/`. So `/healthz/..;/admin`,
+`/healthz%2F..%2Fadmin` or `/healthz/%252e%252e/admin` are inspected, not excluded, with
+`sanitizePath: false` too.
+
+```yaml
+crowdsecAppsecExcludedLocations:
+  - /healthz
+  - registry.example.com/v2/
+```
+
+- `/healthz` matches `/healthz` and everything below it, such as `/healthz/live`, but not
+  `/healthzfoo`. An entry ending with `/`, such as `/v2/`, only matches below it.
+- An entry without a host applies to every host. An entry that is only a host, such as
+  `registry.example.com`, matches every path on that host. The host is compared
+  case-insensitively, without a trailing dot. An entry with a port, such as
+  `registry.example.com:8000`, only matches requests whose `Host` carries that port; an
+  entry without a port matches any port. There are no wildcards or regular expressions.
+- The path is case-sensitive, and the query string is ignored.
+- The path is the one the middleware receives. A middleware that runs before it, such as
+  `stripPrefix`, changes what is matched.
+- `/crowdsec-internal/challenge/` is always sent to AppSec, so bot detection keeps working
+  on an excluded host.
+
+> [!WARNING]
+> Every entry is a WAF bypass for everything below it.
+>
+> - **The exclusion matches requests, not routers.** Any router that receives a matching
+>   host and path skips AppSec, including a catch-all router such as ``PathPrefix(`/`)``
+>   or a `HostRegexp` that also answers that host. Entries without a host apply to every
+>   router that uses the middleware, so `/v2/` would exclude the `/v2/` API of every
+>   application. Prefer the narrowest entries, bound to a host.
+> - **AppSec never sees excluded requests**, so neither in-band nor out-of-band rules,
+>   nor the scenarios built on AppSec events, can react to them. Scenarios that read
+>   Traefik's access logs still see them.
+> - Some backends take the path from a request header such as `X-Original-URL` or
+>   `X-Rewrite-URL`. Behind such a backend, a request to an excluded path can reach
+>   another resource uninspected. AppSec does not route on these headers either, so
+>   strip them in front of such a backend whether or not you exclude anything.
+
+#### AppSec bot detection: route `/crowdsec-internal`
+
+When AppSec bot detection is enabled, the challenge page it returns loads its fingerprint
+script from `/crowdsec-internal/challenge/fpscanner.js`, an absolute path. Any router
+protected by this middleware therefore has to match that prefix as well, otherwise the
+script 404s, the proof-of-work never runs, and the client is stuck on the challenge page
+with no error anywhere:
+
+```yaml
+  - "traefik.http.routers.my-router.rule=PathPrefix(`/my-app`) || PathPrefix(`/crowdsec-internal`)"
+```
+
+The backend service never sees these requests: the plugin forwards them to the AppSec
+component and returns its response directly, and answers `404` when AppSec does not serve
+them (for example when it is unreachable), so the prefix only needs to reach a router
+carrying the middleware. Requests from `clientTrustedIps` bypass the plugin, so they are
+the only exception.
+
+The proof-of-work result is posted to `/crowdsec-internal/challenge/submit`, and AppSec
+has to receive that form in full. Keep `crowdsecAppsecBodyLimit` above `0` and large enough
+for it, which the default of 10MB is. With `0` the plugin sends no body to AppSec, and with
+a smaller limit the proof is cut short: either way it is rejected and the visitor is
+challenged again forever.
+
+CrowdSec documents the same requirement, that the bouncer must forward
+`/crowdsec-internal/challenge/*` unchanged: see
+[enabling bot detection](https://docs.crowdsec.net/docs/appsec/bot_detection/enable) and the
+[challenge protocol](https://docs.crowdsec.net/docs/appsec/bot_detection/challenge_protocol).
+
+See [examples/bot-detection/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/bot-detection/README.md).
+
+#### AppSec bot detection: Content-Security-Policy
+
+The challenge runs an inline script and a blob: worker, so AppSec sends every challenge with a fixed Content-Security-Policy allowing both:
+
+```
+default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob:;
+```
+
+If your own policy forbids inline scripts or blob: workers, the challenge can never be solved: blank page, and Refused to
+execute inline script / Refused to create a worker in the console.
+
+The plugin replaces any policy already set on the response, as the challenge protocol
+(https://docs.crowdsec.net/docs/appsec/bot_detection/challenge_protocol#requirements-for-a-remediation-component)
+requires. Traefik's headers middleware does not: it applies its headers when the response is written, after the plugin.
+Listed before this one, it therefore overwrites the challenge policy with yours.
+
+Put your Content-Security-Policy in a headers middleware listed after this one. Your other security headers can stay
+before it.
+The captcha and ban pages get none of your default CSP so rewrite it on your template.
+
+```yaml
+  - "traefik.http.routers.my-router.middlewares=security-headers@docker,crowdsec@docker,csp@docker"
+  - "traefik.http.middlewares.security-headers.headers.frameDeny=true"
+  - "traefik.http.middlewares.csp.headers.contentSecurityPolicy=default-src 'self'"
+```
+
+/!\ CrowdSec describes the same conflict, and how to solve it in nginx, in
+[enabling bot detection: Content-Security-Policy](https://docs.crowdsec.net/docs/appsec/bot_detection/enable#content-security-policy).
+
 #### Manually add an IP to the blocklist (for testing purposes)
 
 ```bash
@@ -767,7 +891,7 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 
 ### Examples
 
-#### 1. Behind another proxy service (ex: clouflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)
+#### 1. Behind another proxy service (ex: cloudflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)
 
 #### 2. With Redis as an external shared cache [examples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/redis-cache/README.md)
 
@@ -788,6 +912,10 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 #### 10. Using Traefik with Custom Ban HTML Page [examples/custom-ban-page/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-ban-page/README.md)
 
 #### 11. Using Traefik with Custom Captcha Whiketkeeper[examples/custom-captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-captcha/README.md)
+
+#### 12. Using Traefik with AppSec bot detection enabled [examples/bot-detection/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/bot-detection/README.md)
+
+#### 13. Using Crowdsec and Traefik in Nomad [examples/nomad/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/nomad/README.md)
 
 ### Local Mode
 
@@ -814,7 +942,7 @@ The source code of the plugin should be organized as follows:
 ```
 
 For local development, a `docker-compose.local.yml` is provided which reproduces the directory layout needed by Traefik.  
-This works once you have generated and filled your _LAPI-KEY_ (crowdsecLapiKey), if not read above for informations.
+This works once you have generated and filled your _LAPI-KEY_ (crowdsecLapiKey), if not read above for information.
 
 ```bash
 docker compose -f docker-compose.local.yml up -d

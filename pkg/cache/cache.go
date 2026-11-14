@@ -60,6 +60,17 @@ func (localCache) set(key, value string, duration int64) {
 	cache.Set(key, value, duration)
 }
 
+func (lc localCache) mget(keys []string) ([]string, error) {
+	values := make([]string, len(keys))
+	for i, key := range keys {
+		value, err := lc.get(key)
+		if err == nil {
+			values[i] = value
+		}
+	}
+	return values, nil
+}
+
 func (localCache) delete(key string) {
 	cache.Del(key)
 }
@@ -67,7 +78,7 @@ func (localCache) delete(key string) {
 type redisCache struct {
 	log     *slog.Logger
 	writer  simpleredis.SimpleRedis
-	readers []simpleredis.SimpleRedis
+	readers []*simpleredis.SimpleRedis
 	counter atomic.Uint64
 }
 
@@ -77,26 +88,42 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 		return &rc.writer
 	}
 	idx := rc.counter.Add(1) % uint64(n)
-	return &rc.readers[idx]
+	return rc.readers[idx]
+}
+
+func redisError(err error) error {
+	switch err.Error() {
+	case simpleredis.RedisMiss:
+		return errors.New(CacheMiss)
+	case simpleredis.RedisUnreachable:
+		return errors.New(CacheUnreachable)
+	default:
+		return err
+	}
 }
 
 func (rc *redisCache) get(key string) (string, error) {
 	value, err := rc.nextReader().Get(key)
 	if err != nil {
-		switch err.Error() {
-		case simpleredis.RedisMiss:
-			return "", errors.New(CacheMiss)
-		case simpleredis.RedisUnreachable:
-			return "", errors.New(CacheUnreachable)
-		default:
-			return "", err
-		}
+		return "", redisError(err)
 	}
 	valueString := string(value)
 	if len(valueString) > 0 {
 		return valueString, nil
 	}
 	return "", errors.New(CacheMiss)
+}
+
+func (rc *redisCache) mget(keys []string) ([]string, error) {
+	raw, err := rc.nextReader().MGet(keys)
+	if err != nil {
+		return nil, redisError(err)
+	}
+	values := make([]string, len(raw))
+	for i, value := range raw {
+		values[i] = string(value)
+	}
+	return values, nil
 }
 
 func (rc *redisCache) set(key, value string, duration int64) {
@@ -114,6 +141,7 @@ func (rc *redisCache) delete(key string) {
 type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
+	mget(keys []string) ([]string, error)
 	delete(key string)
 }
 
@@ -130,7 +158,7 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 		rc := &redisCache{log: log}
 		rc.writer.Init(writeHost, pass, database)
 		for _, h := range readHosts {
-			var r simpleredis.SimpleRedis
+			r := &simpleredis.SimpleRedis{}
 			r.Init(h, pass, database)
 			rc.readers = append(rc.readers, r)
 		}
@@ -179,9 +207,16 @@ func (c *Client) GetCIDR(ipStr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, key := range ip.CIDRLookupKeys(ipStr, parsePrefixLens(prefixLens)) {
-		value, getErr := c.cache.get(cidrPrefix + key)
-		if getErr == nil {
+	keys := ip.CIDRLookupKeys(ipStr, parsePrefixLens(prefixLens))
+	for i := range keys {
+		keys[i] = cidrPrefix + keys[i]
+	}
+	values, err := c.cache.mget(keys)
+	if err != nil {
+		return "", err
+	}
+	for _, value := range values {
+		if value != "" {
 			return value, nil
 		}
 	}
