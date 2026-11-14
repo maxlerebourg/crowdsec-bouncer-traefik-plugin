@@ -19,7 +19,7 @@ body() {
   echo "[$SCENARIO] request that return 403 must be blocked (AppSec 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/403" 403 -H "X-Forwarded-For: 1.2.3.4"
 
-  echo "[$SCENARIO] request that return 418 must be blocked (AppSec 418)"
+  echo "[$SCENARIO] request that return http_status 418 must be forwarded (AppSec 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/418" 418 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] request that return 500 must be blocked (because CrowdsecAppsecFailureBlock = true) (AppSec 500)"
