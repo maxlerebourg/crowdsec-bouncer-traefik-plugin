@@ -164,6 +164,10 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
+	forwardedHeader := http.CanonicalHeaderKey(config.ForwardedHeadersCustomName)
+	if len(config.ForwardedHeadersTrustedIPs) == 0 && forwardedHeader != "X-Forwarded-For" && forwardedHeader != "X-Real-Ip" {
+		log.Warn(fmt.Sprintf("New:forwardedHeadersTrustedIps is empty, header:%s is read from any client and can be spoofed", forwardedHeader))
+	}
 	appsecExcludedLocations, _ := location.NewMatcher(config.CrowdsecAppsecExcludedLocations)
 
 	var tlsAppsecConfig *tls.Config
