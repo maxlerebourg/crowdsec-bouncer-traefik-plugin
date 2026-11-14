@@ -37,7 +37,7 @@ Crowdsec.
 | Redis     | Primary and replica stand-ins on plain TCP (inline-command wire format): the replica serves the hardcoded verdicts, the primary always misses on GET, so a scenario can prove reads are offloaded to the replica |
 | Backend   | A plain HTTP responder built into the mock |
 
-Fixed ports (override with env vars if needed): Traefik `8000`, LAPI `8090`, backend `8091`, AppSec
+Fixed ports (override with env vars if needed): Traefik `8089`, LAPI `8090`, backend `8091`, AppSec
 `8092`, Redis primary `8093`, Redis replica `8094`.
 
 ## Running locally
