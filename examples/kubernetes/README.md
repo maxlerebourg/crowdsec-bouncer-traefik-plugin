@@ -37,7 +37,7 @@ kubectl -n traefik create secret generic crowdsec-bouncer-key --from-literal=BOU
 ```bash
 helm repo add crowdsec https://crowdsecurity.github.io/helm-charts
 helm repo update
-helm upgrade --install crowdsec crowdsec/crowdsec --version 0.24.2 \
+helm upgrade --install crowdsec crowdsec/crowdsec --version 0.24.3 \
   --namespace crowdsec --values ./crowdsec/values.yml
 kubectl -n crowdsec wait --for=condition=Available deployment --all --timeout=5m
 ```
@@ -47,7 +47,7 @@ kubectl -n crowdsec wait --for=condition=Available deployment --all --timeout=5m
 ```bash
 helm repo add traefik https://traefik.github.io/charts
 helm repo update
-helm upgrade --install traefik traefik/traefik --version 42.3.0 \
+helm upgrade --install traefik traefik/traefik --version 42.4.0 \
   --namespace traefik --values ./traefik/values.yml
 kubectl -n traefik rollout status deployment/traefik
 ```

@@ -82,7 +82,7 @@ job "traefik-crowdsec" {
       }
 
       config {
-        image        = "busybox:1.37"
+        image        = "busybox:1.38"
         network_mode = "host"
         command      = "sh"
         args         = ["-c", "until wget -q -O /dev/null http://${NOMAD_HOST_ADDR_lapi}/health; do sleep 2; done"]
@@ -102,7 +102,7 @@ job "traefik-crowdsec" {
       }
 
       config {
-        image        = "traefik:v3.7.17"
+        image        = "traefik:v3.7.19"
         network_mode = "host"
         args = [
           "--entrypoints.web.address=:${NOMAD_PORT_web}",
