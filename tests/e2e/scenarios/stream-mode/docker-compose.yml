@@ -1,0 +1,51 @@
+services:
+  traefik:
+    image: traefik:v3.7.1
+    container_name: e2e-stream-traefik
+    command:
+      - "--log.level=INFO"
+      - "--accesslog"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.forwardedHeaders.insecure=true"
+      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../../../..:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+    ports:
+      - "8000:80"
+    depends_on:
+      crowdsec:
+        condition: service_healthy
+
+  whoami:
+    image: traefik/whoami
+    container_name: e2e-stream-whoami
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.r.rule=PathPrefix(`/foo`)"
+      - "traefik.http.routers.r.entrypoints=web"
+      - "traefik.http.routers.r.middlewares=bouncer@docker"
+      - "traefik.http.services.s.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.bouncer.plugin.bouncer.updateintervalseconds=3"
+      - "traefik.http.middlewares.bouncer.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer.plugin.bouncer.forwardedheaderstrustedips=172.16.0.0/12"
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.7.8
+    container_name: crowdsec
+    environment:
+      DISABLE_ONLINE_API: "true"
+      BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
+      CUSTOM_HOSTNAME: crowdsec
+      CROWDSEC_BYPASS_DB_VOLUME_CHECK: "true"
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
