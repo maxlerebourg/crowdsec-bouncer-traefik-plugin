@@ -346,6 +346,7 @@ make run
   - default: 600
   - Interval in seconds between metrics updates to Crowdsec
   - If set to zero or less, metrics collection is disabled
+  - Reports the requests processed, and the requests dropped by decision origin (`appsec` for AppSec), like CrowdSec's own bouncers. Requests blocked because the LAPI, Redis or AppSec cannot be reached are not counted as dropped.
 - CrowdsecMode
   - string
   - default: `live`, expected values are: `none`, `live`, `stream`, `alone`, `appsec`
