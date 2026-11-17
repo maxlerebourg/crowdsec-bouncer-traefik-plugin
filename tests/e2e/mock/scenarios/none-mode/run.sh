@@ -17,6 +17,9 @@ body() {
   echo "[$SCENARIO] none mode has no cache -> next request must be blocked immediately"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] the ban must carry the seconds left on its decision as Retry-After"
+  assert_header_between "http://127.0.0.1:${WEB_PORT}/foo" Retry-After 299 300 -H "X-Forwarded-For: 1.2.3.4"
+
   echo "[$SCENARIO] deleting decision"
   lapi_delete_decision 1.2.3.4
 

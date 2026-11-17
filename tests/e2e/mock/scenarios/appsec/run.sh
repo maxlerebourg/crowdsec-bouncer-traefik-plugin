@@ -22,6 +22,13 @@ body() {
   echo "[$SCENARIO] request that return http_status 418 must be forwarded (AppSec 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/418" 418 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] a RateLimit() block (http_status 429) must be answered 429 with the configured Retry-After"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo/429" 429 -H "X-Forwarded-For: 1.2.3.4"
+  assert_header "http://127.0.0.1:${WEB_PORT}/foo/429" Retry-After 6 -H "X-Forwarded-For: 1.2.3.4"
+
+  echo "[$SCENARIO] an AppSec ban other than 429 must carry no Retry-After"
+  assert_header "http://127.0.0.1:${WEB_PORT}/foo/418" Retry-After "" -H "X-Forwarded-For: 1.2.3.4"
+
   echo "[$SCENARIO] request that return 500 must be blocked (because CrowdsecAppsecFailureBlock = true) (AppSec 500)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/500" 403 -H "X-Forwarded-For: 1.2.3.4"
 

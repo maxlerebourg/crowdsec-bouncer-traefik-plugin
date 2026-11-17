@@ -199,6 +199,8 @@ func Test_validateParamsRequired(t *testing.T) {
 	cfg4.UpdateIntervalSeconds = 0
 	cfg5 := getMinimalConfig()
 	cfg5.DefaultDecisionSeconds = 0
+	cfg6 := getMinimalConfig()
+	cfg6.CrowdsecAppsecRateLimitRetryAfterSeconds = -1
 	type args struct {
 		config *Config
 	}
@@ -212,6 +214,7 @@ func Test_validateParamsRequired(t *testing.T) {
 		{name: "Not validate a bad crowdsec mode", args: args{config: cfg3}, wantErr: true},
 		{name: "Not validate a bad update interval seconds", args: args{config: cfg4}, wantErr: true},
 		{name: "Not validate a bad default decision seconds", args: args{config: cfg5}, wantErr: true},
+		{name: "Not validate a negative AppSec rate limit Retry-After", args: args{config: cfg6}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

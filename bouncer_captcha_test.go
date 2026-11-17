@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
@@ -56,7 +57,7 @@ func TestSolvedCaptchaSubmission(t *testing.T) {
 					bouncer.next.ServeHTTP(rw, req)
 				}
 			} else {
-				bouncer.handleRemediationServeHTTP(rw, req, "192.0.2.1", cache.CaptchaValue)
+				bouncer.handleRemediationServeHTTP(rw, req, "192.0.2.1", cache.CaptchaValue, time.Time{})
 			}
 
 			if rw.Code != tt.wantCode {

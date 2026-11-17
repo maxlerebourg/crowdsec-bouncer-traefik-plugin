@@ -67,6 +67,7 @@ type Config struct {
 	CrowdsecAppsecUnreadableBodyBlock          bool     `json:"crowdsecAppsecUnreadableBodyBlock,omitempty"`
 	CrowdsecAppsecExcludedLocations            []string `json:"crowdsecAppsecExcludedLocations,omitempty"`
 	CrowdsecAppsecBodyLimit                    int64    `json:"crowdsecAppsecBodyLimit,omitempty"`
+	CrowdsecAppsecRateLimitRetryAfterSeconds   int64    `json:"crowdsecAppsecRateLimitRetryAfterSeconds,omitempty"`
 	CrowdsecLapiScheme                         string   `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                           string   `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiPath                           string   `json:"crowdsecLapiPath,omitempty"`
@@ -458,8 +459,9 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt0 := map[string]int64{
-		"CrowdsecAppsecBodyLimit":      config.CrowdsecAppsecBodyLimit,
-		"MetricsUpdateIntervalSeconds": config.MetricsUpdateIntervalSeconds,
+		"CrowdsecAppsecBodyLimit":                  config.CrowdsecAppsecBodyLimit,
+		"CrowdsecAppsecRateLimitRetryAfterSeconds": config.CrowdsecAppsecRateLimitRetryAfterSeconds,
+		"MetricsUpdateIntervalSeconds":             config.MetricsUpdateIntervalSeconds,
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {

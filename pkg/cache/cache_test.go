@@ -4,6 +4,7 @@ package cache
 
 import (
 	"testing"
+	"time"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	simpleredis "github.com/maxlerebourg/simpleredis"
@@ -158,5 +159,33 @@ func Test_nextReader(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func Test_SetDecision(t *testing.T) {
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
+	end := time.UnixMilli(time.Now().Add(time.Hour).UnixMilli())
+	client.SetDecision("10.0.0.30", BannedValue, 10, end)
+
+	value, gotEnd, err := client.GetDecision("10.0.0.30")
+	if err != nil || value != BannedValue || !gotEnd.Equal(end) {
+		t.Errorf("GetDecision() = %q, %v, %v, want %q, %v", value, gotEnd, err, BannedValue, end)
+	}
+	if value, err := client.Get("10.0.0.30"); err != nil || value != BannedValue {
+		t.Errorf("Get() = %q, %v, want the value without its end", value, err)
+	}
+
+	client.Set("10.0.0.31", CaptchaValue, 10)
+	if value, gotEnd, err := client.GetDecision("10.0.0.31"); err != nil || value != CaptchaValue || !gotEnd.IsZero() {
+		t.Errorf("GetDecision() of a value cached without an end = %q, %v, %v", value, gotEnd, err)
+	}
+
+	client.Set("10.0.0.32", BannedValue+decisionEndSeparator+"soon", 10)
+	if value, gotEnd, err := client.GetDecision("10.0.0.32"); err != nil || value != BannedValue || !gotEnd.IsZero() {
+		t.Errorf("GetDecision() of an unreadable end = %q, %v, %v", value, gotEnd, err)
+	}
+
+	if _, _, err := client.GetDecision("10.0.0.33"); err == nil || err.Error() != CacheMiss {
+		t.Errorf("GetDecision() of a missing key error = %v, want %s", err, CacheMiss)
 	}
 }

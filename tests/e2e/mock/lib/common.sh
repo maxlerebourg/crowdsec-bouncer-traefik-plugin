@@ -140,6 +140,20 @@ assert_header() {
   fi
 }
 
+# Assert a response header is a whole number of seconds from MIN to MAX.
+# Usage: assert_header_between URL HEADER MIN MAX [curl args...]
+assert_header_between() {
+  local url="$1" header="$2" min="$3" max="$4"
+  shift 4 || true
+  local got
+  got=$(curl -s -D - -o /dev/null "$@" "$url" | tr -d '\r' \
+    | awk -v h="${header,,}" -F': ' 'tolower($1) == h { print $2; exit }')
+  if [[ ! "$got" =~ ^[0-9]+$ ]] || (( got < min || got > max )); then
+    echo "assert_header_between: $url header $header expected $min to $max, got \"$got\"" >&2
+    return 1
+  fi
+}
+
 # Assert a response body contains a substring.
 # Usage: assert_body_contains URL NEEDLE [curl args...]
 assert_body_contains() {

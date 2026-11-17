@@ -50,6 +50,7 @@ const (
 	appsecChallengePathPrefix       = "/crowdsec-internal/challenge/"
 	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 	statusClientClosedRequest       = 499
+	retryAfterHeader                = "Retry-After"
 )
 
 var errAppsecGetBody = errors.New("appsecQuery:GetBody")
@@ -104,6 +105,7 @@ type Bouncer struct {
 	appsecUnreadableBodyBlock bool
 	appsecBodyLimit           int64
 	appsecExcludedLocations   *location.Matcher
+	appsecRetryAfterSeconds   int64
 	crowdsecScheme            string
 	crowdsecHost              string
 	crowdsecPath              string
@@ -237,6 +239,7 @@ func New(_ context.Context, next http.Handler, config *configuration.Config, nam
 		appsecUnreadableBodyBlock: config.CrowdsecAppsecUnreadableBodyBlock,
 		appsecBodyLimit:           config.CrowdsecAppsecBodyLimit,
 		appsecExcludedLocations:   appsecExcludedLocations,
+		appsecRetryAfterSeconds:   config.CrowdsecAppsecRateLimitRetryAfterSeconds,
 		crowdsecScheme:            config.CrowdsecLapiScheme,
 		crowdsecHost:              config.CrowdsecLapiHost,
 		crowdsecPath:              config.CrowdsecLapiPath,
@@ -388,7 +391,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
-		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
+		value, end, cacheErr := bouncer.cacheClient.GetDecision(remoteIP)
 		if cacheErr != nil {
 			cacheErrString := cacheErr.Error()
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
@@ -407,7 +410,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			if value == cache.NoBannedValue {
 				bouncer.handleNextServeHTTP(rw, req, remoteIP)
 			} else {
-				bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value)
+				bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value, end)
 			}
 			return
 		}
@@ -422,7 +425,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 		}
 	} else {
-		value, err := handleNoStreamCache(bouncer, remoteIP)
+		value, end, err := handleNoStreamCache(bouncer, remoteIP)
 		if err != nil {
 			bouncer.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
 		}
@@ -430,7 +433,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			bouncer.handleNextServeHTTP(rw, req, remoteIP)
 		} else {
 			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:%v %s", remoteIP, value, err.Error()))
-			bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value)
+			bouncer.handleRemediationServeHTTP(rw, req, remoteIP, value, end)
 		}
 	}
 }
@@ -499,7 +502,9 @@ func (bouncer *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req *ht
 	}
 }
 
-func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
+// handleRemediationServeHTTP answers a LAPI decision ending at end, the zero
+// time when that is not known.
+func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string, end time.Time) {
 	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
 		if bouncer.captchaClient.Check(remoteIP) {
@@ -514,7 +519,23 @@ func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 		return
 	}
+	if !end.IsZero() {
+		rw.Header().Set(retryAfterHeader, retryAfterSeconds(time.Until(end)))
+	}
 	bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonLAPI)
+}
+
+// retryAfterSeconds is a Retry-After for what is left: whole seconds, rounded
+// up, and at least one, so a client never comes back before the time is up.
+func retryAfterSeconds(left time.Duration) string {
+	seconds := int64(left / time.Second)
+	if left%time.Second > 0 {
+		seconds++
+	}
+	if seconds < 1 {
+		seconds = 1
+	}
+	return strconv.FormatInt(seconds, 10)
 }
 
 func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) {
@@ -562,6 +583,11 @@ func (bouncer *Bouncer) handleAppsecDecisionServeHTTP(rw http.ResponseWriter, re
 		bouncer.captchaClient.ServeHTTP(rw, req, remoteIP)
 	case decision.HTTPStatus >= http.StatusOK && decision.HTTPStatus <= 599:
 		// An AppSec ban with http_status set by SetReturnCode(), response with it.
+		// AppSec gives no time with a 429, such as RateLimit() answers, so its
+		// Retry-After is the one configured.
+		if decision.HTTPStatus == http.StatusTooManyRequests && bouncer.appsecRetryAfterSeconds > 0 {
+			rw.Header().Set(retryAfterHeader, strconv.FormatInt(bouncer.appsecRetryAfterSeconds, 10))
+		}
 		bouncer.handleBanStatusServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, decision.HTTPStatus)
 	default:
 		bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
@@ -639,8 +665,9 @@ func runTicker(ticks <-chan time.Time, work func()) {
 	}
 }
 
-// We are now in none or live mode.
-func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
+// We are now in none or live mode. A ban or captcha comes with when its
+// decision ends.
+func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, time.Time, error) {
 	isLiveMode := bouncer.crowdsecMode == configuration.LiveMode
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
@@ -651,28 +678,28 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	body, err := crowdsecQuery(bouncer, routeURL.String(), nil)
 	if err != nil {
 		if bouncer.updateMaxFailure == -1 {
-			return cache.NoBannedValue, err
+			return cache.NoBannedValue, time.Time{}, err
 		}
-		return cache.BannedValue, err
+		return cache.BannedValue, time.Time{}, err
 	}
 
 	if bytes.Equal(body, []byte("null")) {
 		if isLiveMode {
 			bouncer.cacheClient.Set(remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
 		}
-		return cache.NoBannedValue, nil
+		return cache.NoBannedValue, time.Time{}, nil
 	}
 
 	var decisions []Decision
 	err = json.Unmarshal(body, &decisions)
 	if err != nil {
-		return cache.BannedValue, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
+		return cache.BannedValue, time.Time{}, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
 	}
 	if len(decisions) == 0 {
 		if isLiveMode {
 			bouncer.cacheClient.Set(remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
 		}
-		return cache.NoBannedValue, nil
+		return cache.NoBannedValue, time.Time{}, nil
 	}
 	var decision Decision
 	for _, d := range decisions {
@@ -683,8 +710,9 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	}
 	duration, err := time.ParseDuration(decision.Duration)
 	if err != nil {
-		return cache.BannedValue, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
+		return cache.BannedValue, time.Time{}, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
+	end := time.Now().Add(duration)
 	var value string
 	switch decision.Type {
 	case "ban":
@@ -700,9 +728,9 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		if bouncer.defaultDecisionTimeout < durationSecond {
 			durationSecond = bouncer.defaultDecisionTimeout
 		}
-		bouncer.cacheClient.Set(remoteIP, value, durationSecond)
+		bouncer.cacheClient.SetDecision(remoteIP, value, durationSecond, end)
 	}
-	return value, errors.New("handleNoStreamCache:banned")
+	return value, end, errors.New("handleNoStreamCache:banned")
 }
 
 func getToken(bouncer *Bouncer) error {
@@ -775,6 +803,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.Deleted {
 		bouncer.cacheClient.Delete(decision.Value)
 	}
+	now := time.Now()
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
@@ -788,7 +817,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
 				value = cache.BannedValue
 			}
-			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+			bouncer.cacheClient.SetDecision(decision.Value, value, int64(duration.Seconds()), now.Add(duration))
 		}
 	}
 	bouncer.log.Debug("handleStreamCache:updated")

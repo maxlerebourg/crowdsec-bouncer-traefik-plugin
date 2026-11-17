@@ -19,6 +19,9 @@ body() {
   echo "[$SCENARIO] hit must turn 403 once the cached 'allowed' expires and LAPI is re-queried"
   wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 15 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] the cached ban must carry the seconds left on its decision, not on the cache entry"
+  assert_header_between "http://127.0.0.1:${WEB_PORT}/foo" Retry-After 290 300 -H "X-Forwarded-For: 1.2.3.4"
+
   echo "[$SCENARIO] another non-banned IP must still pass"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 5.6.7.8"
 }
