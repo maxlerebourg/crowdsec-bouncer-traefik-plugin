@@ -498,6 +498,7 @@ make run
   - int
   - default: 403
   - HTTP status code for banned user (not captcha)
+  - When this is 429, a ban from a LAPI decision carries `Retry-After` with the seconds left on the decision.
   - AppSec bans are answered with the `http_status` of the AppSec response instead, which is 403 unless `user_blocked_http_code` or [SetReturnCode()](https://docs.crowdsec.net/docs/appsec/hooks/#on_match) changes it
 - CrowdsecCapiMachineId
   - string

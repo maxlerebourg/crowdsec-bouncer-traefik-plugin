@@ -181,7 +181,7 @@ func Test_handleNoStreamCache(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := handleNoStreamCache(newBouncer(tt.mode, tt.updateMaxFailure), "1.2.3.4")
+			got, _, err := handleNoStreamCache(newBouncer(tt.mode, tt.updateMaxFailure), "1.2.3.4")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("handleNoStreamCache() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1264,7 +1264,7 @@ func TestServeHTTPServesAppsecCaptchaInAppsecMode(t *testing.T) {
 	for _, solved := range []bool{false, true} {
 		nextCalled = false
 		if solved {
-			cacheClient.Set("192.0.2.30_captcha", cache.CaptchaDoneValue, 60)
+			cacheClient.Set("192.0.2.30_captcha", cache.CaptchaDoneValue, 60, time.Time{})
 		}
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 		req.RemoteAddr = "192.0.2.30:1234"

@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
@@ -17,7 +18,7 @@ func TestSolvedCaptchaSubmission(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cacheClient := &cache.Client{}
 	cacheClient.New(log, false, "", nil, "", "")
-	cacheClient.Set("192.0.2.1_captcha", cache.CaptchaDoneValue, 60)
+	cacheClient.Set("192.0.2.1_captcha", cache.CaptchaDoneValue, 60, time.Time{})
 	captchaClient := &captcha.Client{}
 	if err := captchaClient.New(log, cacheClient, &http.Client{}, configuration.HcaptchaProvider, "", "", "", "", "site", "secret", "", "captcha.html", 60); err != nil {
 		t.Fatal(err)
@@ -56,7 +57,7 @@ func TestSolvedCaptchaSubmission(t *testing.T) {
 					bouncer.next.ServeHTTP(rw, req)
 				}
 			} else {
-				bouncer.handleRemediationServeHTTP(rw, req, "192.0.2.1", cache.CaptchaValue)
+				bouncer.handleRemediationServeHTTP(rw, req, "192.0.2.1", cache.CaptchaValue, time.Time{})
 			}
 
 			if rw.Code != tt.wantCode {

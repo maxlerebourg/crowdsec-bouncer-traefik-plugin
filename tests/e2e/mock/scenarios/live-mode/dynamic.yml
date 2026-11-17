@@ -18,6 +18,7 @@ http:
         bouncer:
           enabled: "true"
           crowdsecMode: live
+          remediationStatusCode: "429"
           defaultDecisionSeconds: "2"
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"

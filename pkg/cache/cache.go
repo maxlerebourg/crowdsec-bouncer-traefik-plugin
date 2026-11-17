@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 	"sync/atomic"
+	"time"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
 	simpleredis "github.com/maxlerebourg/simpleredis"
@@ -24,7 +27,8 @@ const (
 	// CacheMiss error string when cache is miss.
 	CacheMiss = "cache:miss"
 	// CacheUnreachable error string when cache is unreachable.
-	CacheUnreachable = "cache:unreachable"
+	CacheUnreachable     = "cache:unreachable"
+	decisionEndSeparator = ";"
 )
 
 //nolint:gochecknoglobals
@@ -135,12 +139,39 @@ func (c *Client) Delete(key string) {
 // Get check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func (c *Client) Get(key string) (string, error) {
+	value, _, err := c.GetDecision(key)
+	return value, err
+}
+
+// GetDecision returns the cached value and the end of its decision.
+func (c *Client) GetDecision(key string) (string, time.Time, error) {
 	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
-	return c.cache.get(key)
+	raw, err := c.cache.get(key)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	value, end := splitDecision(raw)
+	return value, end, nil
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.
-func (c *Client) Set(key string, value string, duration int64) {
+func (c *Client) Set(key string, value string, duration int64, end time.Time) {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
+	// Earlier versions read any value other than NoBannedValue and CaptchaValue as a ban.
+	if value == BannedValue && !end.IsZero() {
+		value += decisionEndSeparator + strconv.FormatInt(end.UnixMilli(), 10)
+	}
 	c.cache.set(key, value, duration)
+}
+
+func splitDecision(raw string) (string, time.Time) {
+	value, millis, found := strings.Cut(raw, decisionEndSeparator)
+	if !found {
+		return raw, time.Time{}
+	}
+	end, err := strconv.ParseInt(millis, 10, 64)
+	if err != nil {
+		return value, time.Time{}
+	}
+	return value, time.UnixMilli(end)
 }
