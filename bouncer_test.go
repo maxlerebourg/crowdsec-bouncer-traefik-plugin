@@ -1264,7 +1264,7 @@ func TestServeHTTPServesAppsecCaptchaInAppsecMode(t *testing.T) {
 	for _, solved := range []bool{false, true} {
 		nextCalled = false
 		if solved {
-			cacheClient.Set("192.0.2.30_captcha", cache.CaptchaDoneValue, 60)
+			cacheClient.Set("192.0.2.30_captcha", cache.CaptchaDoneValue, 60, time.Time{})
 		}
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 		req.RemoteAddr = "192.0.2.30:1234"

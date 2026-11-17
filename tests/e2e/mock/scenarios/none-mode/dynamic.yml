@@ -18,6 +18,7 @@ http:
         bouncer:
           enabled: "true"
           crowdsecMode: none
+          remediationStatusCode: "429"
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"

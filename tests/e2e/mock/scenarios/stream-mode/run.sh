@@ -14,8 +14,8 @@ body() {
   echo "[$SCENARIO] adding ban decision for 1.2.3.4"
   lapi_add_decision 1.2.3.4 ban 5m
 
-  echo "[$SCENARIO] banned IP must be blocked once the next stream poll lands (HTTP 403)"
-  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 15 -H "X-Forwarded-For: 1.2.3.4"
+  echo "[$SCENARIO] banned IP must be blocked once the next stream poll lands (HTTP 429)"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 429 15 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] the ban must carry the seconds left on its decision as Retry-After"
   assert_header_between "http://127.0.0.1:${WEB_PORT}/foo" Retry-After 290 300 -H "X-Forwarded-For: 1.2.3.4"

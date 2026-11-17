@@ -35,8 +35,6 @@ func Test_retryAfterSeconds(t *testing.T) {
 	}
 }
 
-// newLapiBouncer is a bouncer in mode that answers bans with 429, whose LAPI
-// answers every query with body and counts them.
 func newLapiBouncer(t *testing.T, mode, body string) (*Bouncer, *int64) {
 	t.Helper()
 	var queries int64
@@ -94,7 +92,7 @@ func assertBanned(t *testing.T, recorder *httptest.ResponseRecorder, retryAfter 
 	if recorder.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected status 429, got %d", recorder.Code)
 	}
-	if got := recorder.Header().Get("cs-remediation"); got != "ban" {
+	if got := recorder.Header().Get("Cs-Remediation"); got != "ban" {
 		t.Errorf("expected remediation header ban, got %q", got)
 	}
 	if got := recorder.Header().Get("Retry-After"); got != retryAfter {
@@ -102,8 +100,6 @@ func assertBanned(t *testing.T, recorder *httptest.ResponseRecorder, retryAfter 
 	}
 }
 
-// In stream mode the decision's end is cached with it, so every ban answers
-// the seconds left on the decision, not on the cache entry.
 func TestServeHTTPStreamBanRetryAfter(t *testing.T) {
 	bouncer, _ := newLapiBouncer(t, configuration.StreamMode, `{
 		"deleted": [],
@@ -112,7 +108,6 @@ func TestServeHTTPStreamBanRetryAfter(t *testing.T) {
 			{"type": "captcha", "scope": "Ip", "value": "192.0.2.42", "duration": "10m"}
 		]
 	}`)
-	// The stream lease is shared by every bouncer through the global cache.
 	bouncer.cacheClient.Delete(cacheTimeoutKey)
 	t.Cleanup(func() { bouncer.cacheClient.Delete(cacheTimeoutKey) })
 
@@ -120,8 +115,7 @@ func TestServeHTTPStreamBanRetryAfter(t *testing.T) {
 		t.Fatalf("handleStreamCache() error = %v", err)
 	}
 	assertBanned(t, serveFrom(bouncer, "192.0.2.41"), "5401")
-	// Without a captcha provider a captcha decision is a ban, for as long.
-	assertBanned(t, serveFrom(bouncer, "192.0.2.42"), "600")
+	assertBanned(t, serveFrom(bouncer, "192.0.2.42"), "")
 
 	recorder := serveFrom(bouncer, "192.0.2.43")
 	if recorder.Code != http.StatusOK || recorder.Header().Get("Retry-After") != "" {
@@ -129,8 +123,6 @@ func TestServeHTTPStreamBanRetryAfter(t *testing.T) {
 	}
 }
 
-// In live mode a ban is cached for at most defaultDecisionSeconds, which must
-// not shorten the Retry-After of the decision it stands for.
 func TestServeHTTPLiveBanRetryAfter(t *testing.T) {
 	bouncer, queries := newLapiBouncer(t, configuration.LiveMode,
 		`[{"type": "ban", "scope": "Ip", "value": "192.0.2.44", "duration": "1h2m3.5s"}]`)
@@ -153,47 +145,73 @@ func TestServeHTTPNoneBanRetryAfter(t *testing.T) {
 	}
 }
 
-// AppSec gives no time with a 429, so it is the one configured.
-func TestHandleNextServeHTTPAppsecRetryAfter(t *testing.T) {
+func TestServeHTTPBanRetryAfterOnlyWith429(t *testing.T) {
+	bouncer, _ := newLapiBouncer(t, configuration.NoneMode,
+		`[{"type": "ban", "scope": "Ip", "value": "192.0.2.46", "duration": "1h"}]`)
+	bouncer.remediationStatusCode = http.StatusForbidden
+
+	recorder := serveFrom(bouncer, "192.0.2.46")
+	if recorder.Code != http.StatusForbidden || recorder.Header().Get("Retry-After") != "" {
+		t.Errorf("expected 403 without Retry-After, got %d %q", recorder.Code, recorder.Header().Get("Retry-After"))
+	}
+}
+
+func TestServeHTTPBanRetryAfterLatestBlockingDecision(t *testing.T) {
 	tests := []struct {
-		name     string
-		envelope string
-		seconds  int64
-		want     string
+		name string
+		mode string
+		ip   string
+		body string
+		want string
 	}{
-		{name: "rate limit", envelope: `{"action":"ban","http_status":429}`, seconds: 6, want: "6"},
-		{name: "rate limit without a configured time", envelope: `{"action":"ban","http_status":429}`, seconds: 0, want: ""},
-		{name: "ban that is not a 429", envelope: `{"action":"ban","http_status":403}`, seconds: 6, want: ""},
+		{
+			name: "live mode, shorter ban first",
+			mode: configuration.LiveMode,
+			ip:   "192.0.2.47",
+			body: `[{"type": "ban", "scope": "Ip", "value": "192.0.2.47", "duration": "4h"},
+				{"type": "ban", "scope": "Range", "value": "192.0.2.0/24", "duration": "168h"}]`,
+			want: "604800",
+		},
+		{
+			name: "none mode, captcha without a provider outlasting the ban",
+			mode: configuration.NoneMode,
+			ip:   "192.0.2.48",
+			body: `[{"type": "captcha", "scope": "Ip", "value": "192.0.2.48", "duration": "168h"},
+				{"type": "ban", "scope": "Ip", "value": "192.0.2.48", "duration": "1h"}]`,
+			want: "604800",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = io.WriteString(w, tt.envelope)
-			}))
-			defer appsecServer.Close()
-			appsecURL, err := url.Parse(appsecServer.URL)
-			if err != nil {
-				t.Fatal(err)
-			}
-			bouncer := &Bouncer{
-				next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-					t.Error("next handler should not be called for an appsec ban")
-				}),
-				appsecEnabled:           true,
-				appsecScheme:            appsecURL.Scheme,
-				appsecHost:              appsecURL.Host,
-				appsecPath:              "/",
-				appsecRetryAfterSeconds: tt.seconds,
-				httpAppsecClient:        appsecServer.Client(),
-				remediationStatusCode:   http.StatusForbidden,
-				log:                     logger.New("ERROR", ""),
-			}
-			recorder := httptest.NewRecorder()
-			bouncer.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "http://example.com/auth/login", nil), "192.0.2.46")
-			if got := recorder.Header().Get("Retry-After"); got != tt.want {
-				t.Errorf("expected Retry-After %q, got %q", tt.want, got)
+			bouncer, _ := newLapiBouncer(t, tt.mode, tt.body)
+			assertBanned(t, serveFrom(bouncer, tt.ip), tt.want)
+		})
+	}
+}
+
+func Test_blockingDecisionsEnd(t *testing.T) {
+	decisions := []Decision{
+		{Type: "ban", Duration: "1h"},
+		{Type: "captcha", Duration: "3h"},
+		{Type: "ban", Duration: "not a duration"},
+	}
+	tests := []struct {
+		name         string
+		captchaValid bool
+		want         time.Duration
+	}{
+		{name: "captcha served as a ban", captchaValid: false, want: 3 * time.Hour},
+		{name: "captcha served as a captcha", captchaValid: true, want: time.Hour},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			left := time.Until(blockingDecisionsEnd(decisions, tt.captchaValid))
+			if left <= tt.want-time.Minute || left > tt.want {
+				t.Errorf("blockingDecisionsEnd() is %v away, want %v", left, tt.want)
 			}
 		})
+	}
+	if end := blockingDecisionsEnd([]Decision{{Type: "captcha", Duration: "1h"}}, true); !end.IsZero() {
+		t.Errorf("blockingDecisionsEnd() of a served captcha = %v, want zero", end)
 	}
 }

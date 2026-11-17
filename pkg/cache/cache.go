@@ -27,8 +27,7 @@ const (
 	// CacheMiss error string when cache is miss.
 	CacheMiss = "cache:miss"
 	// CacheUnreachable error string when cache is unreachable.
-	CacheUnreachable = "cache:unreachable"
-	// decisionEndSeparator separates a cached value from the end of its decision, in Unix milliseconds.
+	CacheUnreachable     = "cache:unreachable"
 	decisionEndSeparator = ";"
 )
 
@@ -144,8 +143,7 @@ func (c *Client) Get(key string) (string, error) {
 	return value, err
 }
 
-// GetDecision is Get, along with when the decision behind the value ends.
-// The time is zero for a value cached without one, such as by Set.
+// GetDecision returns the cached value and the end of its decision.
 func (c *Client) GetDecision(key string) (string, time.Time, error) {
 	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
 	raw, err := c.cache.get(key)
@@ -157,16 +155,13 @@ func (c *Client) GetDecision(key string) (string, time.Time, error) {
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.
-func (c *Client) Set(key string, value string, duration int64) {
+func (c *Client) Set(key string, value string, duration int64, end time.Time) {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
+	// Earlier versions read any value other than NoBannedValue and CaptchaValue as a ban.
+	if value == BannedValue && !end.IsZero() {
+		value += decisionEndSeparator + strconv.FormatInt(end.UnixMilli(), 10)
+	}
 	c.cache.set(key, value, duration)
-}
-
-// SetDecision is Set for a value that comes from a decision ending at end,
-// which can be later than the duration the value is cached for.
-func (c *Client) SetDecision(key, value string, duration int64, end time.Time) {
-	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs end:%v", key, value, duration, end))
-	c.cache.set(key, value+decisionEndSeparator+strconv.FormatInt(end.UnixMilli(), 10), duration)
 }
 
 func splitDecision(raw string) (string, time.Time) {

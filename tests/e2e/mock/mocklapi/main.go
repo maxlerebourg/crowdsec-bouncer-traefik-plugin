@@ -139,10 +139,6 @@ func main() {
 			case strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "418"):
 				w.WriteHeader(http.StatusForbidden)
 				writeJSON(w, AppSecResponse{Action: "ban", Status: http.StatusTeapot})
-			case strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "429"):
-				// What RateLimit() answers once a source is over its limit.
-				w.WriteHeader(http.StatusForbidden)
-				writeJSON(w, AppSecResponse{Action: "ban", Status: http.StatusTooManyRequests})
 			case strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500"):
 				w.WriteHeader(http.StatusInternalServerError)
 			case strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502"):

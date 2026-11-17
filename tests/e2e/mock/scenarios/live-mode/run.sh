@@ -16,8 +16,8 @@ body() {
 
   # Stays 200 until the cached 'allowed' (defaultDecisionSeconds) expires, then
   # the re-query sees the ban — poll instead of guessing the cache TTL.
-  echo "[$SCENARIO] hit must turn 403 once the cached 'allowed' expires and LAPI is re-queried"
-  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 15 -H "X-Forwarded-For: 1.2.3.4"
+  echo "[$SCENARIO] hit must turn 429 once the cached 'allowed' expires and LAPI is re-queried"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 429 15 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] the cached ban must carry the seconds left on its decision, not on the cache entry"
   assert_header_between "http://127.0.0.1:${WEB_PORT}/foo" Retry-After 290 300 -H "X-Forwarded-For: 1.2.3.4"

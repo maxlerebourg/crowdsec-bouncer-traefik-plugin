@@ -393,10 +393,6 @@ make run
   - []string
   - default: []
   - Requests to these locations are not sent to the Appsec Server, while LAPI decisions still apply to them. An entry is a path such as `/healthz`, which applies to every host, or a host optionally followed by a path, such as `registry.example.com` for every path on that host, or `registry.example.com/v2/`. Read [AppSec excluded locations](#appsec-excluded-locations) before using it: every entry is a WAF bypass.
-- CrowdsecAppsecRateLimitRetryAfterSeconds
-  - int64
-  - default: 0
-  - Seconds sent as `Retry-After` when AppSec answers 429, as [RateLimit()](https://docs.crowdsec.net/docs/next/appsec/rate_limiting/) does once a client is over its limit. AppSec tells the bouncer no time with these answers, so the header is only sent when this is set. A `RateLimit()` limit of N requests per period gives a client one request back every period / N, for example 6 seconds for `10/m`; with several limits behind one middleware, the longest of these never sends a client back too early.
 - CrowdsecAppsecKey
   - string
   - default: value of `CrowdsecLapiKey`
@@ -502,7 +498,7 @@ make run
   - int
   - default: 403
   - HTTP status code for banned user (not captcha)
-  - A ban from a LAPI decision carries `Retry-After` with the seconds left on the decision, rounded up, in every mode. In `live` mode that is the decision's time, not the shorter `DefaultDecisionSeconds` it is cached for. A cache entry written by an earlier version, in Redis for example, has no time, and its ban carries no `Retry-After`.
+  - When this is 429, a ban from a LAPI decision carries `Retry-After` with the seconds left on the decision.
   - AppSec bans are answered with the `http_status` of the AppSec response instead, which is 403 unless `user_blocked_http_code` or [SetReturnCode()](https://docs.crowdsec.net/docs/appsec/hooks/#on_match) changes it
 - CrowdsecCapiMachineId
   - string
@@ -646,7 +642,6 @@ http:
           crowdsecAppsecExcludedLocations:
             - /healthz
             - registry.example.com/v2/
-          crowdsecAppsecRateLimitRetryAfterSeconds: 0
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiScheme: http
           crowdsecLapiHost: crowdsec:8080

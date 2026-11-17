@@ -26,7 +26,6 @@ http:
           crowdsecAppsecBodyLimit: 20
           crowdsecAppsecFailureBlock: "true"
           crowdsecAppsecUnreachableBlock: "false"
-          crowdsecAppsecRateLimitRetryAfterSeconds: 6
           crowdsecAppsecScheme: http
           crowdsecAppsecHost: "@@APPSEC_HOST@@"
           crowdsecAppsecExcludedLocations:

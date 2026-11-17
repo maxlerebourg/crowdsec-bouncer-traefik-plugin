@@ -18,6 +18,7 @@ http:
         bouncer:
           enabled: "true"
           crowdsecMode: stream
+          remediationStatusCode: "429"
           updateIntervalSeconds: "2"
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"

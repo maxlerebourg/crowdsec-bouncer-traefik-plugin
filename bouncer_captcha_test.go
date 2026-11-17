@@ -18,7 +18,7 @@ func TestSolvedCaptchaSubmission(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cacheClient := &cache.Client{}
 	cacheClient.New(log, false, "", nil, "", "")
-	cacheClient.Set("192.0.2.1_captcha", cache.CaptchaDoneValue, 60)
+	cacheClient.Set("192.0.2.1_captcha", cache.CaptchaDoneValue, 60, time.Time{})
 	captchaClient := &captcha.Client{}
 	if err := captchaClient.New(log, cacheClient, &http.Client{}, configuration.HcaptchaProvider, "", "", "", "", "site", "secret", "", "captcha.html", 60); err != nil {
 		t.Fatal(err)

@@ -14,7 +14,7 @@ func Test_Get(t *testing.T) {
 	IPInCache := "10.0.0.10"
 	IPNotInCache := "10.0.0.20"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	client.Set(IPInCache, BannedValue, 10, time.Time{})
 	type args struct {
 		clientIP string
 	}
@@ -70,7 +70,7 @@ func Test_Set(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client.Set(tt.args.clientIP, tt.args.value, tt.args.duration)
+			client.Set(tt.args.clientIP, tt.args.value, tt.args.duration, time.Time{})
 			got, err := client.Get(tt.args.clientIP)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Set() error = %v, wantErr %v", err, tt.wantErr)
@@ -91,7 +91,7 @@ func Test_Delete(t *testing.T) {
 	IPInCache := "10.0.0.12"
 	IPNotInCache := "10.0.0.22"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	client.Set(IPInCache, BannedValue, 10, time.Time{})
 	type args struct {
 		clientIP string
 	}
@@ -162,10 +162,10 @@ func Test_nextReader(t *testing.T) {
 	}
 }
 
-func Test_SetDecision(t *testing.T) {
+func Test_SetEnd(t *testing.T) {
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
 	end := time.UnixMilli(time.Now().Add(time.Hour).UnixMilli())
-	client.SetDecision("10.0.0.30", BannedValue, 10, end)
+	client.Set("10.0.0.30", BannedValue, 10, end)
 
 	value, gotEnd, err := client.GetDecision("10.0.0.30")
 	if err != nil || value != BannedValue || !gotEnd.Equal(end) {
@@ -175,17 +175,22 @@ func Test_SetDecision(t *testing.T) {
 		t.Errorf("Get() = %q, %v, want the value without its end", value, err)
 	}
 
-	client.Set("10.0.0.31", CaptchaValue, 10)
-	if value, gotEnd, err := client.GetDecision("10.0.0.31"); err != nil || value != CaptchaValue || !gotEnd.IsZero() {
+	client.Set("10.0.0.31", CaptchaValue, 10, end)
+	if raw, err := client.cache.get("10.0.0.31"); err != nil || raw != CaptchaValue {
+		t.Errorf("a captcha is cached as %q, %v, want %q as earlier versions read it", raw, err, CaptchaValue)
+	}
+
+	client.Set("10.0.0.32", BannedValue, 10, time.Time{})
+	if value, gotEnd, err := client.GetDecision("10.0.0.32"); err != nil || value != BannedValue || !gotEnd.IsZero() {
 		t.Errorf("GetDecision() of a value cached without an end = %q, %v, %v", value, gotEnd, err)
 	}
 
-	client.Set("10.0.0.32", BannedValue+decisionEndSeparator+"soon", 10)
-	if value, gotEnd, err := client.GetDecision("10.0.0.32"); err != nil || value != BannedValue || !gotEnd.IsZero() {
+	client.cache.set("10.0.0.33", BannedValue+decisionEndSeparator+"soon", 10)
+	if value, gotEnd, err := client.GetDecision("10.0.0.33"); err != nil || value != BannedValue || !gotEnd.IsZero() {
 		t.Errorf("GetDecision() of an unreadable end = %q, %v, %v", value, gotEnd, err)
 	}
 
-	if _, _, err := client.GetDecision("10.0.0.33"); err == nil || err.Error() != CacheMiss {
+	if _, _, err := client.GetDecision("10.0.0.34"); err == nil || err.Error() != CacheMiss {
 		t.Errorf("GetDecision() of a missing key error = %v, want %s", err, CacheMiss)
 	}
 }
