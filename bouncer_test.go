@@ -533,29 +533,33 @@ func Test_isBodyUnreadable(t *testing.T) {
 		method        string
 		protoMajor    int
 		contentLength int64
-		contentType   string
+		contentTypes  []string
 		body          io.ReadCloser
 		want          bool
 	}{
-		{name: "http2 grpc stream without content-length", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "application/grpc", body: realBody(), want: true},
-		{name: "http2 grpc+proto stream without content-length", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "application/grpc+proto; charset=utf-8", body: realBody(), want: true},
-		{name: "http3 grpc stream without content-length", method: http.MethodPost, protoMajor: 3, contentLength: -1, contentType: "application/grpc", body: realBody(), want: true},
+		{name: "http2 grpc stream without content-length", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentTypes: []string{"application/grpc"}, body: realBody(), want: true},
+		{name: "http2 grpc+proto stream without content-length", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentTypes: []string{" Application/GRPC+Proto ; charset=utf-8"}, body: realBody(), want: true},
+		{name: "http2 connect stream without content-length", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentTypes: []string{"application/connect+proto"}, body: realBody(), want: true},
+		{name: "http3 grpc stream without content-length", method: http.MethodPost, protoMajor: 3, contentLength: -1, contentTypes: []string{"application/grpc"}, body: realBody(), want: true},
 		{name: "http3 GET without content-length", method: http.MethodGet, protoMajor: 3, contentLength: -1, body: realBody(), want: true},
 		{name: "http3 DELETE without content-length", method: http.MethodDelete, protoMajor: 3, contentLength: -1, body: realBody(), want: true},
-		{name: "http2 POST without content-length and non-streaming content-type", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "binary/octet-stream", body: realBody(), want: false},
-		{name: "http3 POST without content-length and non-streaming content-type", method: http.MethodPost, protoMajor: 3, contentLength: -1, contentType: "application/json", body: realBody(), want: false},
-		{name: "http2 with content-length", method: http.MethodPost, protoMajor: 2, contentLength: 42, contentType: "application/grpc", body: realBody(), want: false},
-		{name: "http1.1 chunked without content-length", method: http.MethodPost, protoMajor: 1, contentLength: -1, contentType: "application/grpc", body: realBody(), want: false},
-		{name: "http2 without body", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "application/grpc", body: nil, want: false},
-		{name: "http2 with http.NoBody", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentType: "application/grpc", body: http.NoBody, want: false},
+		{name: "http2 grpc-web without content-length is readable", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentTypes: []string{"application/grpc-web+proto"}, body: realBody(), want: false},
+		{name: "http2 duplicate content-type headers are readable", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentTypes: []string{"application/grpc", "application/json"}, body: realBody(), want: false},
+		{name: "http2 POST without content-length and non-streaming content-type", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentTypes: []string{"binary/octet-stream"}, body: realBody(), want: false},
+		{name: "http2 PUT without content-length and empty content-type", method: http.MethodPut, protoMajor: 2, contentLength: -1, body: realBody(), want: false},
+		{name: "http3 PATCH without content-length and non-streaming content-type", method: http.MethodPatch, protoMajor: 3, contentLength: -1, contentTypes: []string{"application/json"}, body: realBody(), want: false},
+		{name: "http2 with content-length", method: http.MethodPost, protoMajor: 2, contentLength: 42, contentTypes: []string{"application/grpc"}, body: realBody(), want: false},
+		{name: "http1.1 chunked without content-length", method: http.MethodPost, protoMajor: 1, contentLength: -1, contentTypes: []string{"application/grpc"}, body: realBody(), want: false},
+		{name: "http2 without body", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentTypes: []string{"application/grpc"}, body: nil, want: false},
+		{name: "http2 with http.NoBody", method: http.MethodPost, protoMajor: 2, contentLength: -1, contentTypes: []string{"application/grpc"}, body: http.NoBody, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, _ := http.NewRequest(tt.method, "http://localhost", nil)
 			req.ProtoMajor = tt.protoMajor
 			req.ContentLength = tt.contentLength
-			if tt.contentType != "" {
-				req.Header.Set("Content-Type", tt.contentType)
+			for _, ct := range tt.contentTypes {
+				req.Header.Add("Content-Type", ct)
 			}
 			req.Body = tt.body
 			if got := isBodyUnreadable(req); got != tt.want {
@@ -1153,9 +1157,7 @@ func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
 			defer close(done)
 
 			req := newUnreadableRequest(tt.method, done)
-			if tt.wantDropped {
-				req.Header.Set("Content-Type", "application/grpc")
-			}
+			req.Header.Set("Content-Type", "application/grpc")
 
 			finished := make(chan error, 1)
 			go func() {

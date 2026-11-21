@@ -855,7 +855,6 @@ func isStreamingContentType(contentType string) bool {
 	mediaType = strings.TrimSpace(strings.ToLower(mediaType))
 	return mediaType == "application/grpc" ||
 		strings.HasPrefix(mediaType, "application/grpc+") ||
-		strings.HasPrefix(mediaType, "application/grpc-") ||
 		strings.HasPrefix(mediaType, "application/connect+")
 }
 
@@ -866,10 +865,14 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 	if httpReq.Body == nil || httpReq.Body == http.NoBody || httpReq.ProtoMajor < 2 || httpReq.ContentLength >= 0 {
 		return false
 	}
-	return !isMethodWithBody(httpReq.Method) || isStreamingContentType(httpReq.Header.Get("Content-Type"))
+	if !isMethodWithBody(httpReq.Method) {
+		return true
+	}
+	contentTypes := httpReq.Header.Values("Content-Type")
+	return len(contentTypes) == 1 && isStreamingContentType(contentTypes[0])
 }
 
-// isMethodWithBody used only when isBodyUnreadable returns true but the request method can't have body.
+// isMethodWithBody reports whether the HTTP method carries a request body that AppSec should buffer or drop.
 func isMethodWithBody(method string) bool {
 	switch method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch:
