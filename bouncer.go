@@ -849,17 +849,30 @@ func crowdsecQuery(bouncer *Bouncer, stringURL string, data []byte) ([]byte, err
 	return body, nil
 }
 
-// isBodyUnreadable reports whether the request body cannot be buffered before
-// forwarding it to the Appsec component. An HTTP/2 or HTTP/3 request without a
-// Content-Length (typically a bidirectional gRPC stream) keeps its body open
-// for the whole life of the stream and never reaches EOF, so reading it with
-// io.ReadAll would block until the request times out and is wrongly turned into
-// a 403.
-func isBodyUnreadable(httpReq *http.Request) bool {
-	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
+// isStreamingContentType reports whether the Content-Type is a gRPC or Connect stream.
+func isStreamingContentType(contentType string) bool {
+	mediaType, _, _ := strings.Cut(contentType, ";")
+	mediaType = strings.TrimSpace(strings.ToLower(mediaType))
+	return mediaType == "application/grpc" ||
+		strings.HasPrefix(mediaType, "application/grpc+") ||
+		strings.HasPrefix(mediaType, "application/connect+")
 }
 
-// isMethodWithBody used only when isBodyUnreadable returns true but the request method can't have body.
+// isBodyUnreadable reports whether the request body cannot be buffered for the Appsec query: an
+// HTTP/2 or HTTP/3 request without a Content-Length that is a gRPC or Connect stream, which may
+// never reach EOF, or whose method takes no body.
+func isBodyUnreadable(httpReq *http.Request) bool {
+	if httpReq.Body == nil || httpReq.Body == http.NoBody || httpReq.ProtoMajor < 2 || httpReq.ContentLength >= 0 {
+		return false
+	}
+	if !isMethodWithBody(httpReq.Method) {
+		return true
+	}
+	contentTypes := httpReq.Header.Values("Content-Type")
+	return len(contentTypes) == 1 && isStreamingContentType(contentTypes[0])
+}
+
+// isMethodWithBody reports whether the HTTP method carries a request body that AppSec should buffer or drop.
 func isMethodWithBody(method string) bool {
 	switch method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch:
