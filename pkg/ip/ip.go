@@ -9,6 +9,15 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
+)
+
+const maxCheckers = 16
+
+//nolint:gochecknoglobals
+var (
+	checkersMu sync.Mutex
+	checkers   = map[string]*Checker{}
 )
 
 // CHECKER
@@ -19,8 +28,31 @@ type Checker struct {
 	authorizedIPsNet []*net.IPNet
 }
 
-// NewChecker builds a new Checker given a list of CIDR-Strings to trusted IPs.
+// NewChecker returns the Checker of a list of CIDR-Strings to trusted IPs, shared between calls with the same list.
 func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
+	key := strings.Join(trustedIPs, ",")
+	if strings.Count(key, ",") != len(trustedIPs)-1 {
+		return newChecker(log, trustedIPs)
+	}
+
+	checkersMu.Lock()
+	defer checkersMu.Unlock()
+	if checker, ok := checkers[key]; ok {
+		return checker, nil
+	}
+
+	checker, err := newChecker(log, trustedIPs)
+	if err != nil {
+		return nil, err
+	}
+	if len(checkers) >= maxCheckers {
+		checkers = map[string]*Checker{}
+	}
+	checkers[key] = checker
+	return checker, nil
+}
+
+func newChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 	checker := &Checker{}
 
 	for _, ipMaskRaw := range trustedIPs {
@@ -33,7 +65,7 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 
 		_, ipAddr, err := net.ParseCIDR(ipMask)
 		if err != nil {
-			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipAddr, err)
+			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 		}
 		checker.authorizedIPsNet = append(checker.authorizedIPsNet, ipAddr)
 		log.Debug(fmt.Sprintf("IP network %v is trusted", ipAddr))
