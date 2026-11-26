@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-const maxCheckers = 64
+const maxCheckers = 16
 
 //nolint:gochecknoglobals
 var (
