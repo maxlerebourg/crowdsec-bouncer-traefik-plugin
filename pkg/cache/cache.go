@@ -3,6 +3,7 @@
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -106,11 +107,13 @@ type cacheInterface interface {
 type Client struct {
 	cache cacheInterface
 	log   *slog.Logger
+	debug bool
 }
 
 // New Initialize cache client.
 func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts []string, pass, database string) {
 	c.log = log
+	c.debug = log.Enabled(context.Background(), slog.LevelDebug)
 	if isRedis {
 		rc := &redisCache{log: log}
 		rc.writer.Init(writeHost, pass, database)
@@ -128,19 +131,25 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 
 // Delete delete decision in cache.
 func (c *Client) Delete(key string) {
-	c.log.Debug(fmt.Sprintf("cache:Delete key:%v", key))
+	if c.debug {
+		c.log.Debug(fmt.Sprintf("cache:Delete key:%v", key))
+	}
 	c.cache.delete(key)
 }
 
 // Get check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func (c *Client) Get(key string) (string, error) {
-	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
+	if c.debug {
+		c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
+	}
 	return c.cache.get(key)
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.
 func (c *Client) Set(key string, value string, duration int64) {
-	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
+	if c.debug {
+		c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
+	}
 	c.cache.set(key, value, duration)
 }
