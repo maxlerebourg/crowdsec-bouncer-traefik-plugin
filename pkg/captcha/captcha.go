@@ -3,6 +3,7 @@ package captcha
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +29,7 @@ type Client struct {
 	cacheClient             *cache.Client
 	httpClient              *http.Client
 	log                     *slog.Logger
+	debug                   bool
 	infoProvider            *infoProvider
 }
 
@@ -84,6 +86,7 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.templateContentType = contentType
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
+	c.debug = log.Enabled(context.Background(), slog.LevelDebug)
 	c.httpClient = httpClient
 	c.cacheClient = cacheClient
 	return nil
@@ -147,7 +150,9 @@ func (c *Client) HasResponse(r *http.Request) bool {
 func (c *Client) Check(remoteIP string) bool {
 	value, _ := c.cacheClient.Get(remoteIP + "_captcha")
 	passed := value == cache.CaptchaDoneValue
-	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
+	if c.debug {
+		c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
+	}
 	return passed
 }
 
@@ -187,6 +192,8 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
+	if c.debug {
+		c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
+	}
 	return captchaResponse.Success, nil
 }
